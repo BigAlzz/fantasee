@@ -1,0 +1,216 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Story {
+  id                    String            @id @default(uuid())
+  title                 String
+  genre                 String
+  subgenre              String?
+  tonePack              String?
+  description           String?
+  status                String            @default("draft") // draft, generating, playable, complete, failed, archived
+  plannedParts          Int               @default(1)
+  generatedParts        Int               @default(0)
+  coverImagePath        String?
+  imageMode             String            @default("off") // off, cover_only, chapter_art, scene_art
+  narratorVoiceId       String?
+  narratorVoiceSpeed    Float             @default(1.0)
+  totalDurationSeconds  Int               @default(0)
+  fullAudioPath         String?
+  videoPath             String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  seriesId              String?
+  seriesOrder           Int?
+  series                Series?           @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+
+  parts                 StoryPart[]
+  characters            Character[]
+  bookmarks             Bookmark[]
+  readingProgress       ReadingProgress?
+  storyBible            StoryBible?
+  images                Image[]
+  jobs                  Job[]
+}
+
+model StoryPart {
+  id                  String             @id @default(uuid())
+  storyId             String
+  partNumber          Int
+  title               String?
+  summary             String?
+  fullText            String?
+  continuityNotesJson String?            // JSON string
+  status              String             @default("pending")
+  audioStatus         String             @default("pending")
+  imageStatus         String             @default("pending")
+  mergedAudioPath     String?
+  timingJsonPath      String?
+  durationSeconds     Int                @default(0)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  story               Story              @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  segments            StoryPartSegment[]
+  bookmarks           Bookmark[]
+  images              Image[]
+
+  @@unique([storyId, partNumber])
+}
+
+model StoryPartSegment {
+  id               String    @id @default(uuid())
+  storyPartId      String
+  segmentOrder     Int
+  type             String    // narration, dialogue, interlude
+  speakerName      String?
+  text             String
+  voiceId          String?
+  audioPath        String?
+  startMs          Int?
+  endMs            Int?
+  charStartIndex   Int?
+  charEndIndex     Int?
+  createdAt        DateTime  @default(now())
+
+  storyPart        StoryPart @relation(fields: [storyPartId], references: [id], onDelete: Cascade)
+}
+
+model Character {
+  id                  String    @id @default(uuid())
+  storyId             String
+  name                String
+  role                String?
+  description         String?
+  traitsJson          String?   // JSON string
+  voiceId             String?
+  voiceSpeed          Float     @default(1.0)
+  firstAppearancePart Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  story               Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+}
+
+model Voice {
+  id             String    @id @default(uuid())
+  provider       String    @default("kokoro")
+  localVoiceName String    @unique
+  label          String
+  genderHint     String?
+  ageHint        String?
+  toneTagsJson   String?   // JSON string
+  styleTagsJson  String?   // JSON string
+  active         Boolean   @default(true)
+}
+
+model Job {
+  id          String    @id @default(uuid())
+  storyId     String?
+  partNumber  Int?
+  jobType     String    // generate_concepts, build_story_bible, generate_part, generate_part_audio, generate_part_images, continue_story, rebuild_timings
+  status      String    @default("queued") // queued, running, done, failed, canceled
+  priority    Int       @default(0)
+  payloadJson String?   // JSON string
+  resultJson  String?   // JSON string
+  errorText   String?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  finishedAt  DateTime?
+
+  story       Story?    @relation(fields: [storyId], references: [id], onDelete: SetNull)
+}
+
+model Bookmark {
+  id              String    @id @default(uuid())
+  storyId         String
+  storyPartId     String
+  charIndex       Int?
+  audioPositionMs Int?
+  note            String?
+  createdAt       DateTime  @default(now())
+
+  story           Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  storyPart       StoryPart @relation(fields: [storyPartId], references: [id], onDelete: Cascade)
+}
+
+model ReadingProgress {
+  id                String    @id @default(uuid())
+  storyId           String    @unique
+  currentPartNumber Int       @default(1)
+  charIndex         Int       @default(0)
+  audioPositionMs   Int       @default(0)
+  fontSize          Int       @default(16)
+  theme             String    @default("dark")
+  playbackSpeed     Float     @default(1.0)
+  autoScroll        Boolean   @default(true)
+  updatedAt         DateTime  @updatedAt
+
+  story             Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+}
+
+model StoryBible {
+  id                  String    @id @default(uuid())
+  storyId             String    @unique
+  worldRulesJson      String?   // JSON string
+  plotArcJson         String?   // JSON string
+  endingPlanJson      String?   // JSON string
+  continuityStateJson String?   // JSON string
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  story               Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+}
+
+model Image {
+  id            String    @id @default(uuid())
+  storyId       String
+  storyPartId   String?
+  imageType     String    // cover, chapter, scene, metaphor
+  promptText    String
+  filePath      String
+  displayTimeMs Int?      // Time in milliseconds when this image should be displayed
+  createdAt     DateTime  @default(now())
+
+  story         Story     @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  storyPart     StoryPart? @relation(fields: [storyPartId], references: [id], onDelete: SetNull)
+}
+
+model Settings {
+  id                String  @id @default("global")
+  lmStudioModelId   String?
+  imageGenProvider  String  @default("off") // off, openai, stable-diffusion, unsplash
+  imageGenApiKey    String?
+  unsplashAppId     String?
+  unsplashAccessKey String?
+  unsplashSecretKey String?
+  kokoroUrl         String  @default("http://localhost:7860/")
+  kokoroVoiceId     String  @default("af_heart")
+  lmStudioUrl       String  @default("http://172.23.48.1:3006/v1")
+  lmStudioApiKey    String?
+  workerHeartbeat   DateTime?
+  updatedAt         DateTime @updatedAt
+}
+
+model Series {
+  id                  String    @id @default(uuid())
+  title               String
+  description         String?
+  overarchingPlotJson String?   // JSON string
+  status              String    @default("active") // active, complete, archived
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  stories             Story[]
+}
