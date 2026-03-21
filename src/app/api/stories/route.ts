@@ -118,14 +118,15 @@ export async function GET() {
             summary: true,
             mergedAudioPath: true
           }
-        },
-        fullAudioPath: true,
-        videoPath: true
+        }
       },
     });
     return NextResponse.json(stories);
-  } catch (error) {
-    console.error("Failed to fetch stories:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    console.error("FATAL: Failed to fetch stories in GET /api/stories:", error);
+    return NextResponse.json({ 
+      error: "Internal Server Error",
+      details: error.message 
+    }, { status: 500 });
   }
 }

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fantasee - Local Story Studio",
+  title: "Fantasee - Cinematic Story Studio",
   description: "Cinematic local-first AI story generator",
 };
 

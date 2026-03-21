@@ -1,0 +1,32 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:./dev.db
+      - LM_STUDIO_URL=http://host.docker.internal:1234/api/v1
+      - KOKORO_URL=http://host.docker.internal:7860/
+    volumes:
+      - ./dev.db:/app/dev.db
+      - ./public/data:/app/public/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    environment:
+      - DATABASE_URL=file:../dev.db
+      - LM_STUDIO_URL=http://host.docker.internal:1234/api/v1
+      - KOKORO_URL=http://host.docker.internal:7860/
+    volumes:
+      - ./dev.db:/app/dev.db
+      - ./public/data:/app/public/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always

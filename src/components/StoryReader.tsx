@@ -539,107 +539,86 @@ export default function StoryReader({ storyId }: StoryReaderProps) {
       </AnimatePresence>
 
       {/* Top Bar */}
-      <header className={`fixed top-0 left-0 right-0 h-16 border-b backdrop-blur-md z-50 px-6 flex items-center justify-between transition-all duration-500 ${currentStyle.header} ${showUI || isUIPinned ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
-        <div className="flex items-center gap-4">
-          <Link href="/" className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors">
+      <header className={`fixed top-0 left-0 right-0 h-16 border-b backdrop-blur-md z-50 px-4 sm:px-6 flex items-center justify-between transition-all duration-500 ${currentStyle.header} ${showUI || isUIPinned ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+        <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
+          <Link href="/" className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors flex-shrink-0">
             <ArrowLeft size={20} />
           </Link>
-          <div>
-            <h1 className="text-sm font-bold tracking-tight">{story?.title}</h1>
-            <p className="text-[10px] uppercase tracking-widest opacity-50">
+          <div className="overflow-hidden">
+            <h1 className="text-xs sm:text-sm font-bold tracking-tight truncate max-w-[120px] sm:max-w-none">{story?.title}</h1>
+            <p className="text-[9px] sm:text-[10px] uppercase tracking-widest opacity-50">
               Part {currentPartIndex + 1} / {story?.plannedParts || 0}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Persistent Worker Status */}
-          <div className="flex items-center gap-3 px-3 py-1.5 bg-black/5 dark:bg-zinc-900/50 border border-current/5 rounded-full mr-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Persistent Worker Status (Hidden on very small screens) */}
+          <div className="hidden xs:flex items-center gap-3 px-3 py-1.5 bg-black/5 dark:bg-zinc-900/50 border border-current/5 rounded-full mr-1 sm:mr-2">
             <div className={`w-1.5 h-1.5 rounded-full ${isWorkerAlive ? 'bg-emerald-400 animate-ping' : 'bg-red-500'}`} />
             <span className="text-[9px] uppercase tracking-widest font-bold opacity-70">
-              {isWorkerAlive ? (activeJob ? activeJob.jobType.split('_').pop() : 'Worker Ready') : 'Worker Offline'}
+              {isWorkerAlive ? (activeJob ? activeJob.jobType.split('_').pop() : 'Ready') : 'Offline'}
             </span>
           </div>
 
-          <button 
-            onClick={() => setFontSize(s => Math.max(14, s - 2))} 
-            className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors relative group/tooltip"
-          >
-            <Type size={16} />
-            <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border z-[60] ${currentStyle.tooltip}`}>
-              Smaller Text
-            </span>
-          </button>
-          <button 
-            onClick={() => setFontSize(s => Math.min(32, s + 2))} 
-            className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors relative group/tooltip"
-          >
-            <Type size={20} />
-            <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border z-[60] ${currentStyle.tooltip}`}>
-              Larger Text
-            </span>
-          </button>
+          <div className="flex items-center">
+            <button 
+              onClick={() => setFontSize(s => Math.max(12, s - 2))} 
+              className="p-1.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors relative group/tooltip"
+            >
+              <Type size={14} />
+            </button>
+            <button 
+              onClick={() => setFontSize(s => Math.min(36, s + 2))} 
+              className="p-1.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors relative group/tooltip"
+            >
+              <Type size={18} />
+            </button>
+          </div>
+          
           <button 
             onClick={() => setTheme(theme === "dark" ? "sepia" : theme === "sepia" ? "light" : "dark")}
-            className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors relative group/tooltip"
+            className="p-1.5 sm:p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
           >
-            <Palette size={20} />
-            <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border z-[60] ${currentStyle.tooltip}`}>
-              Change Theme
-            </span>
+            <Palette size={18} />
           </button>
-          <button 
-            onClick={() => setIsRapidMode(!isRapidMode)}
-            className={`p-2 rounded-full transition-all relative group/tooltip ${isRapidMode ? 'text-amber-400 bg-amber-400/10' : 'opacity-50 hover:bg-black/5 dark:hover:bg-white/5'}`}
-          >
-            <Zap size={20} fill={isRapidMode ? "currentColor" : "none"} />
-            <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border z-[60] ${currentStyle.tooltip}`}>
-              {isRapidMode ? "Disable Rapid Mode" : "Enable Rapid Mode"}
-            </span>
-          </button>
+          
           <button 
             onClick={() => setIsJobMonitorOpen(!isJobMonitorOpen)}
-            className={`p-2 rounded-full transition-all relative group/tooltip ${isJobMonitorOpen ? 'text-amber-400 bg-amber-400/10' : 'opacity-50 hover:bg-black/5 dark:hover:bg-white/5'}`}
+            className={`p-1.5 sm:p-2 rounded-full transition-all ${isJobMonitorOpen ? 'text-amber-400 bg-amber-400/10' : 'opacity-50'}`}
           >
-            <Activity size={20} />
-            <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border z-[60] ${currentStyle.tooltip}`}>
-              Task Monitor
-            </span>
+            <Activity size={18} />
           </button>
 
           {story?.status === 'complete' && (
-            <div className="flex items-center gap-1 border-l border-white/10 pl-2 ml-1 relative">
+            <div className="flex items-center border-l border-white/10 pl-1 ml-1 relative">
               <button 
                 onClick={() => setShowVideoOptions(!showVideoOptions)}
-                className={`p-2 rounded-full transition-colors relative group/tooltip ${showVideoOptions ? 'text-amber-400 bg-amber-400/10' : 'text-zinc-400 hover:text-amber-400'}`}
-                title="Export Slideshow Video (MP4)"
+                className={`p-1.5 sm:p-2 rounded-full transition-colors ${showVideoOptions ? 'text-amber-400 bg-amber-400/10' : 'text-zinc-400'}`}
               >
-                <Video size={20} />
-                <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border z-[60] ${currentStyle.tooltip}`}>
-                  Export Video
-                </span>
+                <Video size={18} />
               </button>
-
+              {/* Video Options Menu (Mobile Optimized) */}
               <AnimatePresence>
                 {showVideoOptions && (
                   <motion.div 
                     initial={{ opacity: 0, scale: 0.9, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                    className={`absolute top-full right-0 mt-2 p-4 rounded-2xl border shadow-2xl z-[100] min-w-[200px] ${currentStyle.card} backdrop-blur-xl`}
+                    className={`absolute top-full right-0 mt-2 p-4 rounded-2xl border shadow-2xl z-[100] min-w-[220px] ${currentStyle.card} backdrop-blur-xl`}
                   >
                     <div className="space-y-4">
                       <div>
-                        <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 mb-2 block">Aspect Ratio</label>
+                        <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 mb-2 block text-left">Aspect Ratio</label>
                         <div className="grid grid-cols-2 gap-2">
                           <button 
                             onClick={() => setVideoConfig(c => ({...c, aspectRatio: '16:9'}))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${videoConfig.aspectRatio === '16:9' ? 'bg-amber-400 text-zinc-950 border-amber-400' : 'border-white/10 hover:bg-white/5'}`}
+                            className={`px-2 py-2 rounded-lg text-[10px] font-bold border transition-all ${videoConfig.aspectRatio === '16:9' ? 'bg-amber-400 text-zinc-950 border-amber-400' : 'border-white/10 hover:bg-white/5'}`}
                           >
                             16:9 (TV)
                           </button>
                           <button 
                             onClick={() => setVideoConfig(c => ({...c, aspectRatio: '9:16'}))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${videoConfig.aspectRatio === '9:16' ? 'bg-amber-400 text-zinc-950 border-amber-400' : 'border-white/10 hover:bg-white/5'}`}
+                            className={`px-2 py-2 rounded-lg text-[10px] font-bold border transition-all ${videoConfig.aspectRatio === '9:16' ? 'bg-amber-400 text-zinc-950 border-amber-400' : 'border-white/10 hover:bg-white/5'}`}
                           >
                             9:16 (Phone)
                           </button>
@@ -647,48 +626,34 @@ export default function StoryReader({ storyId }: StoryReaderProps) {
                       </div>
 
                       <div>
-                        <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 mb-2 block">Quality</label>
+                        <label className="text-[10px] uppercase tracking-widest font-bold opacity-50 mb-2 block text-left">Quality</label>
                         <div className="grid grid-cols-2 gap-2">
                           <button 
                             onClick={() => setVideoConfig(c => ({...c, resolution: '720p'}))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${videoConfig.resolution === '720p' ? 'bg-amber-400 text-zinc-950 border-amber-400' : 'border-white/10 hover:bg-white/5'}`}
+                            className={`px-2 py-2 rounded-lg text-[10px] font-bold border transition-all ${videoConfig.resolution === '720p' ? 'bg-amber-400 text-zinc-950 border-amber-400' : 'border-white/10 hover:bg-white/5'}`}
                           >
-                            HD 720p
+                            720p
                           </button>
                           <button 
                             onClick={() => setVideoConfig(c => ({...c, resolution: '1080p'}))}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${videoConfig.resolution === '1080p' ? 'bg-amber-400 text-zinc-950 border-amber-400' : 'border-white/10 hover:bg-white/5'}`}
+                            className={`px-2 py-2 rounded-lg text-[10px] font-bold border transition-all ${videoConfig.resolution === '1080p' ? 'bg-amber-400 text-zinc-950 border-amber-400' : 'border-white/10 hover:bg-white/5'}`}
                           >
-                            FHD 1080p
+                            1080p
                           </button>
                         </div>
                       </div>
 
                       <button 
                         onClick={handleExportVideo}
-                        className="w-full py-2 bg-zinc-100 text-zinc-950 rounded-xl font-bold text-sm hover:bg-white transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2.5 bg-zinc-100 text-zinc-950 rounded-xl font-bold text-xs hover:bg-white transition-colors flex items-center justify-center gap-2"
                       >
-                        <Sparkles size={16} />
+                        <Sparkles size={14} />
                         Queue Export
                       </button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              {story.videoPath && (
-                <a 
-                  href={story.videoPath} 
-                  download={`${story.title}.mp4`}
-                  className="p-2 text-emerald-400 hover:text-emerald-300 rounded-full transition-colors relative group/tooltip"
-                  title="Download MP4"
-                >
-                  <Download size={20} />
-                  <span className={`absolute -bottom-10 left-1/2 -translate-x-1/2 px-2 py-1 text-[10px] rounded opacity-0 group-hover/tooltip:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border z-[60] ${currentStyle.tooltip}`}>
-                    Download MP4
-                  </span>
-                </a>
-              )}
             </div>
           )}
         </div>
@@ -966,91 +931,73 @@ export default function StoryReader({ storyId }: StoryReaderProps) {
       </main>
 
       {/* Bottom Player Rail */}
-      <footer className={`fixed bottom-0 left-0 right-0 p-6 z-50 transition-all duration-500 ${showUI || isUIPinned ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
-        <div className="max-w-4xl mx-auto bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-3xl p-4 shadow-2xl flex flex-col gap-4 relative">
+      <footer className={`fixed bottom-0 left-0 right-0 p-4 sm:p-6 z-50 transition-all duration-500 ${showUI || isUIPinned ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
+        <div className="max-w-4xl mx-auto bg-zinc-900/90 backdrop-blur-xl border border-white/10 rounded-[2rem] p-3 sm:p-4 shadow-2xl flex flex-col gap-2 sm:gap-4 relative">
           {/* Pin Toggle */}
           <button 
             onClick={togglePin}
-            className={`absolute -top-12 right-6 p-2 rounded-full border backdrop-blur-md transition-all ${
+            className={`absolute -top-10 sm:-top-12 right-4 sm:right-6 p-2 rounded-full border backdrop-blur-md transition-all ${
               isUIPinned 
                 ? 'bg-amber-400 text-zinc-950 border-amber-400' 
                 : 'bg-zinc-900/50 text-zinc-400 border-white/10 hover:text-white'
             }`}
-            title={isUIPinned ? "Unpin Controls" : "Pin Controls Always Visible"}
           >
-            {isUIPinned ? <Pin size={18} /> : <PinOff size={18} />}
+            {isUIPinned ? <Pin size={16} /> : <PinOff size={16} />}
           </button>
 
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 sm:gap-6">
+            <div className="flex items-center gap-1 sm:gap-2">
               <button onClick={handlePrevPart} disabled={currentPartIndex === 0} className="p-2 text-zinc-400 hover:text-white disabled:opacity-30">
-                <SkipBack size={24} />
+                <SkipBack className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
               <button 
                 onClick={() => setIsPlaying(!isPlaying)}
-                className="w-14 h-14 bg-zinc-100 text-zinc-950 rounded-full flex items-center justify-center hover:scale-105 transition-transform"
+                className="w-12 h-12 sm:w-14 sm:h-14 bg-zinc-100 text-zinc-950 rounded-full flex items-center justify-center hover:scale-105 transition-transform"
               >
-                {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" className="ml-1" />}
+                {isPlaying ? <Pause className="w-6 h-6 sm:w-7 sm:h-7" fill="currentColor" /> : <Play className="w-6 h-6 sm:w-7 sm:h-7 ml-1" fill="currentColor" />}
               </button>
               <button onClick={handleNextPart} disabled={!story?.parts || currentPartIndex === story.parts.length - 1} className="p-2 text-zinc-400 hover:text-white disabled:opacity-30">
-                <SkipForward size={24} />
+                <SkipForward className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
             
-            <div className="flex-1 space-y-2">
-              <div className="flex justify-between text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
-                <span>Part {currentPart?.partNumber}</span>
+            <div className="flex-1 space-y-1 sm:space-y-2">
+              <div className="flex justify-between text-[9px] sm:text-[10px] uppercase tracking-widest text-zinc-500 font-bold">
+                <span>P{currentPart?.partNumber}</span>
                 <span>{formatTime(currentTime)} / {formatTime(currentPart?.durationSeconds || 0)}</span>
               </div>
               <div 
-                className="h-1.5 bg-zinc-800 rounded-full overflow-hidden cursor-pointer group/progress relative"
+                className="h-1.5 sm:h-2 bg-zinc-800 rounded-full overflow-hidden cursor-pointer group/progress relative"
                 onClick={handleSeek}
               >
                 <div 
                   className="h-full bg-zinc-100 transition-all duration-100 relative z-10"
                   style={{ width: `${(currentTime / (currentPart?.durationSeconds || 1)) * 100}%` }}
                 />
-                <div className="absolute inset-0 bg-zinc-700 opacity-0 group-hover/progress:opacity-50 transition-opacity" />
               </div>
             </div>
 
-            <div className="hidden md:flex items-center gap-6 text-zinc-400">
-              <div className="flex flex-col gap-1 min-w-[120px]">
+            <div className="flex items-center gap-2 sm:gap-4">
+              {/* Mobile Volume Toggle */}
+              <button 
+                onClick={() => setIsAudioEnabled(!isAudioEnabled)}
+                className={`p-2 rounded-full transition-all ${isAudioEnabled ? 'bg-zinc-800 text-zinc-100' : 'bg-red-500/20 text-red-400 border border-red-500/20'}`}
+              >
+                {isAudioEnabled ? <Volume2 className="w-4.5 h-4.5 sm:w-5 sm:h-5" /> : <VolumeX className="w-4.5 h-4.5 sm:w-5 sm:h-5" />}
+              </button>
+              
+              {/* Desktop Speed Control (Hidden on mobile) */}
+              <div className="hidden lg:flex flex-col gap-1 min-w-[100px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Speed</span>
-                  <span className="text-[10px] font-bold text-amber-400">{playbackRate.toFixed(2)}x</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Speed</span>
+                  <span className="text-[9px] font-bold text-amber-400">{playbackRate.toFixed(1)}x</span>
                 </div>
                 <input 
-                  type="range" 
-                  min="0.5" 
-                  max="2.5" 
-                  step={playbackRate >= 0.8 && playbackRate <= 1.2 ? "0.01" : "0.1"}
+                  type="range" min="0.5" max="2.0" step="0.1"
                   value={playbackRate} 
                   onChange={(e) => setPlaybackRate(parseFloat(e.target.value))}
-                  className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400 hover:accent-amber-300"
+                  className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
                 />
-              </div>
-
-              <div className="h-4 w-[1px] bg-white/5" />
-
-              <div className="flex items-center gap-4">
-                {currentPart?.mergedAudioPath && (
-                  <a 
-                    href={currentPart.mergedAudioPath} 
-                    download={`${story?.title || 'Story'}_Part_${currentPartIndex + 1}.mp3`}
-                    className="p-2 bg-zinc-800 text-zinc-100 rounded-full hover:bg-zinc-700 transition-all group/download"
-                    title="Download Chapter MP3"
-                  >
-                    <Download size={20} />
-                  </a>
-                )}
-                <button 
-                  onClick={() => setIsAudioEnabled(!isAudioEnabled)}
-                  className={`p-2 rounded-full transition-all ${isAudioEnabled ? 'bg-zinc-800 text-zinc-100' : 'bg-red-500/20 text-red-400 border border-red-500/20'}`}
-                  title={isAudioEnabled ? "Disable Audio" : "Enable Audio"}
-                >
-                  {isAudioEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                </button>
               </div>
             </div>
           </div>
