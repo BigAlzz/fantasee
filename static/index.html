@@ -637,6 +637,7 @@ img { display: block; max-width: 100%; }
   background: #000;
 }
 .player-page.active { display: flex; flex-direction: column; }
+.player-page.cursor-hidden { cursor: none; }
 
 .player-image-container {
   flex: 1;
@@ -663,7 +664,7 @@ img { display: block; max-width: 100%; }
   transform: translateY(-100%);
   transition: transform 0.2s ease, opacity 0.2s ease;
 }
-.player-page:hover .player-topbar, .player-topbar.visible { opacity: 1; transform: translateY(0); }
+.player-topbar.visible { opacity: 1; transform: translateY(0); }
 .player-back {
   display: flex;
   align-items: center;
@@ -675,6 +676,24 @@ img { display: block; max-width: 100%; }
   transition: opacity var(--transition);
 }
 .player-back:hover { opacity: 1; }
+
+.player-create-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  padding: 6px 14px;
+  margin-left: 12px;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  opacity: 0.8;
+}
+.player-create-btn:hover { opacity: 1; background: rgba(255,255,255,0.2); }
 .player-progress {
   display: flex;
   align-items: center;
@@ -705,9 +724,48 @@ img { display: block; max-width: 100%; }
   background: #000;
 }
 .player-image {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  transition: opacity 0.3s ease;
+}
+/* Cinematic Ken Burns — slow atmospheric movement for contained images */
+.player-image.ken-zoom-in {
+  animation: kenZoomIn 20s ease-in-out forwards;
+}
+.player-image.ken-zoom-out {
+  animation: kenZoomOut 20s ease-in-out forwards;
+}
+.player-image.ken-pan-up {
+  animation: kenPanUp 22s ease-in-out forwards;
+}
+.player-image.ken-pan-down {
+  animation: kenPanDown 22s ease-in-out forwards;
+}
+.player-image.ken-sway {
+  animation: kenSwayRight 25s ease-in-out infinite;
+}
+
+@keyframes kenZoomIn {
+  0%   { transform: scale(1.0); }
+  100% { transform: scale(1.15); }
+}
+@keyframes kenZoomOut {
+  0%   { transform: scale(1.1); }
+  100% { transform: scale(1.0); }
+}
+@keyframes kenPanUp {
+  0%   { transform: translateY(2%); }
+  100% { transform: translateY(-2%); }
+}
+@keyframes kenPanDown {
+  0%   { transform: translateY(-2%); }
+  100% { transform: translateY(2%); }
+}
+@keyframes kenSwayRight {
+  0%   { transform: translate(-1%, 0.5%); }
+  50%  { transform: translate(1%, -0.5%); }
+  100% { transform: translate(-1%, 0.5%); }
 }
 .player-controls {
   position: absolute;
@@ -715,37 +773,14 @@ img { display: block; max-width: 100%; }
   left: 0;
   right: 0;
   z-index: 10;
-  padding: 40px 48px 24px;
+  padding: 24px 48px;
   background: linear-gradient(0deg, rgba(0,0,0,0.9) 0%, transparent 100%);
   opacity: 0;
   transform: translateY(100%);
   transition: transform 0.35s ease, opacity 0.35s ease;
 }
-.player-page:hover .player-controls, .player-controls.visible { opacity: 1; transform: translateY(0); }
+.player-controls.visible { opacity: 1; transform: translateY(0); }
 
-.player-scene-info {
-  max-width: 700px;
-  margin-bottom: 20px;
-}
-.player-scene-title {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-.player-scene-meta {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-.player-scene-prompt {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  margin-top: 8px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
 .player-scrubber {
   display: flex;
   align-items: center;
@@ -804,10 +839,10 @@ input.volume-slider::-moz-range-thumb {
   border: none;
 }
 
-/* Subtitles overlay */
+/* Subtitles overlay — elegant, responsive positioning */
 .player-subtitles {
   position: absolute;
-  bottom: 80px;
+  bottom: clamp(80px, 15vh, 200px);
   left: 50%;
   transform: translateX(-50%);
   max-width: 80%;
@@ -822,7 +857,7 @@ input.volume-slider::-moz-range-thumb {
   pointer-events: none;
   z-index: 5;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease, bottom 0.4s ease;
   text-shadow: 0 1px 3px rgba(0,0,0,0.5);
   /* Max 3 lines */
   display: -webkit-box;
@@ -832,6 +867,12 @@ input.volume-slider::-moz-range-thumb {
   max-height: 115px;
   word-break: break-word;
 }
+
+/* Subtitles go lower when controls are hidden — clean cinematic look */
+.player-page.controls-hidden .player-subtitles {
+  bottom: 20px;
+}
+
 .player-subtitles.visible {
   opacity: 1;
 }
@@ -1209,11 +1250,10 @@ input.volume-slider::-moz-range-thumb {
   .scene-grid { grid-template-columns: 1fr; }
   .modal { padding: 24px; }
   .form-row { grid-template-columns: 1fr; }
-  .player-controls { padding: 24px 16px 16px; }
+  .player-controls { padding: 24px 16px; }
   .player-progress-bar { width: 100px; }
-  .player-scene-title { font-size: 16px; }
   .volume-slider { width: 40px; }
-  .player-subtitles { font-size: 18px; max-width: 90%; bottom: 120px; padding: 6px 12px; }
+  .player-subtitles { font-size: 18px; max-width: 90%; padding: 6px 12px; }
   #btn-volume { width: 36px; height: 36px; }
 }
 
@@ -1317,6 +1357,7 @@ input.volume-slider::-moz-range-thumb {
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
+    <button class="player-create-btn" onclick="closePlayer();setTimeout(openCreateModal,350)" title="Create a new story">+ Create</button>
     <div class="player-progress">
       <span id="player-progress-label">1 / 10</span>
       <div class="player-progress-bar">
@@ -1339,11 +1380,6 @@ input.volume-slider::-moz-range-thumb {
     <audio id="player-audio" preload="auto" style="display:none"></audio>
   </div>
   <div class="player-controls" id="player-controls">
-    <div class="player-scene-info">
-      <div class="player-scene-title" id="player-scene-title">Scene Title</div>
-      <div class="player-scene-meta" id="player-scene-meta">Seed: 12345</div>
-      <div class="player-scene-prompt" id="player-scene-prompt"></div>
-    </div>
     <div class="player-scrubber">
       <button class="player-btn" onclick="playerPrev()">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
@@ -1378,6 +1414,11 @@ input.volume-slider::-moz-range-thumb {
           <rect x="2" y="5" width="20" height="14" rx="2"/>
           <path d="M7 10.5c0-.83.67-1.5 1.5-1.5h1c.83 0 1.5.67 1.5 1.5v3c0 .83-.67 1.5-1.5 1.5h-1c-.83 0-1.5-.67-1.5-1.5V10.5z"/>
           <path d="M13 10.5c0-.83.67-1.5 1.5-1.5h1c.83 0 1.5.67 1.5 1.5v3c0 .83-.67 1.5-1.5 1.5h-1c-.83 0-1.5-.67-1.5-1.5V10.5z"/>
+        </svg>
+      </button>
+      <button class="player-btn" id="btn-fullscreen" onclick="toggleFullscreen()" title="Fullscreen (f)">
+        <svg id="fullscreen-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
         </svg>
       </button>
     </div>
@@ -1448,19 +1489,27 @@ input.volume-slider::-moz-range-thumb {
           </select>
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Images per Scene</label>
+          <input type="number" class="form-input" id="form-images-per-scene"
+                 value="1" min="1" max="10" step="1"
+                 title="Target images per scene — generator will try to create this many" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tone</label>
+          <select class="form-select" id="form-tone">
+            <option value="dramatic">Dramatic</option>
+            <option value="dark">Dark / Grim</option>
+            <option value="heroic">Heroic</option>
+            <option value="mysterious">Mysterious</option>
+            <option value="lighthearted">Lighthearted</option>
+          </select>
+        </div>
+      </div>
       <div class="form-group">
         <label class="form-label">Characters (optional)</label>
         <input class="form-input" id="form-characters" placeholder="e.g. Aldric the veteran, Lira the archer" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Tone</label>
-        <select class="form-select" id="form-tone">
-          <option value="dramatic">Dramatic</option>
-          <option value="dark">Dark / Grim</option>
-          <option value="heroic">Heroic</option>
-          <option value="mysterious">Mysterious</option>
-          <option value="lighthearted">Lighthearted</option>
-        </select>
       </div>
       <button type="submit" class="btn-submit" id="btn-submit-create">
         Begin Generation
@@ -1505,6 +1554,7 @@ const state = {
   subtitlesOn: true,
   volume: 1,
   muted: false,
+  _sceneChanging: false,
 };
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1782,16 +1832,21 @@ function updatePlayer() {
     ? `/images/${scene.image_filenames[0]}`
     : '';
 
-  document.getElementById('player-image').src = imgUrl;
-  document.getElementById('player-image').alt = scene.title;
-  document.getElementById('player-scene-title').textContent = `${scene.title}`;
-  document.getElementById('player-scene-meta').textContent =
-    scene.seed ? `Seed: ${scene.seed}  •  Scene ${scene.scene}` : `Scene ${scene.scene}`;
-  document.getElementById('player-scene-prompt').textContent = scene.prompt || '';
-
+  const img = document.getElementById('player-image');
+  const prevSrc = img.src;
+  const newSrc = imgUrl;
+  if (prevSrc !== newSrc) {
+    // Apply Ken Burns cinematic animation on scene change
+    img.src = newSrc;
+    img.alt = scene.title;
+    applyKenBurns(img);
+  } else {
+    img.src = newSrc;
+    img.alt = scene.title;
+  }
   // Subtitles: build sentence segments for audio-synced display
   const subEl = document.getElementById('player-subtitles');
-  const narration = scene.narration || scene.narration_text || '';
+  const narration = scene.narration || scene.narration_text || scene.narrative || '';
   if (narration) {
     buildSubtitleSegments(narration);
   } else {
@@ -1831,17 +1886,21 @@ function updatePlayer() {
     audioIndicator.style.display = 'flex';
     audioIcon.textContent = '🔊';
     if (audioEl.src !== `/audio/${scene.audio_file}`) {
+      state._sceneChanging = true; // Suppress pause → showControls during transition
       audioEl.pause();
       audioEl.src = `/audio/${scene.audio_file}`;
       audioEl.currentTime = 0;
       audioEl.load();
       // Try autoplay; show tap-to-play overlay if blocked
       audioEl.play().then(() => {
+        // Scene transition complete — allow pause event to show controls again
+        setTimeout(() => { state._sceneChanging = false; }, 1000);
         playOverlay.style.display = 'none';
         audioIndicator.classList.remove('muted');
         audioIcon.textContent = '🔊';
         updatePlayIcon();
       }).catch(() => {
+        setTimeout(() => { state._sceneChanging = false; }, 1000);
         // Autoplay blocked — let user tap
         playOverlay.style.display = 'flex';
         audioIndicator.classList.add('muted');
@@ -2091,6 +2150,16 @@ function setVolume(val) {
   updateVolumeIcon();
 }
 
+// Mouse wheel volume control on hover (button + slider)
+function handleVolumeWheel(e) {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.05 : 0.05;
+  const newVol = Math.max(0, Math.min(1, state.volume + delta));
+  setVolume(newVol);
+}
+document.getElementById('volume-slider').addEventListener('wheel', handleVolumeWheel, { passive: false });
+document.getElementById('btn-volume').addEventListener('wheel', handleVolumeWheel, { passive: false });
+
 function toggleMute() {
   const audioEl = document.getElementById('player-audio');
   state.muted = !state.muted;
@@ -2121,7 +2190,52 @@ document.addEventListener('keydown', (e) => {
   if (e.key === ' ' || e.key === 'k' || e.key === 'K') { e.preventDefault(); togglePlay(); }
   if (e.key === 'm' || e.key === 'M') { e.preventDefault(); toggleMute(); }
   if (e.key === 'c' || e.key === 'C') { e.preventDefault(); toggleSubtitles(); }
+  if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
   if (e.key === 'Escape') { closePlayer(); }
+});
+
+// ── Ken Burns ──────────────────────────────────────────────────
+// Pick a random cinematic animation for the current scene image.
+// Animations: zoom-in, zoom-out, pan-up, pan-down, dissolve.
+function applyKenBurns(img) {
+  const effects = ['ken-zoom-in', 'ken-zoom-out', 'ken-pan-up', 'ken-pan-down', 'ken-sway'];
+  // Remove any previous animation
+  for (const cls of effects) img.classList.remove(cls);
+  img.style.animation = 'none';
+  // Force reflow to restart animation
+  void img.offsetWidth;
+  // Pick random effect
+  const choice = effects[Math.floor(Math.random() * effects.length)];
+  img.classList.add(choice);
+}
+
+// ── Fullscreen Toggle ──────────────────────────────────────────
+function toggleFullscreen() {
+  const el = document.getElementById('player-page');
+  if (!document.fullscreenElement) {
+    el.requestFullscreen?.().catch(() => {});
+  } else {
+    document.exitFullscreen?.().catch(() => {});
+  }
+}
+
+// Double-click image → toggle fullscreen
+document.getElementById('player-image').addEventListener('dblclick', toggleFullscreen);
+
+// Update fullscreen icon + trigger auto-hide on enter
+document.addEventListener('fullscreenchange', () => {
+  const icon = document.getElementById('fullscreen-icon');
+  if (document.fullscreenElement) {
+    // Switch to "minimize" icon
+    icon.innerHTML = '<path d="M8 3v3a2 2 0 0 1-2 2H3m0 0h3a2 2 0 0 0 2-2V3m0 18v-3a2 2 0 0 1 2-2h3m0 0H9a2 2 0 0 0-2 2v3M21 16v-3a2 2 0 0 0-2-2h-3m0 0h3a2 2 0 0 1 2 2v3"/>';
+    // Show controls briefly on fullscreen enter, then auto-hide
+    showControls();
+    clearTimeout(playerHideTimer);
+    playerHideTimer = setTimeout(hideControls, 2000);
+  } else {
+    // Switch to "expand" icon
+    icon.innerHTML = '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>';
+  }
 });
 
 // Sync play/pause icon on audio events
@@ -2129,16 +2243,70 @@ document.getElementById('player-audio').addEventListener('play', updatePlayIcon)
 document.getElementById('player-audio').addEventListener('pause', updatePlayIcon);
 document.getElementById('player-audio').addEventListener('ended', updatePlayIcon);
 
-// Auto-hide player controls
+// ███████████████████████████████████████████████████████████████████████
+// AUTO-HIDE PLAYER CONTROLS (YouTube-style)
+// ███████████████████████████████████████████████████████████████████████
 let playerHideTimer;
-document.getElementById('player-page').addEventListener('mousemove', () => {
+let lastMouseX = 0, lastMouseY = 0;
+const MOUSE_MOVE_THRESHOLD = 8; // px — ignore tiny cursor jitter
+
+function showControls() {
   document.getElementById('player-topbar').classList.add('visible');
   document.getElementById('player-controls').classList.add('visible');
-  clearTimeout(playerHideTimer);
-  playerHideTimer = setTimeout(() => {
+  document.getElementById('player-page').classList.remove('cursor-hidden');
+  document.getElementById('player-page').classList.remove('controls-hidden');
+}
+
+function hideControls() {
+  const audioEl = document.getElementById('player-audio');
+  const controls = document.getElementById('player-controls');
+  const topbar = document.getElementById('player-topbar');
+  if (controls._isHover || topbar._isHover) return; // Don't hide while hovering
+  const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  // In fullscreen: always hide after timeout (immersive). Normal: only hide when playing.
+  if (isFS || (audioEl && !audioEl.paused)) {
     document.getElementById('player-topbar').classList.remove('visible');
     document.getElementById('player-controls').classList.remove('visible');
-  }, 3000);
+    document.getElementById('player-page').classList.add('cursor-hidden');
+    document.getElementById('player-page').classList.add('controls-hidden');
+  }
+}
+
+function scheduleHide() {
+  clearTimeout(playerHideTimer);
+  playerHideTimer = setTimeout(hideControls, 3000);
+}
+
+// Show on significant mouse movement (threshold filters tiny jitter)
+document.addEventListener('mousemove', (e) => {
+  const playerPage = document.getElementById('player-page');
+  if (!playerPage.classList.contains('active')) return;
+  const dx = Math.abs(e.clientX - lastMouseX);
+  const dy = Math.abs(e.clientY - lastMouseY);
+  if (dx < MOUSE_MOVE_THRESHOLD && dy < MOUSE_MOVE_THRESHOLD) return;
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+  showControls();
+  scheduleHide();
+});
+
+// Keep controls visible while hovering over controls
+const controlsEl = document.getElementById('player-controls');
+const topbarEl = document.getElementById('player-topbar');
+controlsEl.addEventListener('mouseenter', () => { controlsEl._isHover = true; showControls(); clearTimeout(playerHideTimer); });
+controlsEl.addEventListener('mouseleave', () => { controlsEl._isHover = false; scheduleHide(); });
+topbarEl.addEventListener('mouseenter', () => { topbarEl._isHover = true; showControls(); clearTimeout(playerHideTimer); });
+topbarEl.addEventListener('mouseleave', () => { topbarEl._isHover = false; scheduleHide(); });
+
+// Keep controls visible when paused, hide when playing (after timer)
+document.getElementById('player-audio').addEventListener('play', () => {
+  scheduleHide(); // Will hide after 3s if no movement
+});
+document.getElementById('player-audio').addEventListener('pause', () => {
+  // Don't show controls during scene transitions (audio changes trigger pause)
+  if (state._sceneChanging) return;
+  showControls(); // Show controls when paused (YouTube behavior)
+  clearTimeout(playerHideTimer);
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2162,6 +2330,7 @@ async function submitCreate(e) {
     story_concept: document.getElementById('form-concept').value,
     style: document.getElementById('form-style').value,
     num_scenes: parseInt(document.getElementById('form-scenes').value),
+    images_per_scene: parseInt(document.getElementById('form-images-per-scene').value),
     characters: document.getElementById('form-characters').value,
     tone: document.getElementById('form-tone').value,
   };
@@ -2290,6 +2459,7 @@ function connectWebSocket() {
           Object.assign(existing, data);
         } else {
           state.tasks.push(data);
+          openProgressPanel();
         }
         updateProgressDisplay();
       }

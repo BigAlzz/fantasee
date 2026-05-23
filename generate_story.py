@@ -6,6 +6,7 @@ optionally renders each scene through ComfyUI, and saves results to outputs.
 
 Usage:
   python generate_story.py --concept "A lone ranger..." --scenes 5 --style "fantasy painterly"
+  python generate_story.py --concept "A lone ranger..." --scenes 5 --images-per-scene 3 --style "fantasy painterly"
 
 Outputs:
   - Writes PNG frames to E:\hermes\workspace\outputs\
@@ -30,7 +31,7 @@ import requests
 OUTPUTS = Path(r"E:\hermes\workspace\outputs")
 STORY_META_DIR = OUTPUTS / "_stories"
 
-OPFNFILE_BASE = "https://api.opencode.ai"
+OPFNFILE_BASE = "https://opencode.ai/zen/go"
 # Use Go tier for generation
 OPFNFILE_API_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
 # Models from: https://opencode.ai/zen/go/v1/models
@@ -92,19 +93,41 @@ def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str
 STORY_OUTLINE_SYSTEM = """You are a creative writing assistant specializing in visual storytelling. 
 Your task is to generate a detailed scene-by-scene breakdown for an illustrated story.
 
-For each scene, provide:
-1. Scene title (short, evocative)
-2. Visual prompt (detailed description for image generation — include character descriptions, lighting, composition, mood, color palette)
-3. Narrative description (what happens in this scene)
+CRITICAL — CHARACTER BIBLE RULE:
+If specific characters are provided in the prompt, every single scene MUST include
+those characters by name in both the visual prompt and narrative, maintaining
+consistent appearances (hairstyle, clothing, distinguishing features) across all scenes.
+Characters are the anchor of the story — never drop them from a scene description.
 
-Format each scene as:
+For each scene, provide:
+1. Scene title (short, evocative, 2-5 words)
+2. Visual prompt (DETAILED natural language paragraph for image generation — never a tag list.
+   Write it as descriptive prose. Include: character appearances, setting, lighting, camera
+   angle/position, composition, color palette, mood, atmosphere. 80-150 words.)
+3. Narrative description (what happens in this scene — 30-60 words, purely in prose)
+
+QUALITY STANDARDS for visual prompts:
+- Write in FULL SENTENCES, not comma-separated tags or keyword lists
+- ALWAYS mention the main character(s) by name and describe their appearance
+- Include lighting direction and quality (e.g., "golden hour light", "harsh noon shadows",
+  "flickering torchlight", "moonlight filtering through leaves")
+- Include camera perspective (e.g., "low angle looking up", "wide establishing shot",
+  "over-the-shoulder", "close-up on the character's face")
+- Describe color palette explicitly (e.g., "deep indigos and emerald greens",
+  "warm amber and rust tones", "pale greys with splashes of crimson")
+- Use vivid, atmospheric language matching the requested tone
+- For fantasy/painterly style: descriptive, flowing prose with rich sensory detail
+- NEVER use tag-list format: "a warrior, forest, sunset" is unacceptable
+
+Format each scene exactly as:
 
 --- SCENE 1
 Title: <title>
-Visual Prompt: <detailed image generation prompt — 80-150 words covering subject, setting, lighting, composition, mood>
+Visual Prompt: <detailed natural language image generation prompt — 80-150 words>
 Narrative: <what happens — 30-60 words>
 
-Match tone and style requested. For fantasy/painterly style, use vivid, atmospheric language in prompts."""
+Scene transitions must feel natural — each scene should flow from the previous one.
+Maintain consistent character appearances across ALL scenes."""
 
 
 def generate_story_outline(concept: str, num_scenes: int, style: str,
@@ -207,14 +230,40 @@ def generate_scene_image(scene: dict, scene_num: int, story_id: str,
             node["inputs"]["text"] = prompt_text
             break
 
-    # Set seed in KSampler node
+    # ── Quality overrides: enforce established art norms ──────────────
+    # These override whatever the workflow template has, ensuring
+    # every generated scene meets the quality bar.
+    QUALITY_SAMPLER = "dpmpp_2m"
+    QUALITY_SCHEDULER = "karras"
+    QUALITY_STEPS = 25
+    QUALITY_CFG = 7.0
+
+    QUALITY_NEGATIVE = (
+        "low quality, blurry, deformed, ugly, bad anatomy, distorted, "
+        "watermark, text, signature, logo, extra limbs, fused fingers, "
+        "mutated hands, bad proportions, cropped, out of frame, "
+        "worst quality, low resolution, jpeg artifacts, "
+        "photorealistic, realistic, modern, futuristic, sci-fi, "
+        "cartoon, chibi, 3d render, cgi, "
+        "nocturnal, peaceful, calm, relaxing, comic, manga lineart"
+    )
+
     use_seed = seed or (hash(story_id + str(scene_num)) % (2**32 - 1))
     for node_id, node in workflow.items():
         if not isinstance(node, dict):
             continue
-        if node.get("class_type") == "KSampler":
+        ct = node.get("class_type", "")
+
+        if ct == "KSampler":
             node["inputs"]["seed"] = use_seed
-            break
+            node["inputs"]["sampler_name"] = QUALITY_SAMPLER
+            node["inputs"]["scheduler"] = QUALITY_SCHEDULER
+            node["inputs"]["steps"] = QUALITY_STEPS
+            node["inputs"]["cfg"] = QUALITY_CFG
+
+        # Override negative prompt on the SECOND CLIPTextEncode node
+        if ct == "CLIPTextEncode" and node["inputs"].get("text", "") != prompt_text:
+            node["inputs"]["text"] = QUALITY_NEGATIVE
 
     # Set filename prefix in SaveImage
     scene_padded = f"{scene_num:02d}"
@@ -292,14 +341,37 @@ def save_story_manifest(story_id: str, title: str, subtitle: str,
                         description: str, tags: list, scenes: list):
     """Save the story manifest to the outputs/_stories/ directory."""
     STORY_META_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Determine hero image — fallback chain
+    hero_image = None
+    for s in scenes:
+        fnames = s.get("image_filenames", [])
+        if fnames and fnames[0]:
+            hero_image = fnames[0]
+            break
+    
+    # Enhance tags with genre inference from scenes
+    all_tags = list(tags)
+    if not any(t in all_tags for t in ["fantasy", "scifi", "horror", "mystery"]):
+        # Check scene titles/prompts for genre signals
+        scene_text = " ".join(s.get("title", "") + " " + s.get("prompt", "") for s in scenes).lower()
+        for genre_keyword, genre_tag in [("magic", "fantasy"), ("dragon", "fantasy"),
+                                          ("knight", "fantasy"), ("sword", "fantasy"),
+                                          ("spaceship", "scifi"), ("alien", "scifi"),
+                                          ("haunt", "horror"), ("shadow", "horror"),
+                                          ("detective", "mystery"), ("clue", "mystery")]:
+            if genre_keyword in scene_text and genre_tag not in all_tags:
+                all_tags.append(genre_tag)
+    
     manifest = {
         "id": story_id,
         "title": title,
         "subtitle": subtitle,
         "description": description,
-        "tags": tags,
-        "hero_image": scenes[0].get("image_filenames", [None])[0] if scenes else None,
+        "tags": all_tags,
+        "hero_image": hero_image,
         "scene_count": len(scenes),
+        "generated": True,  # distinguish auto-generated from hand-crafted
         "scenes": scenes,
     }
     path = STORY_META_DIR / f"{story_id}.json"
@@ -312,7 +384,7 @@ def save_story_manifest(story_id: str, title: str, subtitle: str,
 
 def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy painterly",
                  characters: str = "", tone: str = "dramatic",
-                 skip_images: bool = False):
+                 skip_images: bool = False, images_per_scene: int = 1):
     """Run the full story generation pipeline."""
     emit("queued", "Starting generation pipeline...")
 
@@ -323,6 +395,17 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
         title_prompt, temperature=0.8)
     story_title = (title_result or "Untitled Story").strip().strip('"').strip("'")
     story_id = slugify(story_title)
+    
+    # ── Collision check: avoid overwriting existing stories ─────────
+    existing_id = story_id
+    counter = 1
+    while (STORY_META_DIR / f"{existing_id}.json").exists():
+        existing_id = f"{story_id}-{counter}"
+        counter += 1
+    if existing_id != story_id:
+        story_id = existing_id
+        emit("running", f"Story ID collision — using {story_id}", 0.02)
+    
     emit("running", f"Story: \"{story_title}\" (id: {story_id})", 0.02)
 
     # 2. Generate story description
@@ -340,6 +423,17 @@ Be evocative but concise."""
     if not scenes:
         emit("error", "Failed to generate scene outline.")
         return None
+    
+    # ── Scene count validation ─────────────────────────────────────
+    if len(scenes) < num_scenes:
+        emit("warning", f"LLM produced {len(scenes)} scenes (requested {num_scenes}). "
+             f"This indicates a quality issue — the LLM truncated. Proceeding with what we have.")
+    elif len(scenes) > num_scenes:
+        emit("warning", f"LLM produced {len(scenes)} scenes (requested {num_scenes}). "
+             f"Trimming to {num_scenes}.")
+        scenes = scenes[:num_scenes]
+    else:
+        emit("running", f"LLM produced exactly {num_scenes} scenes as requested.", 0.15)
 
     # 4. (Optional) Render images via ComfyUI
     output_scenes = []
@@ -349,14 +443,21 @@ Be evocative but concise."""
             "title": scene.get("title", f"Scene {i + 1}"),
             "prompt": scene.get("prompt", ""),
             "narrative": scene.get("narrative", ""),
+            # The player reads 'narration' or 'narration_text' for subtitles —
+            # populate both so generated stories work with the existing player
+            "narration": scene.get("narrative", ""),
+            "narration_text": scene.get("narrative", ""),
             "seed": hash(story_id + str(i)) % (2**32 - 1),
             "image_filenames": [],
         }
 
         if not skip_images:
-            img = generate_scene_image(scene, i + 1, story_id, s["seed"])
-            if img:
-                s["image_filenames"] = [img]
+            for img_idx in range(images_per_scene):
+                img = generate_scene_image(scene, i + 1, story_id, s["seed"] + img_idx)
+                if img:
+                    s["image_filenames"].append(img)
+        elif not s["image_filenames"]:
+            s["image_filenames"] = []
 
         output_scenes.append(s)
 
@@ -387,6 +488,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate a story via Hermes pipeline")
     parser.add_argument("--concept", required=True, help="Story concept description")
     parser.add_argument("--scenes", type=int, default=10, help="Number of scenes")
+    parser.add_argument("--images-per-scene", type=int, default=1, help="Number of images to generate per scene")
     parser.add_argument("--style", default="fantasy painterly", help="Art style")
     parser.add_argument("--characters", default="", help="Character descriptions")
     parser.add_argument("--tone", default="dramatic", help="Story tone")
@@ -397,6 +499,7 @@ if __name__ == "__main__":
         result = run_pipeline(
             concept=args.concept,
             num_scenes=args.scenes,
+            images_per_scene=args.images_per_scene,
             style=args.style,
             characters=args.characters,
             tone=args.tone,

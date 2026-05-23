@@ -9,9 +9,32 @@ import os
 import re
 import subprocess
 import sys
+from pathlib import Path
+
+# ── Resolve API keys that Hermes masks in .env ─────────────────────
+# Hermes masks env vars (e.g. `OPENCODE_GO_API_KEY=***`) but stores
+# the real values in auth.json credential pool.
+_HERMES_HOME = Path(os.environ.get("HERMES_HOME", "E:\\hermes"))
+_AUTH_PATH = _HERMES_HOME / "auth.json"
+
+def _resolve_env_var(name: str) -> str:
+    """Get an env var, unmasking it from auth.json if it's Hermes-masked."""
+    val = os.environ.get(name, "")
+    if val and not val.startswith("***"):
+        return val
+    # Try auth.json credential pool
+    try:
+        with open(_AUTH_PATH) as f:
+            auth = json.load(f)
+        for provider_creds in auth.get("credential_pool", {}).values():
+            for cred in provider_creds:
+                if cred.get("label") == name and cred.get("access_token"):
+                    return cred["access_token"]
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        pass
+    return val
 import time
 import uuid
-from pathlib import Path
 from typing import Optional
 
 from contextlib import asynccontextmanager
@@ -413,6 +436,7 @@ class GenerateRequest(BaseModel):
     story_concept: str
     style: str = "fantasy painterly"
     num_scenes: int = 5
+    images_per_scene: int = 1
     characters: str = ""
     tone: str = "dramatic"
 
@@ -425,6 +449,7 @@ async def _run_generation(task_id: str, req: GenerateRequest):
         sys.executable, str(script),
         "--concept", req.story_concept,
         "--scenes", str(req.num_scenes),
+        "--images-per-scene", str(req.images_per_scene),
         "--style", req.style,
         "--tone", req.tone,
     ]
@@ -435,7 +460,7 @@ async def _run_generation(task_id: str, req: GenerateRequest):
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        env={**os.environ, "OPENCODE_GO_API_KEY": os.environ.get("OPENCODE_GO_API_KEY", "")},
+        env={**os.environ, "OPENCODE_GO_API_KEY": _resolve_env_var("OPENCODE_GO_API_KEY")},
     )
 
     # Read stdout line by line, parse progress markers
