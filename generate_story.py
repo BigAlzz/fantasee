@@ -237,18 +237,87 @@ TONE GUIDE — match the narration and visual style to the requested tone:
 - noir:        world-weary, sardonic, short clipped sentences
 - lyrical:     poetic cadence, rhythmic pauses, sung quality on description
 - gritty:      raw, short punchy, in-the-mud, no flourishes
-- manhwa:      Korean webtoon energy — punchy present-tense, rapid action
-               bursts broken by gut-punch character beats. (sharp inhale)
-               before twist reveals, then short short short for action
-               sequences, then full stop. Internal-monologue beats drop
-               into spoken-word register. Show, then cut. End beats on
-               cliffhanger lines that beg the next panel.
+- manhwa:      Korean / Chinese webtoon energy. See the full MANHWA NARRATION
+               block below — when this tone is selected, follow that block
+               for the Narration field's voice, rhythm, and structure.
 - tense:       taut, alert, short sentences, hold tension
 - emotional:   thicken on emotional beats, (pause) before vulnerable moments
 - whisper:     (whispers) through intimate passages
 - urgent:      controlled urgency, (sharp inhale) at key turns
 - excited:     gentle warmth, (laughs) at happy moments
 - calm:        unhurried, like a steady hand on a shoulder
+
+MANHWA NARRATION (only when tone includes "manhwa", "manhwa-style", "webtoon",
+"isekai", "system", or "leveling"):
+When the requested tone is manhwa, write the Narration field in the voice
+and rhythm of an English-language Korean / Chinese web novel chapter
+(think Solo Leveling, The Beginning After The End, Omniscient Reader's
+Viewpoint translated to English). Use these rules:
+
+VOICE & POINT OF VIEW
+- First person, past tense for internal thoughts and feelings, present
+  tense for the action happening RIGHT NOW. Mix them beat by beat.
+  Example: "I almost cried in my kitchen because at the one moment it
+  mattered I had no food saved. And right when humanity was teetering
+  on the edge of giving up before everything got ugly, the new world
+  showed up instead."
+- The narrator is the protagonist. They are slightly self-deprecating,
+  sharp, dry, and a little cocky. They notice the small absurdities of
+  the situation and crack wise to themselves, but they are not a clown.
+- Use the protagonist's name sparingly — they think in terms of "I",
+  "my", "myself". The system / world refers to them by name.
+
+RHYTHM
+- Vary sentence length aggressively within a single paragraph. A
+  barrage of 3-6 word sentences ("The dog understood me. He
+  clamped the strap in his teeth. He ran.") is followed by a
+  longer 30-50 word sentence that explains the consequence or
+  inner reaction.
+- Use short paragraphs (1-4 sentences). Single-sentence paragraphs
+  are encouraged at emotional pivots.
+- Sentence fragments for shock or emphasis: "Gone. All of it. Gone."
+- Em-dashes for mid-thought pivots: "Which is also why I am not
+  bringing him along — I would never admit I am scared to grab a
+  rooster bare-handed."
+
+SYSTEM / GAME MECHANICS (when the story is an isekai / system story)
+- The world is a game. Surface stats, levels, item descriptions, and
+  rewards in clean prose, not as raw JSON. Example: "The probe read
+  it as a primary conscription camp recruiting level one spearman.
+  Free conscription available, 10 out of 10, one free soldier per day."
+- Status screens belong in their own short paragraphs, often after a
+  moment of silence. One number per screen line, mixed with a
+  one-sentence reaction from the protagonist.
+- Items with flavor text read like the system is talking back: "Its
+  description taunting me outright, 'If you want the island to run
+  fast, do not take my wood.'"
+
+ESCALATION & PUNCHLINES
+- The protagonist is always slightly outmatched, then outsmarts
+  the situation. The "win" is rarely a clean fight — it's a clever
+  use of resources, a misread situation, or a borrowed tool.
+- Enemies and rivals are introduced with a confident threat, then
+  dismantled beat by beat until the protagonist is standing over
+  them with a deadpan one-liner.
+- End every scene with a turn: a new enemy spotted, a new item
+  revealed, a system notification, or a cliffhanger line that makes
+  the listener NEED the next scene. "And just as I go to set my
+  things down beside the tank, my foot skids out from under me."
+
+WHAT TO AVOID
+- No "the end", "to be continued", or out-of-story meta asides
+  inside the Narration field — those go in the system prompt
+  elsewhere if used at all.
+- No modern slang that breaks the setting (no "lol", "bruh", "yeet").
+  Witty internal monologue is fine; cringe is not.
+- No wooden "show, don't tell" moralizing. Show through the
+  protagonist's specific reactions, not narrator commentary.
+
+LENGTH
+- Aim for 200-300 words per scene for manhwa tone (longer than
+  other tones). The voice carries a lot of texture in web novels,
+  and the listener should feel like they are inside a real chapter
+  rather than a beat summary.
 
 Format each scene exactly as:
 
