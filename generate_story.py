@@ -125,6 +125,22 @@ those characters by name in both the visual prompt and narrative, maintaining
 consistent appearances (hairstyle, clothing, distinguishing features) across all scenes.
 Characters are the anchor of the story — never drop them from a scene description.
 
+PACING — BACKGROUND-AWARE NARRATION:
+A low-volume (5% by default) background music track will be looped under
+the full story. The selected track's mood has already been matched to the
+story tone. Write narration whose pacing feels natural over that loop:
+- Aim for ~120-180 words per scene so narration breathes with the music.
+- Use longer pauses (one-sentence paragraphs, em-dashes, ellipses) before
+  big reveals so the music has space to swell.
+- Don't cram the entire beat into a single run-on sentence — split
+  moments of stillness into their own short sentence so the music can
+  breathe.
+- Tone-specific pacing hint (the background track has been tuned to this):
+  dramatic → measured and weighty, dark → slow with longer silences,
+  epic → broad strokes with gravitas, hopeful → lift toward the end of
+  scenes, mysterious → trailing off, lighthearted → upbeat, melancholic
+  → wistful with (sighs) at the end of long sentences.
+
 For each scene, provide:
 1. Scene title (short, evocative, 2-5 words)
 2. Visual prompt (DETAILED natural language paragraph for image generation — never a tag list.
@@ -401,12 +417,41 @@ def _wrap_title_lines(text: str, max_chars: int = 18) -> list[str]:
 
 def write_title_slide(story_dir: Path, story_id: str, title: str,
                       concept: str, tone: str, style: str) -> str:
-    """Create a lightweight title-card SVG before the expensive pipeline work."""
+    """Create an image-backed title card before the expensive pipeline work.
+
+    The new pipeline renders a 1920x1080 PNG with a tone-tinted gradient,
+    soft glow, and a readable scrim behind the title text. A legacy SVG
+    mirror is still emitted so any code that pointed at the .svg keeps
+    working without modification.
+
+    Returns the POSIX path (relative to ``story_dir``) of the canonical
+    PNG asset. Falls back to the legacy SVG if Pillow is unavailable.
+    """
     title_dir = story_dir / "assets" / "title"
     title_dir.mkdir(parents=True, exist_ok=True)
+
+    rel_path = Path("assets") / "title" / "title_slide.png"
+
+    try:
+        from title_image import generate_title_image
+        paths = generate_title_image(story_dir, story_id, title, concept, tone, style)
+        rel_path = Path("assets") / "title" / "title_slide.png"
+    except Exception as e:
+        # Fall back to the old SVG-only path so the story still gets a
+        # title asset if Pillow is missing or another error occurs.
+        print(f"[title_image] PNG render failed ({e}), falling back to SVG", file=sys.stderr)
+        paths = _write_legacy_title_svg(story_dir, title, concept, tone, style)
+        rel_path = Path("assets") / "title" / "title_slide.svg"
+
+    emit("running", f"Title slide ready: {rel_path.as_posix()}", 0.04)
+    return rel_path.as_posix()
+
+
+def _write_legacy_title_svg(story_dir: Path, title: str, concept: str,
+                            tone: str, style: str):
+    """Fallback title slide that produces only the legacy SVG (no PNG)."""
     rel_path = Path("assets") / "title" / "title_slide.svg"
     path = story_dir / rel_path
-
     title_lines = _wrap_title_lines(title)
     subtitle = concept.strip().replace("\n", " ")
     if len(subtitle) > 118:
@@ -427,20 +472,10 @@ def write_title_slide(story_dir: Path, story_id: str, title: str,
       <stop offset="52%" stop-color="#18162a"/>
       <stop offset="100%" stop-color="#2a1015"/>
     </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="44%" r="62%">
-      <stop offset="0%" stop-color="#e8d7a2" stop-opacity="0.20"/>
-      <stop offset="55%" stop-color="#b43b3f" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#000000" flood-opacity="0.55"/>
-    </filter>
   </defs>
   <rect width="1920" height="1080" fill="url(#bg)"/>
-  <rect width="1920" height="1080" fill="url(#glow)"/>
-  <rect x="108" y="92" width="1704" height="896" rx="10" fill="none" stroke="#ffffff" stroke-opacity="0.14"/>
   <text x="960" y="242" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="26" fill="#d8caa7" letter-spacing="8">{html.escape(tone.upper())} / {html.escape(style.upper()[:38])}</text>
-  <text text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="92" font-weight="700" fill="#fff8e8" filter="url(#softShadow)">
+  <text text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="92" font-weight="700" fill="#fff8e8">
     {"".join(tspans)}
   </text>
   <text x="960" y="720" text-anchor="middle" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="30" fill="#d6d2dc" opacity="0.86">{html.escape(subtitle)}</text>
@@ -455,8 +490,14 @@ def write_title_slide(story_dir: Path, story_id: str, title: str,
         f"Title: {title}\nTone: {tone}\nStyle: {style}\nConcept: {concept}\n",
         encoding="utf-8",
     )
-    emit("running", f"Title slide ready: {rel_path.as_posix()}", 0.04)
-    return rel_path.as_posix()
+
+    class _Paths:
+        pass
+    p = _Paths()
+    p.png = None
+    p.svg = path
+    p.prompt = working_title
+    return p
 
 
 # ── Main Pipeline ──────────────────────────────────────────────────────
@@ -465,8 +506,18 @@ def write_title_slide(story_dir: Path, story_id: str, title: str,
 def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy painterly",
                  characters: str = "", tone: str = "dramatic",
                  skip_images: bool = False, images_per_scene: int = 5,
-                 voice_preset: str = "Dean"):
-    """Run the full story generation pipeline."""
+                 voice_preset: str = "Dean",
+                 background_audio: Optional[str] = None,
+                 background_volume: Optional[float] = None,
+                 background_muted: bool = False):
+    """Run the full story generation pipeline.
+
+    New optional parameters (all default to ``None``/``False`` which means
+    "auto-pick from the background music folder"):
+    - ``background_audio``: pin a specific track filename from Background/.
+    - ``background_volume``: 0.0-1.0 mix level for the Plex export.
+    - ``background_muted``: start with the background silent.
+    """
     _resolve_api_key()
     emit("queued", "Starting full-pipeline generation...")
 
@@ -488,6 +539,24 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
     emit("running", f"Story: \"{story_title}\" (id: {story_id})", 0.03)
     emit("running", "Generating title slide first...", 0.035)
     title_slide = write_title_slide(story_dir, story_id, story_title, concept, tone, style)
+
+    # Pick a background music track up-front so the LLM can pace narration
+    # to its mood. The selection is auto from the Background/ folder
+    # unless the caller pinned one in via the CLI / API.
+    from background_music import background_audio_payload
+    bg_payload = background_audio_payload(tone=tone, style=style)
+    if background_audio:
+        bg_payload["background_audio"] = background_audio
+    if background_volume is not None:
+        bg_payload["background_volume"] = max(0.0, min(1.0, float(background_volume)))
+    if background_muted:
+        bg_payload["background_muted"] = True
+    if bg_payload.get("background_audio"):
+        emit("running",
+             f"Background track: {bg_payload['background_audio']} "
+             f"(default {int(bg_payload['background_volume'] * 100)}%)",
+             0.04)
+
     early_manifest = {
         "id": story_id,
         "title": story_title,
@@ -499,7 +568,14 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
         "generated": True,
         "status": "generating",
         "hero_image": title_slide,
-        "title_slide": title_slide,
+        "title_image": title_slide,    # canonical: image-backed PNG
+        "title_slide": title_slide,    # legacy alias for older clients
+        "title_slide_svg": "assets/title/title_slide.svg",
+        "background_audio": bg_payload.get("background_audio"),
+        "background_volume": bg_payload.get("background_volume", 0.05),
+        "background_muted": bg_payload.get("background_muted", False),
+        "background_track_duration": bg_payload.get("background_track_duration", 0.0),
+        "background_track_tags": bg_payload.get("background_track_tags", []),
         "storage_root": "stories",
         "scenes": [],
     }
@@ -710,6 +786,24 @@ Be evocative but concise."""
     emit("running", "Step 6/6: Saving manifest...", 0.95)
     tags = [style, tone, "generated"]
 
+    # Build per-scene chapter metadata so the manifest already carries the
+    # chapter boundaries. The Plex exporter can use them directly without
+    # re-deriving from audio durations on disk.
+    chapter_seconds = 0.0
+    chapter_gap = 0.5
+    chapters: list[dict] = []
+    for s in output_scenes:
+        dur = float(s.get("audio_duration") or 0.0)
+        if dur <= 0:
+            continue
+        chapters.append({
+            "scene": s.get("scene"),
+            "title": s.get("title") or f"Scene {s.get('scene')}",
+            "start": round(chapter_seconds, 3),
+            "end": round(chapter_seconds + dur, 3),
+        })
+        chapter_seconds += dur + chapter_gap
+
     manifest = {
         "id": story_id,
         "title": story_title,
@@ -721,7 +815,15 @@ Be evocative but concise."""
         "generated": True,
         "status": "complete",
         "hero_image": title_slide,
-        "title_slide": title_slide,
+        "title_image": title_slide,    # canonical: image-backed PNG
+        "title_slide": title_slide,    # legacy alias
+        "title_slide_svg": "assets/title/title_slide.svg",
+        "background_audio": early_manifest.get("background_audio"),
+        "background_volume": early_manifest.get("background_volume", 0.05),
+        "background_muted": early_manifest.get("background_muted", False),
+        "background_track_duration": early_manifest.get("background_track_duration", 0.0),
+        "background_track_tags": early_manifest.get("background_track_tags", []),
+        "chapters": chapters,
         "storage_root": "stories",
         "scenes": output_scenes,
     }
@@ -757,6 +859,12 @@ if __name__ == "__main__":
     parser.add_argument("--voice", default="Dean", help="Xiaomi voice: Mia, Chloe, Milo, Dean (default: Dean)")
     parser.add_argument("--skip-images", action="store_true", help="Skip ComfyUI rendering")
     parser.add_argument("--target-duration", type=float, help="Target total duration in minutes (overrides --scenes)")
+    parser.add_argument("--background-audio", default=None,
+                        help="Pin a specific background track filename (otherwise auto-selected by tone)")
+    parser.add_argument("--background-volume", type=float, default=None,
+                        help="Background volume 0.0-1.0 (default 0.05)")
+    parser.add_argument("--background-muted", action="store_true",
+                        help="Start the story with background audio muted")
     args = parser.parse_args()
 
     try:
@@ -774,6 +882,9 @@ if __name__ == "__main__":
             skip_images=args.skip_images,
             images_per_scene=args.images_per_scene,
             voice_preset=args.voice,
+            background_audio=args.background_audio,
+            background_volume=args.background_volume,
+            background_muted=args.background_muted,
         )
         if result:
             sys.exit(0)

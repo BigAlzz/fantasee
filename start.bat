@@ -33,6 +33,19 @@ rem ============================================================
 set "ROOT=C:\dev\fantasee"
 set "COMFYUI_DIR=C:\Users\alist\Documents\comfy\ComfyUI"
 set "COMFYUI_PY=C:\Users\alist\Documents\comfy\venv\Scripts\python.exe"
+rem Per-worker ComfyUI SQLite database. ComfyUI's built-in DB at
+rem user\comfyui.db is locked by whichever worker started first, so
+rem the 2nd/3rd/Nth workers all bail at startup with
+rem "Could not acquire lock on database". --database-url gives each
+rem worker its own file so they can run side by side. ComfyUI uses
+rem SQLAlchemy under the hood, so the value must be a URL
+rem (sqlite:///<path>) not a raw filesystem path. Forward slashes
+rem required even on Windows.
+set "COMFYUI_USER_DIR=%COMFYUI_DIR%\user"
+rem ComfyUI's --database-url wants a SQLAlchemy URL, not a filesystem
+rem path. Convert backslashes to forward slashes and prepend sqlite:///.
+rem Substring substitution: %VAR:\=/% replaces every \ with /.
+set "DB_URL_BASE=sqlite:///%COMFYUI_USER_DIR:\=/%"
 rem Force UTF-8 for Python's stdout/stderr so the rgthree-comfy custom
 rem node's party emoji doesn't crash ComfyUI on Windows cp1252 consoles.
 set "PYTHONIOENCODING=utf-8"
@@ -79,7 +92,7 @@ rem ------------------------------------------------------------
     call :check_port_quick
     title %TITLE%
     cd /d "%COMFYUI_DIR%"
-    "%COMFYUI_PY%" main.py --directml --listen 127.0.0.1 --port %PORT%
+    "%COMFYUI_PY%" main.py --directml --listen 127.0.0.1 --port %PORT% --database-url "%DB_URL_BASE%/comfyui_%PORT%.db"
     goto :end
 
 rem ------------------------------------------------------------
@@ -90,7 +103,7 @@ rem ------------------------------------------------------------
     call :check_port_quick
     title %TITLE%
     cd /d "%COMFYUI_DIR%"
-    "%COMFYUI_PY%" main.py --directml --listen 127.0.0.1 --port %PORT%
+    "%COMFYUI_PY%" main.py --directml --listen 127.0.0.1 --port %PORT% --database-url "%DB_URL_BASE%/comfyui_%PORT%.db"
     goto :end
 
 rem ------------------------------------------------------------
@@ -112,7 +125,11 @@ rem ------------------------------------------------------------
     call :check_port
     title %TITLE%
     cd /d "%COMFYUI_DIR%"
-    "%COMFYUI_PY%" main.py --cpu --listen 127.0.0.1 --port %PORT% --disable-auto-launch
+    rem Run the CPU worker at BELOW_NORMAL priority so it yields to the
+    rest of the desktop. /BELOWNORMAL is a Windows `start` flag, so this
+    opens the worker in a new console (the .bat exits once `start`
+    returns). The new console inherits the title we set above.
+    start /BELOWNORMAL /D "%COMFYUI_DIR%" "%TITLE%" "%COMFYUI_PY%" main.py --cpu --listen 127.0.0.1 --port %PORT% --disable-auto-launch --database-url "%DB_URL_BASE%/comfyui_%PORT%.db"
     goto :end
 
 rem ------------------------------------------------------------
@@ -198,7 +215,8 @@ rem ------------------------------------------------------------
         ) else (
             >> "%WORKER_HELPER%" echo call "%ROOT%\start.bat" cpu !PORT!
         )
-        start "%WORKER_LABEL% [:!PORT!]" "%WORKER_HELPER%"
+        rem /BELOWNORMAL so the worker yields to other desktop tasks.
+        start /BELOWNORMAL "%WORKER_LABEL% [:!PORT!]" "%WORKER_HELPER%"
         set /a "IDX=!IDX!+1"
         goto :do_max_spawn_loop
     :do_max_spawn_done

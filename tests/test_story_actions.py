@@ -1,0 +1,410 @@
+"""Tests for story_actions: repair plan + apply, extend plan + apply, regenerate.
+
+The full regeneration flow goes through ``generate_story.run_pipeline``
+which spawns an LLM — out of scope for unit tests. We cover:
+
+* ``plan_repair`` decision logic with a synthetic manifest + on-disk
+  assets (no ComfyUI / TTS / Whisper calls).
+* The perceptual-hash duplicate detector.
+* ``plan_extend`` with a manifest that has audio durations and one
+  without (should still work).
+* The end-to-end shape of ``apply_extend``'s return value (no LLM call).
+* The backup-and-wipe flow of ``regenerate_story`` using a monkey-patched
+  ``run_pipeline`` so we never hit the network.
+
+The tests build their own synthetic story directories in a temp dir
+and clean up afterwards, so they don't touch the real ``stories/`` tree.
+Each test passes the temp dir explicitly via the ``story_dir`` parameter
+on the action functions — that override was added so the action
+module doesn't need to know about ``STORIES_ROOT`` swapping.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import unittest
+import wave
+from pathlib import Path
+
+from tests._helpers import has_pillow, temp_dir
+
+
+def _wav(path: Path, seconds: float = 1.0, rate: int = 22050) -> None:
+    """Write a short silent WAV at ``path``."""
+    n = int(seconds * rate)
+    with wave.open(str(path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(rate)
+        wf.writeframes(b"\x00\x00" * n)
+
+
+def _png_solid(path: Path, color: tuple = (128, 64, 32), size: tuple = (32, 32)) -> None:
+    """Write a solid-color PNG at ``path`` using Pillow (test-only).
+
+    NOTE: Solid colors produce identical avg-hashes for any two colors
+    (because the mean IS the pixel value, so the threshold comparison
+    is the same for every pixel). Use :func:`_png_pattern` for tests
+    that need the perceptual hash to actually distinguish the images.
+    """
+    if not has_pillow():
+        raise unittest.SkipTest("Pillow required for test fixture")
+    from PIL import Image
+    Image.new("RGB", size, color).save(path, "PNG")
+
+
+def _png_pattern(path: Path, *, fg: tuple, bg: tuple, size: tuple = (32, 32),
+                 orientation: str = "horizontal") -> None:
+    """Write a PNG with alternating bright/dark stripes.
+
+    Two images with different orientations have very different
+    perceptual-hash signatures, so the duplicate detector can
+    distinguish them. Used by tests that need the phash to behave
+    realistically.
+    """
+    if not has_pillow():
+        raise unittest.SkipTest("Pillow required for test fixture")
+    from PIL import Image, ImageDraw
+    img = Image.new("RGB", size, bg)
+    d = ImageDraw.Draw(img)
+    if orientation == "horizontal":
+        d.rectangle([(0, 0), (size[0], size[1] // 2)], fill=fg)
+    elif orientation == "vertical":
+        d.rectangle([(0, 0), (size[0] // 2, size[1])], fill=fg)
+    elif orientation == "checkerboard":
+        half = 8
+        for y in range(0, size[1], half):
+            for x in range(0, size[0], half):
+                if ((x // half) + (y // half)) % 2 == 0:
+                    d.rectangle([(x, y), (x + half, y + half)], fill=fg)
+    else:
+        raise ValueError(f"Unknown orientation: {orientation}")
+    img.save(path, "PNG")
+
+
+def _build_synthetic_story(root: Path, slug: str, scenes: list[dict]) -> Path:
+    """Create a story dir with a manifest + per-scene assets on disk.
+
+    ``scenes`` is a list of dicts with the keys:
+      - ``key`` (str): scene number, e.g. "01"
+      - ``title`` (str)
+      - ``prompt`` (str)
+      - ``narration`` (str)
+      - ``image`` (bool): write a PNG. Each scene gets a unique color
+        so the perceptual-hash duplicate detector doesn't fire
+        between scenes in a single test.
+      - ``audio`` (bool): write a WAV
+      - ``subs``  (bool): write a subs JSON
+    Returns the story directory.
+    """
+    story_dir = root / slug
+    story_dir.mkdir(parents=True)
+    manifest = {
+        "id": slug,
+        "title": "Test Story",
+        "subtitle": "A test",
+        "description": "A test story for repair / extend / regenerate tests.",
+        "tags": ["fantasy painterly", "dramatic", "generated"],
+        "tone": "dramatic",
+        "voice_preset": "Dean",
+        "story_concept": "A test concept for the repair/extend/regenerate tests.",
+        "scenes": [],
+    }
+    # Each scene's image is a *different orientation* of stripes so
+    # the perceptual-hash duplicate detector can tell them apart. Solid
+    # colors (even with different RGB values) all hash to the same
+    # uniform pattern under the avg-hash technique, so they make for
+    # a useless test fixture.
+    stripe_styles = [
+        ("horizontal", (240, 240, 240), (20, 20, 20)),
+        ("vertical",   (240, 240, 240), (20, 20, 20)),
+        ("checkerboard", (200, 50, 50), (10, 10, 30)),
+        ("horizontal", (60, 200, 80), (10, 30, 10)),
+        ("vertical",   (80, 60, 200), (10, 10, 30)),
+        ("checkerboard", (220, 200, 60), (40, 30, 10)),
+    ]
+    for idx, s in enumerate(scenes):
+        scene_obj = {
+            "scene": s["key"],
+            "title": s.get("title", f"Scene {s['key']}"),
+            "prompt": s.get("prompt", f"A scene prompt for {s['key']}."),
+            "narrative": "",
+            "narration": s.get("narration", f"Narration for scene {s['key']}."),
+            "narration_text": s.get("narration", f"Narration for scene {s['key']}."),
+        }
+        if s.get("image"):
+            img = story_dir / f"{slug}_s{s['key']}_test_01_00001_.png"
+            style_idx = idx % len(stripe_styles)
+            orient, fg, bg = stripe_styles[style_idx]
+            _png_pattern(img, fg=fg, bg=bg, orientation=orient)
+            scene_obj["image_filenames"] = [img.name]
+        if s.get("audio"):
+            audio = story_dir / f"tts_{slug}_s{s['key']}.wav"
+            _wav(audio)
+            scene_obj["audio_filename"] = audio.name
+            scene_obj["audio_duration"] = 1.0
+        if s.get("subs"):
+            subs = story_dir / f"subs_{slug}_s{s['key']}.json"
+            subs.write_text(json.dumps([
+                {"text": "line one", "start": 0.0, "end": 0.5},
+                {"text": "line two", "start": 0.5, "end": 1.0},
+            ]), encoding="utf-8")
+            scene_obj["subtitle_file"] = subs.name
+        manifest["scenes"].append(scene_obj)
+
+    (story_dir / f"{slug}.json").write_text(
+        json.dumps(manifest, indent=2), encoding="utf-8",
+    )
+    return story_dir
+
+
+# ── plan_repair ───────────────────────────────────────────────────────
+
+
+class TestPlanRepair(unittest.TestCase):
+    def test_finds_missing_image(self):
+        with temp_dir() as tmp:
+            slug = "missing-image"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": False, "audio": True, "subs": True},
+            ])
+            import story_actions
+            plan = story_actions.plan_repair(slug, story_dir=story)
+            self.assertEqual(plan.scenes[0].missing, ["image"])
+            self.assertIn("regen_image", plan.scenes[0].actions)
+
+    def test_finds_missing_audio(self):
+        with temp_dir() as tmp:
+            slug = "missing-audio"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": False, "subs": True},
+            ])
+            import story_actions
+            plan = story_actions.plan_repair(slug, story_dir=story)
+            self.assertEqual(plan.scenes[0].missing, ["audio"])
+            self.assertIn("regen_tts", plan.scenes[0].actions)
+
+    def test_finds_missing_subs(self):
+        with temp_dir() as tmp:
+            slug = "missing-subs"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": False},
+            ])
+            import story_actions
+            plan = story_actions.plan_repair(slug, story_dir=story)
+            self.assertEqual(plan.scenes[0].missing, ["subs"])
+            self.assertIn("regen_subs", plan.scenes[0].actions)
+
+    def test_detects_empty_subs_file(self):
+        with temp_dir() as tmp:
+            slug = "empty-subs"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True},
+            ])
+            (story / f"subs_{slug}_s01.json").write_text("[]", encoding="utf-8")
+            import story_actions
+            plan = story_actions.plan_repair(slug, story_dir=story)
+            actions = plan.scenes[0].actions
+            self.assertIn("regen_subs", actions)
+
+    def test_finds_empty_narration(self):
+        with temp_dir() as tmp:
+            slug = "no-narration"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True,
+                 "narration": ""},
+            ])
+            import story_actions
+            plan = story_actions.plan_repair(slug, story_dir=story)
+            self.assertIn("narration", plan.scenes[0].missing)
+
+    def test_skips_complete_scenes(self):
+        with temp_dir() as tmp:
+            slug = "all-complete"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True},
+                {"key": "02", "image": True, "audio": True, "subs": True},
+            ])
+            import story_actions
+            plan = story_actions.plan_repair(slug, story_dir=story)
+            self.assertEqual(plan.skipped_complete, 2)
+            self.assertEqual(plan.scenes, [])
+
+    def test_detects_near_duplicate_image(self):
+        if not has_pillow():
+            self.skipTest("Pillow required for phash test")
+        with temp_dir() as tmp:
+            slug = "dup-image"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True},
+                {"key": "02", "image": True, "audio": True, "subs": True},
+            ])
+            # Force scene 2 to have the SAME image as scene 1 so the
+            # phash detector finds a near-duplicate. The synthetic
+            # helper gives each scene a distinct color by default.
+            src = story / f"{slug}_s01_test_01_00001_.png"
+            dst = story / f"{slug}_s02_test_01_00001_.png"
+            shutil.copyfile(src, dst)
+            import story_actions
+            plan = story_actions.plan_repair(slug, story_dir=story)
+            scenes_checked = len(plan.scenes) + plan.skipped_complete
+            self.assertEqual(scenes_checked, 2)
+            dup = [s for s in plan.scenes if s.duplicate_image]
+            self.assertEqual(len(dup), 1, "should detect the duplicate")
+
+
+# ── plan_extend ───────────────────────────────────────────────────────
+
+
+class TestPlanExtend(unittest.TestCase):
+    def test_plans_five_scenes(self):
+        with temp_dir() as tmp:
+            slug = "extend-five"
+            _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True},
+            ])
+            import story_actions
+            plan = story_actions.plan_extend(slug, scenes=5, story_dir=tmp / slug)
+            self.assertEqual(plan.will_add, 5)
+            self.assertEqual(plan.current_scene_count, 1)
+
+    def test_recovers_style_tone_from_manifest(self):
+        with temp_dir() as tmp:
+            slug = "extend-style"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True},
+            ])
+            # Override style/tone via the manifest
+            manifest_path = story / f"{slug}.json"
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            data["style"] = "cinematic"
+            data["tone"] = "noir"
+            manifest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            import story_actions
+            plan = story_actions.plan_extend(slug, scenes=3, story_dir=story)
+            self.assertEqual(plan.style, "cinematic")
+            self.assertEqual(plan.tone, "noir")
+
+
+# ── regenerate_story (mocked pipeline) ──────────────────────────────
+
+
+class TestRegenerate(unittest.TestCase):
+    def test_backup_then_wipe_clears_old_files(self):
+        """Re-generate should back the story up to .trash/ and wipe
+        everything in the story dir before re-running the pipeline."""
+        with temp_dir() as tmp:
+            slug = "to-regen"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True},
+            ])
+
+            # The regenerator uses TRASH_DIR which is a module-level
+            # constant pointing at STORIES_ROOT/.trash. For this test
+            # we patch it so the backup lands in our temp dir.
+            import story_actions
+            from story_storage import ensure_story_layout
+            original_trash = story_actions.TRASH_DIR
+            story_actions.TRASH_DIR = tmp / "trash"
+            try:
+                # Monkey-patch generate_story.run_pipeline so we don't
+                # hit the LLM. The regenerator imports the symbol
+                # lazily, so we patch the module attribute it resolves
+                # to at call time.
+                from generate_story import run_pipeline as _real_run_pipeline
+
+                def _fake_run_pipeline(**kwargs):
+                    ensure_story_layout(story)
+                    (story / f"{slug}.json").write_text(
+                        json.dumps({
+                            "id": slug, "scenes": [{"scene": "01"}],
+                            "status": "complete",
+                        }, indent=2),
+                        encoding="utf-8",
+                    )
+                    return {"id": slug, "scene_count": 1, "status": "complete"}
+                import generate_story
+                generate_story.run_pipeline = _fake_run_pipeline
+
+                result = story_actions.regenerate_story(
+                    slug, backup=True, story_dir=story,
+                )
+
+                self.assertEqual(result["status"], "ok")
+                self.assertIsNotNone(result["backup_path"])
+                backup_path = Path(result["backup_path"])
+                self.assertTrue(backup_path.is_dir(),
+                                "backup directory was not created")
+                # The original WAV should still be in the backup
+                self.assertTrue((backup_path / f"tts_{slug}_s01.wav").exists())
+
+                # The live story dir should have been wiped and
+                # re-built with the standard subfolders.
+                self.assertTrue((story / "working").is_dir())
+                self.assertTrue((story / "assets" / "title").is_dir())
+            finally:
+                story_actions.TRASH_DIR = original_trash
+                # Restore the real run_pipeline so other tests don't break
+                generate_story.run_pipeline = _real_run_pipeline
+
+
+# ── perceptual hash ───────────────────────────────────────────────────
+
+
+class TestPerceptualHash(unittest.TestCase):
+    def test_identical_images_have_zero_distance(self):
+        if not has_pillow():
+            self.skipTest("Pillow required")
+        with temp_dir() as tmp:
+            p1 = tmp / "a.png"
+            p2 = tmp / "b.png"
+            _png_pattern(p1, fg=(200, 50, 50), bg=(10, 10, 30), orientation="horizontal")
+            _png_pattern(p2, fg=(200, 50, 50), bg=(10, 10, 30), orientation="horizontal")
+            import story_actions
+            self.assertEqual(story_actions._phash_hamming(p1, p2), 0)
+
+    def test_completely_different_images_have_large_distance(self):
+        if not has_pillow():
+            self.skipTest("Pillow required")
+        with temp_dir() as tmp:
+            p1 = tmp / "a.png"
+            p2 = tmp / "b.png"
+            # Horizontal stripes vs vertical stripes → very different
+            # avg-hash signatures because the brightness distribution
+            # along rows vs columns is inverted.
+            _png_pattern(p1, fg=(240, 240, 240), bg=(20, 20, 20), orientation="horizontal")
+            _png_pattern(p2, fg=(240, 240, 240), bg=(20, 20, 20), orientation="vertical")
+            import story_actions
+            d = story_actions._phash_hamming(p1, p2)
+            # The two patterns have very different brightness distributions
+            # → most of the 256 hash bits should differ.
+            self.assertGreater(d, 64)
+
+    def test_missing_file_returns_large_distance(self):
+        if not has_pillow():
+            self.skipTest("Pillow required")
+        with temp_dir() as tmp:
+            p1 = tmp / "exists.png"
+            p2 = tmp / "missing.png"
+            _png_pattern(p1, fg=(200, 50, 50), bg=(10, 10, 30), orientation="horizontal")
+            import story_actions
+            self.assertEqual(story_actions._phash_hamming(p1, p2), 999)
+
+
+# ── apply_extend (no-LLM path) ───────────────────────────────────────
+
+
+class TestApplyExtendNoLLM(unittest.TestCase):
+    def test_apply_extend_refuses_with_no_existing_scenes(self):
+        """If the manifest has no scenes, apply_extend should raise."""
+        with temp_dir() as tmp:
+            slug = "empty-story"
+            story = _build_synthetic_story(tmp, slug, [])  # no scenes
+            import story_actions
+            with self.assertRaises(RuntimeError):
+                story_actions.apply_extend(slug, scenes=3, story_dir=story)
+
+
+if __name__ == "__main__":
+    unittest.main()

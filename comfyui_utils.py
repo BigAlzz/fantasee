@@ -31,8 +31,46 @@ def _comfyui_bases() -> list[str]:
         return [u.strip().rstrip("/") for u in env_val.split(",") if u.strip()]
     return [COMFYUI_BASE]
 
-# Default base workflow template (the generator will inject prompt + seed)
-DEFAULT_WORKFLOW_PATH = Path(r"E:\hermes\workspace\siege_story\workflows\siege_scene01_polished.json")
+# Default base workflow template (the generator will inject prompt + seed).
+# Resolved at request time via ``_resolve_workflow_path`` so a per-story
+# workflow in ``stories/<id>/working/workflows/`` wins over a global default,
+# and a missing workflow is reported with actionable guidance instead of
+# a stale hard-coded path.
+DEFAULT_WORKFLOW_PATH: Optional[Path] = None  # resolved lazily
+
+
+def _resolve_workflow_path(explicit: Optional[str] = None) -> Optional[Path]:
+    """Pick the ComfyUI workflow JSON to use for image generation.
+
+    Resolution order (first hit wins):
+    1. ``explicit`` — the caller passed a path (e.g. from a future
+       admin UI or a per-scene override).
+    2. ``FANTASEE_WORKFLOW_PATH`` env var.
+    3. Any ``*.json`` in the current story's ``working/workflows/`` dir
+       (looks up ``STORY_DIR`` from the cwd if set, otherwise skips).
+    4. ``./workflow.json`` in the project root (a single shipped workflow).
+    5. ``None`` — caller decides what to do.
+    """
+    if explicit:
+        p = Path(explicit)
+        return p if p.exists() else None
+    env = os.environ.get("FANTASEE_WORKFLOW_PATH", "").strip()
+    if env:
+        p = Path(env)
+        if p.exists():
+            return p
+    # 3: per-story override
+    story_dir_env = os.environ.get("FANTASEE_CURRENT_STORY_DIR", "").strip()
+    if story_dir_env:
+        wf_dir = Path(story_dir_env) / "working" / "workflows"
+        if wf_dir.is_dir():
+            for candidate in sorted(wf_dir.glob("*.json")):
+                return candidate
+    # 4: project-root default
+    root_default = Path(__file__).parent / "workflow.json"
+    if root_default.exists():
+        return root_default
+    return None
 
 # Available checkpoints and their best use cases
 CHECKPOINTS = {
@@ -50,8 +88,8 @@ CHECKPOINTS = {
 QUALITY_SETTINGS = {
     "sampler": "dpmpp_2m",
     "scheduler": "karras",
-    "steps": 25,
-    "cfg": 7.0,
+    "steps": 30,
+    "cfg": 7.5,
     "width": 896,
     "height": 512,
 }
@@ -78,23 +116,45 @@ DEFAULT_NEGATIVE = (
     "fused lips, missing lips, extra nostrils, two noses, "
     "deformed face, ugly face, asymmetric face, "
     "cross-eyed, lazy eye, extra eyes, missing eyes, "
+    "bad eyes, poorly drawn eyes, dead eyes, "
+    "bad eyebrows, missing eyebrows, "
+    "unnatural skin, plastic skin, waxy skin, "
+    "overexposed face, underexposed face, blown highlights on face, "
     "bad teeth, missing teeth, extra teeth, "
     "mutated face, malformed, disfigured, "
     "skin blemishes, acne, wrinkles, old age, elderly, child, baby, "
     "lowres, error, cropped, jpeg artifacts, signature, watermark, username, blurry"
 )
 
+
 # Positive-prompt guard suffix appended to every visual prompt before submission.
-# Counter-acts the negative above and tells the model explicitly what a correct
-# human face looks like. Medium / close-up shots without this end up with the
-# snout deform because nothing in the prompt pulls the model back toward a
-# well-defined human nose.
+# Pulls the model toward a sharp, well-framed, well-lit human face. The
+# previous version was tuned only for the close-up "pig snout" failure mode
+# and left medium shots looking flat and un-detailed — the new block adds
+# eye/iris detail, catchlights, framing cues, and quality boosters that
+# SD 1.5 needs to keep the face the focal point at medium framing.
 DEFAULT_POSITIVE_GUARD_SUFFIX = (
+    # Face structure and skin
     "beautiful detailed human face, well-defined human nose, "
     "natural human facial features, sharp facial structure, "
-    "symmetric face, clear skin, masterpiece, best quality, highly detailed"
+    "symmetric face, clear skin, natural skin texture, "
+    # Eye detail (the single biggest quality win on SD 1.5)
+    "detailed eyes, detailed iris, detailed pupils, detailed eyelashes, "
+    "defined eyebrows, catchlights in eyes, expressive eyes, "
+    # Lips and teeth
+    "detailed lips, natural lip color, visible teeth detail, "
+    # Hair (kept on face-side of the framing)
+    "detailed hair, individual hair strands, hair shading, "
+    # Lighting and focus — explicitly direct the model to keep the face sharp
+    "rim lighting, soft directional lighting on face, "
+    "sharp focus on face, subject in focus, shallow depth of field, "
+    "cinematic portrait lighting, "
+    # Framing cues so the model keeps the face the focal point at medium shots
+    "portrait framing, head and shoulders composition, medium close-up, "
+    "looking at viewer, eye contact, "
+    # Quality boosters
+    "masterpiece, best quality, highly detailed, sharp focus, 8k uhd"
 )
-
 
 # ── Health Check ────────────────────────────────────────────────────────
 
@@ -236,7 +296,14 @@ def _comfyui_paths() -> tuple[Optional[str], Optional[str]]:
 
 
 def _spawn_cpu_comfyui(port: int) -> Optional[subprocess.Popen]:
-    """Spawn a CPU-only ComfyUI on the given port as a detached subprocess.
+    """Spawn a GPU-backed ComfyUI on the given port as a detached subprocess.
+
+    The function is still called ``_spawn_cpu_comfyui`` for back-compat
+    with the callers (``ensure_workers``, ``_startup_ensure_workers``),
+    but the spawn uses ``--directml`` (AMD GPU) — the auto-spawn is
+    meant as a "the user has no ComfyUI running at all" fallback, and
+    in that case we want the GPU path so renders are fast. Set
+    ``FANTASEE_AUTO_SPAWN_CPU=0`` to disable this auto-spawn entirely.
 
     Returns the Popen handle, or None if spawn failed. The process is
     started with a new process group so it can be killed cleanly.
@@ -244,11 +311,11 @@ def _spawn_cpu_comfyui(port: int) -> Optional[subprocess.Popen]:
     global _cpu_process
     py, d = _comfyui_paths()
     if not py or not d:
-        print("[comfyui_utils] CPU spawn skipped: COMFYUI_PY/COMFYUI_DIR not set or not found",
+        print("[comfyui_utils] GPU spawn skipped: COMFYUI_PY/COMFYUI_DIR not set or not found",
               file=sys.stderr)
         return None
 
-    log_path = Path(d).parent / f"comfyui-cpu-{port}.log"
+    log_path = Path(d).parent / f"comfyui-gpu-{port}.log"
     log_fh = open(log_path, "ab", buffering=0)
 
     # Force UTF-8 for the child's stdout/stderr so custom-node log lines
@@ -258,9 +325,14 @@ def _spawn_cpu_comfyui(port: int) -> Optional[subprocess.Popen]:
     spawn_env["PYTHONIOENCODING"] = "utf-8"
     spawn_env["PYTHONUTF8"] = "1"
 
+    db_path = Path(d) / "user" / f"comfyui-{port}.db"
+    # ComfyUI's --database-url is a SQLAlchemy URL, not a filesystem path.
+    # sqlite:///<forward-slash-absolute-path> on Windows. The 3 slashes
+    # are scheme + empty host + path; the drive letter sits in the path.
+    db_url = "sqlite:///" + str(db_path).replace("\\", "/")
     kwargs = {
-        "args": [py, "main.py", "--cpu", "--listen", "127.0.0.1", "--port", str(port),
-                 "--disable-auto-launch"],
+        "args": [py, "main.py", "--directml", "--listen", "127.0.0.1", "--port", str(port),
+                 "--disable-auto-launch", "--database-url", db_url],
         "cwd": d,
         "stdout": log_fh,
         "stderr": log_fh,
@@ -268,21 +340,28 @@ def _spawn_cpu_comfyui(port: int) -> Optional[subprocess.Popen]:
         "env": spawn_env,
     }
     if os.name == "nt":
+        # CREATE_NEW_PROCESS_GROUP lets us kill it cleanly without
+        # taking down the parent. No priority tweak — the auto-spawned
+        # worker is now a GPU render and shouldn't yield to other tasks
+        # the way a CPU worker would.
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     else:
         kwargs["start_new_session"] = True
 
-    print(f"[comfyui_utils] spawning CPU ComfyUI on :{port} (cwd={d}, log={log_path})",
+    print(f"[comfyui_utils] spawning GPU ComfyUI on :{port} (cwd={d}, log={log_path})",
           file=sys.stderr)
     try:
         proc = subprocess.Popen(**kwargs)
         _cpu_process = proc
-        # Register this URL as a CPU worker so the GUI badge can label it.
-        cpu_url = f"http://127.0.0.1:{port}"
-        _register_worker_kind(cpu_url, "cpu")
+        # Register this URL as a GPU worker so the picker treats it
+        # as the preferred target. (Function/variable name kept
+        # ``_cpu_process`` for back-compat — the global is just a
+        # handle to "the auto-spawned worker".)
+        gpu_url = f"http://127.0.0.1:{port}"
+        _register_worker_kind(gpu_url, "gpu")
         return proc
     except Exception as e:
-        print(f"[comfyui_utils] CPU spawn failed: {e}", file=sys.stderr)
+        print(f"[comfyui_utils] GPU spawn failed: {e}", file=sys.stderr)
         return None
 
 
@@ -455,10 +534,22 @@ def _register_worker_kind(url: str, kind: str) -> None:
 # ── Workflow Manipulation ───────────────────────────────────────────────
 
 def load_workflow(path: Optional[str] = None) -> Optional[dict]:
-    """Load a ComfyUI workflow JSON file."""
-    wf_path = Path(path) if path else DEFAULT_WORKFLOW_PATH
-    if not wf_path.exists():
-        print(f"[comfyui_utils] Workflow not found: {wf_path}", file=sys.stderr)
+    """Load a ComfyUI workflow JSON file.
+
+    Resolution order is documented on :func:`_resolve_workflow_path`. When
+    no workflow can be located the function logs a single actionable line
+    (was previously spamming ``Workflow not found: <stale path>`` on
+    every call) and returns ``None`` so the caller can surface a clear
+    error to the user.
+    """
+    wf_path = _resolve_workflow_path(path)
+    if not wf_path:
+        print(
+            "[comfyui_utils] No ComfyUI workflow found. Set FANTASEE_WORKFLOW_PATH "
+            "to a JSON file, or place a workflow in the story's working/workflows/ "
+            "directory, or drop a workflow.json next to comfyui_utils.py.",
+            file=sys.stderr,
+        )
         return None
     with open(wf_path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -558,22 +649,61 @@ def _healthy_bases(timeout: float = 1.5) -> list[str]:
     return healthy
 
 
-def _pick_healthy_base() -> Optional[str]:
-    """Pick a healthy ComfyUI worker using round-robin.
+def _worker_kind(url: str) -> str:
+    """Return the kind of a ComfyUI worker: "gpu", "cpu", or "manual".
 
-    Returns the URL of a healthy worker, or None if no configured
-    worker is currently up. The round-robin counter advances on every
-    call so back-to-back single-image requests fan out across all
-    workers instead of always hitting the first one.
+    Mirrors the fallback logic in :func:`get_worker_status`: an
+    explicit registration in ``_worker_kinds`` wins; the default
+    ComfyUI base (8188) is implicitly GPU; anything else is treated as
+    a manually-configured worker of unknown kind.
+    """
+    if url in _worker_kinds:
+        return _worker_kinds[url]
+    if url == COMFYUI_BASE:
+        return "gpu"
+    return "manual"
+
+
+def _bases_by_priority(bases: list[str]) -> list[str]:
+    """Reorder a worker list so GPU workers come first, then CPU, then manual.
+
+    Within each group the original order is preserved, so
+    ``COMFYUI_URLS`` order is still respected for that kind.
+    """
+    gpus = [b for b in bases if _worker_kind(b) == "gpu"]
+    cpus = [b for b in bases if _worker_kind(b) == "cpu"]
+    manuals = [b for b in bases if _worker_kind(b) not in ("gpu", "cpu")]
+    return gpus + cpus + manuals
+
+
+def _pick_healthy_base() -> Optional[str]:
+    """Pick a healthy ComfyUI worker, preferring GPU over CPU.
+
+    Order of preference: healthy GPU workers (round-robin) > healthy
+    CPU workers (round-robin) > healthy "manual" workers (round-robin).
+    CPU workers are only used when no GPU worker is up, so a single
+    healthy GPU gets all the jobs and CPU workers stay idle.
+
+    Returns None if no configured worker is currently up.
     """
     healthy = _healthy_bases()
     if not healthy:
         return None
+    gpus = [b for b in healthy if _worker_kind(b) == "gpu"]
+    cpus = [b for b in healthy if _worker_kind(b) == "cpu"]
+    manuals = [b for b in healthy if _worker_kind(b) not in ("gpu", "cpu")]
+
     global _rr_counter
     with _rr_lock:
-        idx = _rr_counter % len(healthy)
+        if gpus:
+            pool = gpus
+        elif cpus:
+            pool = cpus
+        else:
+            pool = manuals
+        idx = _rr_counter % len(pool)
         _rr_counter += 1
-        return healthy[idx]
+        return pool[idx]
 
 
 def generate_image(
@@ -858,7 +988,7 @@ def generate_images_parallel(
     # actually use it. Subsequent calls return immediately.
     ensure_workers(min_workers=2, wait_for_spawn=True, wait_timeout=90)
 
-    bases = _comfyui_bases()
+    bases = _bases_by_priority(_comfyui_bases())
     if not bases:
         return [None] * len(jobs)
     if max_workers is None:

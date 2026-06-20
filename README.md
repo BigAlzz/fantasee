@@ -1,69 +1,169 @@
-# Fantasee 0.1 — Story Viewer
+# Fantasee
 
-A Netflix-style browser for AI-generated stories with audio narration. Browse, play, and watch narrated visual stories in your browser.
+Fantasee is a local AI story generation and viewing app. It writes narrated multi-scene stories from a text concept, generates images through ComfyUI, creates narration audio and synced subtitles, then presents the result in a Netflix-style browser/player.
+
+The app is file-based: story manifests and assets live under `stories/<story-id>/`. There is no application SQLite database. ComfyUI itself may create per-worker SQLite files under its own `user/` directory.
 
 ## Quick Start
 
-```
-pip install fastapi uvicorn
+```bat
+pip install fastapi uvicorn pillow requests
 python server.py
 ```
 
-Open http://127.0.0.1:8765
+Open `http://127.0.0.1:8765`.
+
+For the normal GPU-first local workflow:
+
+```bat
+start.bat gpu1
+start.bat server
+```
+
+If no ComfyUI worker is detected when the server starts, Fantasee auto-spawns a DirectML GPU worker on port `8189`.
 
 ## Features
 
-- **Cinematic player** — full-screen image viewer with audio narration
-- **Scene navigation** — scrub through scenes, auto-advance on audio end
-- **Synced subtitles** — sentence-level captions synced to audio playback
-- **Volume & playback controls** — play/pause, mute, keyboard shortcuts
-- **Story library** — browse available stories via hero + card grid
-- **Live generation** — create new stories from a prompt (WebSocket progress)
+- **Story generation** — title, description, scene outline, image prompts, narration, subtitles, and manifest output.
+- **Seed picker** — ask the LLM for 2-6 story ideas before committing to generation.
+- **ComfyUI image generation** — API-format workflow injection, GPU-first worker selection, per-worker SQLite databases.
+- **Face-quality prompt guard** — automatic positive and negative prompt additions for better medium-shot human faces.
+- **Cinematic player** — full-screen image player with narration, subtitles, keyboard controls, and background music.
+- **Background music** — auto-selected mood track with separate volume and mute controls.
+- **Story maintenance** — repair missing assets, re-generate a story, extend a story, delete old stories.
+- **Plex export** — MP4 with chapters, SRT/VTT sidecars, poster, and mixed background audio.
+
+## Launch Commands
+
+| Command | Purpose |
+|---|---|
+| `start.bat server` | Start only the Fantasee web app on `8765` |
+| `start.bat gpu1` | Start DirectML ComfyUI GPU worker on `8188` |
+| `start.bat gpu2` | Start second DirectML ComfyUI worker on `8189` |
+| `start.bat cpu <port>` | Start CPU ComfyUI worker at below-normal priority |
+| `start.bat max [N]` | Start N CPU workers plus server |
+| `start.bat all` | Start gpu1, gpu2, and server |
+| `kill_workers.bat` | Kill Fantasee and ComfyUI worker processes on standard ports |
+
+For desktop responsiveness, prefer `gpu1 + server`. CPU workers are fallback workers and run below normal priority when launched by Fantasee scripts.
+
+## ComfyUI Setup
+
+Fantasee needs a ComfyUI API-format workflow. The repository includes `workflow.json`, a minimal SD 1.5 workflow with these node types:
+
+- `CheckpointLoaderSimple`
+- `CLIPTextEncode` for positive prompt
+- `CLIPTextEncode` for negative prompt
+- `EmptyLatentImage`
+- `KSampler`
+- `VAEDecode`
+- `SaveImage`
+
+Workflow lookup order:
+
+1. Explicit `workflow_path` argument.
+2. `FANTASEE_WORKFLOW_PATH` environment variable.
+3. `stories/<story-id>/working/workflows/*.json` when `FANTASEE_CURRENT_STORY_DIR` is set.
+4. `workflow.json` in the project root.
+
+The negative prompt node must contain one of `ugly`, `blurry`, `deformed`, or `low quality` in its placeholder text so `inject_prompt()` can identify it.
+
+## Worker Databases
+
+ComfyUI's built-in database cannot be shared by multiple processes. Fantasee launch scripts pass a per-port SQLAlchemy SQLite URL:
+
+```text
+sqlite:///C:/Users/alist/Documents/comfy/ComfyUI/user/comfyui_<port>.db
+```
+
+This prevents `Could not acquire lock on database` and `Unsupported database URL` errors when multiple workers run side by side.
+
+## Story Storage
+
+```text
+stories/
+  <story-id>/
+    <story-id>.json
+    <story-id>_s01_...png
+    tts_<story-id>_s01.wav
+    subs_<story-id>_s01.json
+    assets/title/
+    working/
+    final/plex/
+```
+
+Legacy stories in `outputs/` remain readable through the fallback in `story_storage.py`.
+
+## Story Actions
+
+| Action | Endpoint | Behavior |
+|---|---|---|
+| Generate | `POST /api/generate` | Start a new story task |
+| Queue | `POST /api/generate-queue` | Run multiple story concepts sequentially |
+| Seed suggestions | `POST /api/seed-suggestions` | Ask the LLM for story seed ideas |
+| Repair | `GET/POST /api/stories/<id>/repair` | Preview and repair missing images/audio/subtitles |
+| Re-generate | `POST /api/stories/<id>/regenerate` | Back up, wipe, and rerun the story |
+| Extend | `POST /api/stories/<id>/extend` | Add scenes from current story context |
+| Delete | `DELETE /api/stories/<id>` | Delete a story directory, optionally with backup |
+| Plex export | `POST /api/stories/<id>/export-plex` | Build Plex package in background |
+
+Repair, regenerate, generation, queue generation, and Plex export report progress through `WS /ws` task updates.
 
 ## Keyboard Shortcuts
 
 | Key | Action |
-|-----|--------|
-| `Space` / `K` | Play / Pause |
-| `→` | Next scene |
-| `←` | Previous scene |
-| `M` | Mute / Unmute |
+|---|---|
+| `Space` / `K` | Play or pause |
+| `Right` | Next scene |
+| `Left` | Previous scene |
+| `M` | Mute narration |
+| `B` | Mute background music |
 | `C` | Toggle captions |
+| `F` | Toggle fullscreen |
 | `Esc` | Close player |
 
-## API
+## Plex Export
 
-- `GET /api/stories` — list all stories
-- `GET /api/stories/:id` — get story with scenes
-- `GET /images/:filename` — serve scene images
-- `GET /audio/:filename` — serve audio narration
-- `POST /api/generate` — generate a new story
-- `WS /ws` — live generation status updates
+Each exported story writes a Plex-ready package to:
 
-## Tech
+```text
+stories/<story-id>/final/plex/
+```
 
-- **Backend:** Python + FastAPI + Uvicorn
-- **Frontend:** Vanilla JS, Netflix-inspired dark theme
-- **Data:** JSON-based story/scene storage
+Outputs include:
 
-## Content Generation (Hermes Agent Skills)
+- `<story-id>.mp4`
+- `<story-id>.en.srt`
+- `<story-id>.en.vtt`
+- `<story-id>-poster.png`
+- `<story-id>-poster.svg`
+- `chapters.ffmeta`
 
-This repo ships with the Hermes Agent skills needed to generate stories,
-images, narration, and video for the viewer. Located in `skills/`:
+CLI export:
 
-| Skill | What it does |
-|-------|-------------|
-| `animated-storytelling.SKILL.md` | Full pipeline: write story, generate ComfyUI workflows, render images, TTS, assemble MP4 clips, export viewer manifest |
-| `comfyui.SKILL.md` | ComfyUI setup + scripts (`run_workflow.py`, `run_batch.py`, `health_check.py`, etc.) |
-| `piper-tts.SKILL.md` | Local neural TTS for narration audio |
-| `humanizer.SKILL.md` | Strip AI writing patterns from narration text |
-| `story-scene-generation.SKILL.md` | Add new scenes to existing stories |
-| `local-subagent-story-generation.SKILL.md` | Offload story writing to a local LM Studio |
+```bat
+python plex_export.py <story-id>
+```
 
-Full reference documentation, scripts, and prompting guides are in the
-`skills/` subdirectories. See `skills/README.md` for the complete pipeline
-walkthrough.
+GUI export: open a story detail page and click **Export to Plex**.
 
-**To use:** clone this repo, symlink the `skills/` directory into your
-`$HERMES_HOME/skills/` directory, and Hermes will recognize them as
-loadable skills when you ask it to generate story content.
+## Tests
+
+```bat
+python -m unittest discover -s tests -v
+python -m pytest tests/test_story_actions.py
+```
+
+The tests cover story repair/extend/regenerate planning, background music selection, Plex export helpers, seed suggestions, subtitles, and title images.
+
+## Documentation
+
+- `docs/SYSTEM.md` — current system architecture and operations guide.
+- `docs/STORY_ENGINE_ARCHITECTURE.md` — older design-plan notes for future architecture work.
+
+## Notes
+
+- Delete is currently synchronous and modal-blocking on large story folders.
+- LLM/TTS outages can block seed suggestions or story generation.
+- Plain SD 1.5 checkpoints are weak for human faces. Tuned models such as DreamShaper for fantasy or Counterfeit for anime are better.
+- `start.bat max` is CPU-worker mode. It is useful for fallback or CPU-only machines, not the preferred GPU-first desktop workflow.

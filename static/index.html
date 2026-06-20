@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -214,7 +214,7 @@ img { display: block; max-width: 100%; }
 /* ── Generation Progress Toast ──────────────────────────────────────── */
 .gen-progress-toast {
   position: fixed;
-  bottom: 24px;
+  top: 80px;
   right: 24px;
   z-index: var(--z-toast);
   min-width: 340px;
@@ -1176,6 +1176,45 @@ input.volume-slider::-moz-range-thumb {
   border: none;
 }
 
+/* Background music slider — slightly different color so the user can
+   tell it apart from the narration volume slider. */
+input.volume-slider.volume-slider-bg {
+  background: linear-gradient(90deg, rgba(120,200,255,0.7) 0%, rgba(120,200,255,0.2) 100%);
+  width: 70px;
+}
+input.volume-slider.volume-slider-bg::-webkit-slider-thumb {
+  background: #7ec8ff;
+  width: 11px;
+  height: 11px;
+}
+input.volume-slider.volume-slider-bg::-moz-range-thumb {
+  background: #7ec8ff;
+  width: 11px;
+  height: 11px;
+}
+.player-btn#btn-bg-mute.muted #bg-volume-icon {
+  opacity: 0.4;
+}
+
+/* Background track name indicator (top-right of player) */
+.bg-track-indicator {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: rgba(0,0,0,0.55);
+  color: rgba(255,255,255,0.85);
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.bg-track-indicator[hidden] { display: none; }
+.bg-track-label { white-space: nowrap; }
+
 /* Subtitles overlay — elegant, responsive positioning.
    Uses transform: translateY instead of `bottom` to keep the move on
    the compositor (avoids layout reflow when toggling controls). */
@@ -1490,10 +1529,179 @@ input.volume-slider::-moz-range-thumb {
   color: var(--text-muted);
   margin-top: 4px;
 }
+
+/* Detail-page action groups (Story / Quality / Output / Danger) so the
+   user can see at a glance which buttons change story content vs.
+   which only audit / re-render. Replaces the original 9-button soup
+   that mixed all of these together. */
+.detail-action-section {
+  margin-bottom: 14px;
+}
+.detail-action-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.detail-action-row .btn-secondary,
+.detail-action-row .btn-accent {
+  flex: 1 1 130px;
+  min-width: 130px;
+  text-align: center;
+  font-size: 13px;
+  padding: 8px 10px;
+}
+.detail-action-danger {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+/* Story-seed slider — visually distinct from the regular range inputs so
+   the user notices it. The pill on the right echoes the current count. */
+input.seed-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  height: 4px;
+  background: linear-gradient(90deg,
+    var(--accent) 0%, var(--accent) calc((var(--val, 1) - 1) / 5 * 100%),
+    rgba(255,255,255,0.15) calc((var(--val, 1) - 1) / 5 * 100%));
+  border-radius: 2px;
+  outline: none;
+}
+input.seed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+input.seed-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+}
+.seed-count-pill {
+  min-width: 36px;
+  padding: 4px 10px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  text-align: center;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+/* Seed picker — replaces the form when 2+ seeds are requested. Cards
+   show the title, brief description, and per-seed style + tone. The user
+   can select one (single mode) or many (queue mode) before generating. */
+.seed-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+.seed-picker[hidden] { display: none; }
+.seed-picker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.seed-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.seed-card {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+}
+.seed-card:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-hover);
+}
+.seed-card.selected {
+  border-color: var(--accent);
+  background: rgba(229, 9, 20, 0.06);
+}
+.seed-card-checkbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.seed-card-body { display: flex; flex-direction: column; gap: 4px; }
+.seed-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+.seed-card-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.seed-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.seed-card-meta .meta-tag {
+  padding: 2px 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+.seed-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.seed-picker-summary {
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 .btn-submit {
   width: 100%;
@@ -1583,6 +1791,102 @@ input.volume-slider::-moz-range-thumb {
   transition: background var(--transition);
 }
 .btn-queue-add:hover { background: rgba(255,255,255,0.1); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   IN-MODAL PROGRESS VIEW
+   Replaces the create form once the user hits "Begin Generation" so they
+   have a persistent, unmissable progress indicator in the same place they
+   just clicked. Updates live from the WebSocket.
+   ══════════════════════════════════════════════════════════════════════ */
+.modal-progress {
+  text-align: center;
+  padding: 16px 0 8px;
+}
+.modal-progress-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  color: var(--accent);
+}
+.modal-progress-icon svg {
+  width: 100%;
+  height: 100%;
+}
+@keyframes modal-progress-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.modal-progress-spinner {
+  transform-origin: 32px 32px;
+  animation: modal-progress-spin 1.2s linear infinite;
+}
+.modal-progress-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+.modal-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.modal-progress-fill {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-glow-end));
+  transform: scaleX(var(--pct, 0));
+  transform-origin: left center;
+  transition: transform 0.4s ease;
+  border-radius: 4px;
+}
+.modal-progress-message {
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-height: 18px;
+  margin-bottom: 16px;
+}
+.modal-progress-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: rgba(0,0,0,0.25);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.modal-progress-stage {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  animation: modal-progress-fade-in 0.3s ease;
+}
+@keyframes modal-progress-fade-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.modal-progress-stage-time {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.modal-progress-stage-text {
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+.modal-progress-bg {
+  width: 100%;
+  margin-top: 4px;
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    GENERATION PROGRESS PANEL
@@ -2045,6 +2349,45 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
 .toast.warn { border-color: var(--warn); }
 .toast.info { border-color: var(--info); }
 
+/* Plex export progress toast — shares the gen-progress-toast visual base,
+   adds per-stage rows so the user can see discover / subtitles / chapters /
+   audio mix / finalize tick off. */
+.plex-progress-toast { min-width: 320px; }
+.plex-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.plex-stage {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary);
+  transition: background 0.2s, color 0.2s;
+}
+.plex-stage-current {
+  background: rgba(255,183,77,0.10);
+  color: var(--text-primary);
+}
+.plex-stage-done {
+  background: rgba(0,200,83,0.10);
+  color: var(--success-fg);
+}
+.plex-stage-error {
+  background: rgba(244,67,54,0.12);
+  color: var(--accent);
+}
+.plex-pct {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
 /* Empty state */
 .empty-state {
   text-align: center;
@@ -2154,6 +2497,11 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
     <img id="player-image" src="" alt="Scene" class="player-image" width="1920" height="1080" />
     <div class="player-subtitles" id="player-subtitles" aria-live="polite" aria-atomic="true"></div>
     <audio id="player-audio" preload="auto" style="display:none" crossorigin="anonymous"></audio>
+    <!-- Background music track — separate audio element so its volume is
+         independent from the narration. Sourced from /api/background/<file>
+         which is served by server.py. -->
+    <audio id="player-background" preload="none" loop
+           aria-hidden="true" style="display:none"></audio>
   </div>
   <div class="player-controls" id="player-controls">
     <div class="player-scrubber">
@@ -2199,7 +2547,26 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
           <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
         </svg>
       </button>
+      <!-- Background audio toggle (separate from narration). Always
+           visible so the user can find it. -->
+      <button type="button" class="player-btn" id="btn-bg-mute"
+              data-action="toggle-bg-mute"
+              aria-label="Mute background music" aria-pressed="false"
+              title="Background music mute (B)">
+        <svg id="bg-volume-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
+          <path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+      </button>
+      <input type="range" class="volume-slider volume-slider-bg" id="bg-volume-slider"
+             min="0" max="100" step="1" value="5"
+             data-action="set-bg-volume" aria-label="Background music volume"
+             title="Background music volume" />
     </div>
+  </div>
+  <!-- Background track name (small overlay) so the user can see what's playing. -->
+  <div class="bg-track-indicator" id="bg-track-indicator" hidden aria-live="polite">
+    <span class="bg-track-label" id="bg-track-label">Background: —</span>
   </div>
 </div>
 
@@ -2283,6 +2650,16 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
           </select>
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label" for="form-seeds">Story Seeds (1 = generate directly, 2-6 = pick from suggestions)</label>
+        <div style="display:flex;align-items:center;gap:12px">
+          <input type="range" class="seed-slider" id="form-seeds" min="1" max="6" step="1" value="1"
+                 aria-describedby="form-seeds-hint"
+                 title="How many story ideas to generate from your concept" />
+          <span class="seed-count-pill" id="seed-count-pill" aria-live="polite">1</span>
+        </div>
+        <div class="form-hint" id="form-seeds-hint">At 1, the story starts immediately. At 2+, you'll see distinct seed ideas first and pick which to generate.</div>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="form-images-per-scene">Images per Scene</label>
@@ -2332,9 +2709,32 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
         <div class="form-hint" id="form-characters-hint">Comma-separated names + brief descriptors</div>
       </div>
       <button type="submit" class="btn-submit" id="btn-submit-create" data-action="submit-create">
-        Begin Generation
+        <span id="btn-submit-label">Begin Generation</span>
       </button>
     </form>
+    <!-- Seed picker: hidden by default. Shown when the user picks 2+ seeds
+         and the LLM returns the suggestions. Lets them cherry-pick which
+         idea(s) to actually generate, then submits the chosen ones to the
+         background queue. -->
+    <div id="seed-picker" class="seed-picker" hidden>
+      <div class="seed-picker-header">
+        <div>
+          <div class="modal-title" style="font-size:18px">Pick a seed</div>
+          <div class="modal-desc" id="seed-picker-subtitle">Choose one (or several) to generate. Each goes into the background queue.</div>
+        </div>
+        <button type="button" class="modal-close" data-action="seed-picker-back" aria-label="Back to form">×</button>
+      </div>
+      <div class="seed-picker-list" id="seed-picker-list" role="list" aria-label="Generated story seeds"></div>
+      <div class="seed-picker-footer">
+        <span class="seed-picker-summary" id="seed-picker-summary">0 selected</span>
+        <div style="display:flex;gap:10px">
+          <button type="button" class="btn-secondary" data-action="seed-picker-back">Back</button>
+          <button type="button" class="btn-accent" id="btn-generate-seeds" data-action="generate-selected-seeds" disabled>
+            <span id="btn-generate-seeds-label">Generate Selected</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2372,6 +2772,59 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
       <button type="button" class="btn-secondary" data-action="close-delete">Cancel</button>
       <button type="button" class="btn-primary" id="btn-confirm-delete" style="background:#d32f2f" data-action="confirm-delete">
         Delete permanently
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Re-generate confirmation modal.
+     Shown when the user clicks "Re-generate" so they understand the
+     consequences and can opt to keep a backup in stories/.trash/. -->
+<div class="modal-overlay" id="regen-modal" data-dialog="regen">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="regen-modal-title" tabindex="-1">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="regen-modal-title">Re-generate this story?</div>
+        <div class="modal-desc">Wipe all images, audio, subtitles, and videos — then re-run the generation pipeline from scratch using the original concept.</div>
+      </div>
+      <button type="button" class="modal-close" data-action="close-regen" aria-label="Close re-generate dialog">×</button>
+    </div>
+    <div class="form-group">
+      <div id="regen-modal-summary" style="background:var(--bg-elevated);border-radius:6px;padding:12px;font-size:13px;line-height:1.6">Scanning story…</div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer">
+      <input type="checkbox" id="regen-modal-backup" checked />
+      <span style="font-size:13px">Save a backup in <code>stories/.trash/</code> first (recommended)</span>
+    </label>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button type="button" class="btn-secondary" data-action="close-regen">Cancel</button>
+      <button type="button" class="btn-primary" id="btn-confirm-regen" data-action="confirm-regenerate" style="background:var(--accent)">
+        🔄 Re-generate
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Repair preview modal. Shown when the user clicks "Repair" so they
+     can see exactly which scenes + assets will be regenerated before
+     committing. Mirrors the delete-preview pattern. -->
+<div class="modal-overlay" id="repair-modal" data-dialog="repair">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="repair-modal-title" tabindex="-1">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="repair-modal-title">Repair this story?</div>
+        <div class="modal-desc">We'll regenerate only the assets that are missing or look like near-duplicates of a previous scene.</div>
+      </div>
+      <button type="button" class="modal-close" data-action="close-repair" aria-label="Close repair dialog">×</button>
+    </div>
+    <div class="form-group">
+      <div id="repair-modal-summary" style="background:var(--bg-elevated);border-radius:6px;padding:12px;font-size:13px;line-height:1.6">Scanning story…</div>
+    </div>
+    <div id="repair-modal-scenes" style="max-height:280px;overflow-y:auto;background:var(--bg-elevated);border-radius:6px;padding:10px 12px;font-size:12px;margin-bottom:16px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button type="button" class="btn-secondary" data-action="close-repair">Cancel</button>
+      <button type="button" class="btn-accent" id="btn-confirm-repair" data-action="confirm-repair" disabled>
+        🔧 Repair
       </button>
     </div>
   </div>
@@ -2437,6 +2890,12 @@ const state = {
   subtitlesOn: true,
   volume: 1,
   muted: false,
+  // Background music — separate audio element, persisted locally.
+  // Defaults match the spec: 5% volume, unmuted.
+  backgroundVolume: 0.05,
+  backgroundMuted: false,
+  backgroundAudio: null,        // filename selected by the story
+  backgroundLoaded: false,
   _sceneChanging: false,
   _wsBackoff: 0,                 // exponential backoff for WS reconnect
   _dialogFocusStack: [],         // for openDialog/closeDialog focus restore
@@ -2632,6 +3091,39 @@ const API = {
     });
     return res.json();
   },
+  async exportPlex(storyId, opts = {}) {
+    const res = await fetch(`/api/stories/${storyId}/export-plex`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        background_volume: opts.backgroundVolume ?? null,
+        background_muted: opts.backgroundMuted ?? null,
+        background_audio: opts.backgroundAudio ?? null,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+  async getPlexExport(storyId) {
+    const res = await fetch(`/api/stories/${storyId}/export-plex`);
+    if (!res.ok) return null;
+    return res.json();
+  },
+  async fetchSeedSuggestions({ concept, count, style, tone, characters }) {
+    const res = await fetch('/api/seed-suggestions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ concept, count, style, tone, characters }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2655,6 +3147,11 @@ function pickHeroImage(story) {
     if (story.hero_image.startsWith('/')) return story.hero_image;
     if (story.hero_image.includes('/')) return `/${story.hero_image}`;
     return `/images/${story.hero_image}`;
+  }
+  // Prefer the new image-backed title PNG if the manifest carries it.
+  if (story.title_image) {
+    if (story.title_image.startsWith('/')) return story.title_image;
+    if (story.title_image.includes('/')) return `/${story.title_image}`;
   }
   if (story.scenes && story.scenes[0]) {
     const s0 = story.scenes[0];
@@ -3009,28 +3506,61 @@ async function openDetail(storyId) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
           Resume (Scene ${getProgress(story.id) + 1})
         </button>` : '') + `
-        <button class="btn-secondary" id="btn-critic" data-action="run-critic" data-id="${story.id}">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
-          Run Critic
-        </button>
-        <button class="btn-secondary" id="btn-improve" data-action="improve-story" data-id="${story.id}">
-          ✨ Improve Story
-        </button>
-        <button class="btn-secondary" id="btn-render" data-action="render-story" data-id="${story.id}">
-          🎬 Re-render
-        </button>
-        <button class="btn-secondary" id="btn-extend" data-action="extend-story" data-id="${story.id}">
-          ⏱️ Extend
-        </button>
-        <button class="btn-secondary" id="btn-improve-loop" data-action="improve-loop" data-id="${story.id}">
-          🔄 Improve Loop
-        </button>
-        <button class="btn-secondary" id="btn-add-images" data-action="add-images-bulk" data-id="${story.id}">
-          🖼️ Add Images
-        </button>
-        <button class="btn-secondary btn-danger" id="btn-delete" data-action="delete-story" data-id="${story.id}">
-          🗑️ Delete
-        </button>
+        <div class="detail-action-section" data-section="story">
+          <div class="detail-action-section-label">Story</div>
+          <div class="detail-action-row">
+            <button class="btn-secondary" id="btn-regenerate" data-action="regenerate-story" data-id="${story.id}"
+                    title="Wipe this story and re-run the generation pipeline from scratch">
+              🔄 Re-generate
+            </button>
+            <button class="btn-secondary" id="btn-repair" data-action="repair-story" data-id="${story.id}"
+                    title="Find missing images / audio / subtitles and regenerate only those">
+              🔧 Repair
+            </button>
+            <button class="btn-secondary" id="btn-extend" data-action="extend-story" data-id="${story.id}"
+                    title="Add 5 new scenes that continue the story">
+              ➕ Extend (5 scenes)
+            </button>
+          </div>
+        </div>
+        <div class="detail-action-section" data-section="quality">
+          <div class="detail-action-section-label">Quality</div>
+          <div class="detail-action-row">
+            <button class="btn-secondary" id="btn-critic" data-action="run-critic" data-id="${story.id}">
+              📊 Run Critic
+            </button>
+            <button class="btn-secondary" id="btn-improve" data-action="improve-story" data-id="${story.id}">
+              ✨ Improve Story
+            </button>
+            <button class="btn-secondary" id="btn-improve-loop" data-action="improve-loop" data-id="${story.id}">
+              🔄 Improve Loop
+            </button>
+            <button class="btn-secondary" id="btn-add-images" data-action="add-images-bulk" data-id="${story.id}">
+              🖼️ Add Images
+            </button>
+          </div>
+        </div>
+        <div class="detail-action-section" data-section="output">
+          <div class="detail-action-section-label">Output</div>
+          <div class="detail-action-row">
+            <button class="btn-secondary" id="btn-render" data-action="render-story" data-id="${story.id}">
+              🎬 Re-render Video
+            </button>
+            <button class="btn-accent" id="btn-export-plex" data-action="export-plex" data-id="${story.id}"
+                    title="Render a Plex-ready MP4 with chapters, SRT/VTT sidecars, and mixed background audio">
+              📺 Export to Plex
+            </button>
+            <button class="btn-secondary" id="btn-open-plex" data-action="open-plex" data-id="${story.id}"
+                    title="Open the latest Plex package in a new tab">
+              🔗 Open Plex package
+            </button>
+          </div>
+        </div>
+        <div class="detail-action-danger">
+          <button class="btn-secondary btn-danger" id="btn-delete" data-action="delete-story" data-id="${story.id}">
+            🗑️ Delete story
+          </button>
+        </div>
         <button class="btn-secondary" data-action="close-detail">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           Close
@@ -3136,10 +3666,10 @@ async function addSceneImage(storyId, idx, btn) {
 
 async function refineScenePrompt(storyId, idx, btn) {
   const instruction = await promptModal({
-    title: 'Refine prompt',
+    title: 'Refine prompt + regenerate image',
     label: 'Refinement direction (optional)',
     placeholder: 'e.g. Make it darker, add a dragon, focus on the sword…',
-    okText: 'Refine',
+    okText: 'Refine + regen image',
   });
   setBusy(btn, true, '<span class="spinner"></span> Refining…');
   try {
@@ -3150,8 +3680,19 @@ async function refineScenePrompt(storyId, idx, btn) {
       body: JSON.stringify(body),
     });
     if (res.ok) {
-      btn.textContent = '✅ Refined';
-      setTimeout(() => { btn.disabled = false; btn.textContent = '✨ Refine'; btn.removeAttribute('aria-busy'); }, 2000);
+      const data = await res.json();
+      const regenerated = data.image_regenerated;
+      btn.textContent = regenerated ? '✅ Refined + image' : '✅ Refined';
+      setTimeout(() => { btn.disabled = false; btn.textContent = '✨ Refine'; btn.removeAttribute('aria-busy'); }, 2200);
+      if (regenerated) {
+        toast.success('Prompt refined and image regenerated.');
+      } else if (data.image_error) {
+        // ComfyUI was down or the regen failed — prompt was updated
+        // but the user will need to re-render to see the visual change.
+        toast.warn(`Prompt refined, but image not regenerated: ${data.image_error}`);
+      } else {
+        toast.success('Prompt refined. Re-render to see the new image.');
+      }
       openDetail(storyId);
     } else {
       const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
@@ -3222,25 +3763,28 @@ async function renderStory(storyId) {
 
 // ── Extend Story ───────────────────────────────────────────────────────
 async function extendStory(storyId) {
-  const minutesStr = await promptModal({
+  // Default to "Add 5 scenes" — the per-spec button label. The user
+  // can still target a custom minute count via the advanced field, but
+  // the default is now the simple "give me 5 more" experience.
+  const scenesStr = await promptModal({
     title: 'Extend story',
-    label: 'Target total duration (minutes)',
-    defaultValue: '30',
+    label: 'How many new scenes to add?',
+    defaultValue: '5',
     okText: 'Extend',
   });
-  const minutes = minutesStr;
-  if (!minutes) return;
+  const scenes = parseInt(scenesStr, 10);
+  if (!scenes || scenes < 1) return;
   const btn = document.getElementById('btn-extend');
-  setBusy(btn, true, '<span class="spinner"></span> Extending…');
+  setBusy(btn, true, `<span class="spinner"></span> Adding ${scenes} scene(s)…`);
   try {
     const res = await fetch(`/api/stories/${storyId}/extend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target_minutes: parseFloat(minutes), images_per_scene: 2, voice: 'Dean' }),
+      body: JSON.stringify({ scenes, images_per_scene: 2, voice: 'Dean' }),
     });
     if (res.ok) {
       const data = await res.json();
-      toast.success(`Added ${data.new_scenes_added} scenes. Total: ${data.total_scenes} scenes, ~${data.estimated_minutes}min`);
+      toast.success(`Added ${data.new_scenes_added} scene(s). Total: ${data.total_scenes} scenes.`);
       openDetail(storyId);
     } else {
       const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
@@ -3481,6 +4025,215 @@ async function executeDeleteStory() {
 // Close delete modal on overlay click + Escape (drag-safe via shared helper)
 attachBackdropDismiss(document.getElementById('delete-modal'), closeDeleteModal);
 
+// ── Re-generate Story ─────────────────────────────────────────────────
+// Two-phase flow: first hit the endpoint in "preview" mode to get the
+// on-disk footprint, then open the confirmation modal. The modal's
+// "Re-generate" button POSTs with backup=true (default) and the
+// server runs the wipe + re-run in a background task with WS progress.
+
+let _regenTarget = null;  // { storyId, btn }
+
+async function confirmRegenerateStory(storyId, btn) {
+  _regenTarget = { storyId, btn };
+  const summary = document.getElementById('regen-modal-summary');
+  const confirmBtn = document.getElementById('btn-confirm-regen');
+  setBusy(confirmBtn, true, 'Scanning…');
+  summary.textContent = 'Scanning story for on-disk files…';
+
+  const modal = document.getElementById('regen-modal');
+  modal.classList.add('active');
+  openDialog(modal);
+
+  try {
+    // First hit the endpoint in dry-run mode so the modal can show
+    // the "you'll be deleting N files, M MB" warning before the user
+    // commits. The actual regeneration only happens when they click
+    // the modal's "Re-generate" button.
+    const res = await fetch(`/api/stories/${encodeURIComponent(storyId)}/regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dry_run: true, backup: true }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    if (data.status === 'preview') {
+      const sizeMb = data.bytes_freed ? (data.bytes_freed / 1024 / 1024).toFixed(1) : '?';
+      const files = data.files_count || 0;
+      summary.innerHTML = `This will delete <b>${files}</b> files (<b>${sizeMb} MB</b>) ` +
+        `and re-run the generation pipeline from scratch using the saved concept.<br>` +
+        `<span style="color:var(--text-muted)">A backup will be saved to <code>stories/.trash/</code> if you keep the box checked.</span>`;
+    } else {
+      summary.textContent = data.message || 'Ready to re-generate.';
+    }
+  } catch (e) {
+    summary.textContent = `Could not scan: ${e.message}`;
+  } finally {
+    setBusy(confirmBtn, false);
+    confirmBtn.textContent = '🔄 Re-generate';
+  }
+}
+
+function closeRegenModal() {
+  const modal = document.getElementById('regen-modal');
+  modal.classList.remove('active');
+  closeDialog(modal);
+  _regenTarget = null;
+  if (state && state._regenSourceBtn) {
+    state._regenSourceBtn = null;
+  }
+}
+
+async function executeRegenerateStory() {
+  if (!_regenTarget) {
+    closeRegenModal();
+    return;
+  }
+  const { storyId, btn } = _regenTarget;
+  const backup = document.getElementById('regen-modal-backup').checked;
+  const confirmBtn = document.getElementById('btn-confirm-regen');
+  setBusy(confirmBtn, true, '<span class="spinner"></span> Starting…');
+  try {
+    const res = await fetch(`/api/stories/${encodeURIComponent(storyId)}/regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backup }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    prefillProgressPanel(data.task_id, `Re-generating: ${storyId}`,
+                        { kind: 'regenerate' });
+    showToast(`Re-generation started in the background.`, 'success', { duration: 4000 });
+    closeRegenModal();
+  } catch (e) {
+    showToast(`Re-generate failed: ${e.message}`, 'error');
+  } finally {
+    setBusy(confirmBtn, false);
+    confirmBtn.textContent = '🔄 Re-generate';
+    if (btn) { btn.disabled = false; btn.innerHTML = '🔄 Re-generate'; }
+  }
+}
+
+attachBackdropDismiss(document.getElementById('regen-modal'), closeRegenModal);
+
+// ── Repair Story ──────────────────────────────────────────────────────
+// Two-phase flow: GET /repair returns the per-scene plan; the modal
+// renders that plan so the user knows what'll be regenerated. The
+// "Repair" button POSTs to actually run the work.
+
+let _repairPlan = null;
+let _repairStoryId = null;
+let _repairBtn = null;
+
+async function confirmRepairStory(storyId, btn) {
+  _repairStoryId = storyId;
+  _repairBtn = btn;
+  _repairPlan = null;
+  const summary = document.getElementById('repair-modal-summary');
+  const scenesEl = document.getElementById('repair-modal-scenes');
+  const confirmBtn = document.getElementById('btn-confirm-repair');
+  setBusy(confirmBtn, true, 'Scanning…');
+  summary.textContent = 'Scanning story for missing assets…';
+  scenesEl.innerHTML = '';
+
+  const modal = document.getElementById('repair-modal');
+  modal.classList.add('active');
+  openDialog(modal);
+
+  try {
+    const res = await fetch(`/api/stories/${encodeURIComponent(storyId)}/repair`, {
+      method: 'GET',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
+    const plan = await res.json();
+    _repairPlan = plan;
+    const total = plan.scenes_to_repair || 0;
+    summary.innerHTML = total === 0
+      ? `✓ All ${plan.scenes_checked} scene(s) look complete — nothing to repair.`
+      : `Will regenerate assets for <b>${total}</b> scene(s) out of ${plan.scenes_checked}. ` +
+        `<span style="color:var(--text-muted)">${plan.scenes_already_complete} already complete.</span>`;
+    scenesEl.innerHTML = plan.scenes
+      .filter(s => (s.actions || []).length > 0)
+      .map(s => {
+        const actions = s.actions.map(a => {
+          if (a === 'regen_image') return s.duplicate_image
+            ? '🖼️ image (looks like a near-duplicate of the previous scene)'
+            : '🖼️ image (missing)';
+          if (a === 'regen_tts') return '🔊 audio (missing or corrupt)';
+          if (a === 'regen_subs') return '💬 subtitles (missing)';
+          return a;
+        }).join(' · ');
+        return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+          <b>Scene ${s.scene_key}:</b> ${escapeHtml(s.title)}<br>
+          <span style="color:var(--text-muted)">${actions}</span>
+        </div>`;
+      }).join('') || '<div style="color:var(--text-muted);text-align:center;padding:12px">Nothing to repair</div>';
+  } catch (e) {
+    summary.textContent = `Could not scan: ${e.message}`;
+  } finally {
+    setBusy(confirmBtn, false);
+    if (_repairPlan) {
+      const total = _repairPlan.scenes_to_repair || 0;
+      confirmBtn.disabled = total === 0;
+      confirmBtn.textContent = total === 0
+        ? '🔧 Nothing to repair'
+        : `🔧 Repair ${total} scene${total === 1 ? '' : 's'}`;
+    } else {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = '🔧 Repair';
+    }
+  }
+}
+
+function closeRepairModal() {
+  const modal = document.getElementById('repair-modal');
+  modal.classList.remove('active');
+  closeDialog(modal);
+  _repairPlan = null;
+  _repairStoryId = null;
+  _repairBtn = null;
+}
+
+async function executeRepairStory() {
+  if (!_repairStoryId) {
+    closeRepairModal();
+    return;
+  }
+  const storyId = _repairStoryId;
+  const confirmBtn = document.getElementById('btn-confirm-repair');
+  setBusy(confirmBtn, true, '<span class="spinner"></span> Starting…');
+  try {
+    const res = await fetch(`/api/stories/${encodeURIComponent(storyId)}/repair`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    prefillProgressPanel(data.task_id, `Repairing: ${storyId}`,
+                        { kind: 'repair' });
+    showToast(`Repair started in the background.`, 'success', { duration: 4000 });
+    closeRepairModal();
+  } catch (e) {
+    showToast(`Repair failed: ${e.message}`, 'error');
+  } finally {
+    setBusy(confirmBtn, false);
+  }
+}
+
+attachBackdropDismiss(document.getElementById('repair-modal'), closeRepairModal);
+
 // ── Bulk Add Images ────────────────────────────────────────────────────
 async function addImagesBulk(storyId) {
   const perSceneStr = await promptModal({
@@ -3537,6 +4290,10 @@ async function openPlayer(storyId, sceneIndex) {
   audioEl.volume = state.volume;
   audioEl.muted = state.muted;
   updateVolumeIcon();
+  // Configure the background music track from the story manifest. Uses the
+  // manifest's `background_audio` (auto-selected server-side at generation
+  // time); falls back to whatever is currently set if the field is missing.
+  setupBackgroundAudioForStory(story);
   const ccBtn = document.getElementById('btn-cc');
   ccBtn.classList.toggle('active', state.subtitlesOn);
   updateCcButton(ccBtn);
@@ -3549,6 +4306,11 @@ function closePlayer() {
   document.getElementById('player-page').classList.remove('active');
   document.getElementById('player-audio').pause();
   document.getElementById('player-audio').src = '';
+  // Stop the background music too — it was synced to the narration
+  // timeline so a stale loop would otherwise keep playing in the background
+  // tab.
+  const bgEl = document.getElementById('player-background');
+  if (bgEl) { bgEl.pause(); bgEl.currentTime = 0; }
   state.playerStory = null;
 }
 
@@ -3677,6 +4439,10 @@ function updatePlayer() {
         playOverlay.style.display = 'none';
         audioIndicator.classList.remove('muted');
         audioIcon.textContent = '🔊';
+        // Start (or keep playing) the background music in sync with the
+        // narration. The background audio is looped, so we don't need to
+        // reset currentTime on scene change — it should ride the timeline.
+        startBackgroundAudio();
         updatePlayIcon();
       }).catch(() => {
         setTimeout(() => { state._sceneChanging = false; }, 1000);
@@ -3819,9 +4585,14 @@ function togglePlay() {
   if (audioEl.paused) {
     audioEl.play().then(() => {
       document.getElementById('play-overlay').style.display = 'none';
+      // Bring the background music in too — it's looped at low volume so
+      // it never competes with the narration, and tying it to play/pause
+      // means pausing also silences the music.
+      startBackgroundAudio();
     }).catch(() => {});
   } else {
     audioEl.pause();
+    pauseBackgroundAudio();
   }
   updatePlayIcon();
 }
@@ -3923,6 +4694,133 @@ function toggleSubtitles() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// BACKGROUND AUDIO (music)
+// Persisted locally per-device — new stories still default to 5%/unmuted
+// when no preference has been recorded yet.
+// ═══════════════════════════════════════════════════════════════════════
+const BG_VOLUME_KEY = 'fantasee_bg_volume_v1';
+const BG_MUTED_KEY = 'fantasee_bg_muted_v1';
+const DEFAULT_BG_VOLUME = 0.05;
+
+function loadBackgroundPrefs() {
+  try {
+    const v = localStorage.getItem(BG_VOLUME_KEY);
+    if (v !== null) {
+      const parsed = parseFloat(v);
+      if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) {
+        state.backgroundVolume = parsed;
+      }
+    }
+    const m = localStorage.getItem(BG_MUTED_KEY);
+    if (m !== null) state.backgroundMuted = m === 'true';
+  } catch (e) { /* localStorage may be disabled — keep defaults */ }
+}
+function saveBackgroundPrefs() {
+  try {
+    localStorage.setItem(BG_VOLUME_KEY, String(state.backgroundVolume));
+    localStorage.setItem(BG_MUTED_KEY, String(state.backgroundMuted));
+  } catch (e) { /* best-effort persistence */ }
+}
+loadBackgroundPrefs();
+
+function backgroundAudioEl() {
+  return document.getElementById('player-background');
+}
+
+/** Set the background audio volume (0-1) and persist. Does not change mute. */
+function setBackgroundVolume(val, opts = {}) {
+  const v = Math.max(0, Math.min(1, parseFloat(val)));
+  state.backgroundVolume = v;
+  const audioEl = backgroundAudioEl();
+  if (audioEl) audioEl.volume = v;
+  if (!opts.skipPersist) saveBackgroundPrefs();
+  // Update the slider value (0-100 scale)
+  const slider = document.getElementById('bg-volume-slider');
+  if (slider) slider.value = Math.round(v * 100);
+  updateBackgroundVolumeIcon();
+}
+
+/** Toggle the background mute state and persist. */
+function toggleBackgroundMute() {
+  state.backgroundMuted = !state.backgroundMuted;
+  applyBackgroundMute();
+  saveBackgroundPrefs();
+  updateBackgroundVolumeIcon();
+}
+
+function applyBackgroundMute() {
+  const audioEl = backgroundAudioEl();
+  if (audioEl) audioEl.muted = state.backgroundMuted;
+  const btn = document.getElementById('btn-bg-mute');
+  if (btn) {
+    btn.classList.toggle('muted', state.backgroundMuted);
+    btn.setAttribute('aria-pressed', String(state.backgroundMuted));
+    btn.setAttribute('aria-label', state.backgroundMuted ? 'Unmute background music' : 'Mute background music');
+  }
+}
+
+function updateBackgroundVolumeIcon() {
+  const icon = document.getElementById('bg-volume-icon');
+  if (!icon) return;
+  if (state.backgroundMuted || state.backgroundVolume === 0) {
+    icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/><line x1="22" y1="9" x2="17" y2="14" stroke="currentColor" stroke-width="1.5"/><line x1="17" y1="9" x2="22" y2="14" stroke="currentColor" stroke-width="1.5"/>';
+  } else if (state.backgroundVolume < 0.25) {
+    icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>';
+  } else {
+    icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/><path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+  }
+}
+
+/** Configure the background audio element for a story. Called from openPlayer. */
+function setupBackgroundAudioForStory(story) {
+  const audioEl = backgroundAudioEl();
+  if (!audioEl) return;
+  const filename = (story && story.background_audio) || null;
+  state.backgroundAudio = filename;
+  if (filename) {
+    audioEl.src = `/api/background/${encodeURIComponent(filename)}`;
+    audioEl.loop = true;
+    audioEl.volume = state.backgroundVolume;
+    audioEl.muted = state.backgroundMuted;
+    state.backgroundLoaded = true;
+    // Show track name overlay
+    const label = document.getElementById('bg-track-label');
+    const indicator = document.getElementById('bg-track-indicator');
+    if (label) label.textContent = `♪ ${filename.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ').slice(0, 60)}`;
+    if (indicator) indicator.hidden = false;
+  } else {
+    audioEl.removeAttribute('src');
+    state.backgroundLoaded = false;
+    const indicator = document.getElementById('bg-track-indicator');
+    if (indicator) indicator.hidden = true;
+  }
+  // Sync the slider/button to the persisted preference
+  const slider = document.getElementById('bg-volume-slider');
+  if (slider) slider.value = Math.round(state.backgroundVolume * 100);
+  applyBackgroundMute();
+  updateBackgroundVolumeIcon();
+}
+
+/** Start the background track if it's loaded and not already playing. */
+async function startBackgroundAudio() {
+  const audioEl = backgroundAudioEl();
+  if (!audioEl || !state.backgroundLoaded || !audioEl.src) return;
+  if (state.backgroundMuted) return; // user explicitly muted
+  try {
+    await audioEl.play();
+  } catch (e) {
+    // Autoplay may be blocked — same overlay mechanic as the narration track
+    // isn't appropriate here since the background is non-critical. Just log.
+    console.warn('[bg-audio] play() rejected:', e);
+  }
+}
+
+function pauseBackgroundAudio() {
+  const audioEl = backgroundAudioEl();
+  if (audioEl && !audioEl.paused) audioEl.pause();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // VOLUME
 // ═══════════════════════════════════════════════════════════════════════
 function setVolume(val) {
@@ -3967,6 +4865,143 @@ function updateVolumeIcon() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// PLEX EXPORT
+// Triggers the server-side render, listens for the WebSocket progress
+// events, and surfaces each pipeline stage to the user.
+// ═══════════════════════════════════════════════════════════════════════
+const PLEX_STAGE_LABELS = {
+  discover:  'Discovering scenes',
+  subtitles: 'Writing subtitle sidecars',
+  chapters:  'Building chapter markers',
+  audio_mix: 'Mixing narration + background audio',
+  finalize:  'Finalizing MP4',
+  complete:  'Plex export complete',
+  error:     'Plex export failed',
+};
+
+function exportPlexFromButton(btn) {
+  // Read the story id from the nearest data attribute we can find
+  let storyId = btn && btn.dataset && btn.dataset.id;
+  if (!storyId && state.currentDetail && state.currentDetail.id) {
+    storyId = state.currentDetail.id;
+  }
+  if (!storyId) {
+    toast.error('Open a story first to export it to Plex.');
+    return;
+  }
+  exportPlexAction(storyId, btn);
+}
+
+async function exportPlexAction(storyId, btn) {
+  if (btn) setBusy(btn, true, '<span class="spinner"></span> Exporting…');
+  // Show the per-stage toast immediately so the user sees feedback.
+  showPlexProgressToast('<div class="plex-stage plex-stage-current">Starting Plex export…</div>');
+
+  function onWs(e) {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type !== 'task_update') return;
+      if (!data.task_id || !data.task_id.startsWith('plex-')) return;
+      if (data.story_id && data.story_id !== storyId) return;
+      const stage = data.stage || 'discover';
+      const label = PLEX_STAGE_LABELS[stage] || stage;
+      const pct = Math.round((data.progress || 0) * 100);
+      const status = data.status || 'running';
+      const cssClass = status === 'error' ? 'plex-stage-error'
+        : status === 'done' ? 'plex-stage-done' : 'plex-stage-current';
+      const html = `<div class="plex-stage ${cssClass}">
+        <span class="plex-stage-label">${label}</span>
+        <span class="plex-pct">${pct}%</span>
+      </div>`;
+      // Replace the contents of the toast — keeps the UI simple and
+      // avoids needing to diff per-stage.
+      const done = status === 'done';
+      const fail = status === 'error';
+      const finalHtml = `
+        ${html}
+        <div class="plex-stage ${done ? 'plex-stage-done' : fail ? 'plex-stage-error' : ''}">
+          <span class="plex-stage-label">${done ? '✓ Ready' : fail ? '✗ ' + (data.message || 'Failed') : 'In progress…'}</span>
+        </div>
+      `;
+      showPlexProgressToast(finalHtml);
+      if (done) {
+        toast.success('Plex export ready — click "Open Plex package" to download.');
+        if (btn) setBusy(btn, false);
+        // Refresh story cache so the new package shows up
+        setTimeout(() => init(), 500);
+        // Auto-dismiss the toast after a few seconds
+        setTimeout(() => {
+          const t = document.getElementById('plex-progress-toast');
+          if (t) t.remove();
+        }, 6000);
+        if (ws) ws.removeEventListener('message', onWs);
+      } else if (fail) {
+        toast.error(data.message || 'Plex export failed');
+        if (btn) setBusy(btn, false);
+        if (ws) ws.removeEventListener('message', onWs);
+      }
+    } catch (_) { /* ignore */ }
+  }
+  if (ws) ws.addEventListener('message', onWs);
+
+  try {
+    const result = await API.exportPlex(storyId, {
+      backgroundVolume: state.backgroundVolume,
+      backgroundMuted: state.backgroundMuted,
+      backgroundAudio: state.backgroundAudio,
+    });
+    if (Array.isArray(state.tasks)) {
+      state.tasks.push({
+        id: result.task_id, kind: 'plex_export', story_id: storyId,
+        status: 'running', message: 'Plex export started',
+      });
+    }
+  } catch (e) {
+    toast.error(`Plex export failed: ${e.message || e}`);
+    if (btn) setBusy(btn, false);
+  }
+}
+
+function showPlexProgressToast(html) {
+  let toastEl = document.getElementById('plex-progress-toast');
+  if (!toastEl) {
+    toastEl = document.createElement('div');
+    toastEl.id = 'plex-progress-toast';
+    toastEl.className = 'gen-progress-toast plex-progress-toast';
+    toastEl.innerHTML = `
+      <div class="toast-header">
+        <span class="toast-title">Plex Export</span>
+        <button type="button" class="toast-close" data-action="dismiss-plex-toast" aria-label="Dismiss notification">&times;</button>
+      </div>
+      <div class="plex-stages" id="plex-stages"></div>
+    `;
+    document.body.appendChild(toastEl);
+  }
+  const stages = toastEl.querySelector('#plex-stages');
+  if (stages) stages.innerHTML = html;
+}
+
+async function openPlexPackage(btn) {
+  const storyId = (btn && btn.dataset && btn.dataset.id)
+    || (state.currentDetail && state.currentDetail.id);
+  if (!storyId) {
+    toast.error('Open a story first.');
+    return;
+  }
+  try {
+    const pkg = await API.getPlexExport(storyId);
+    if (!pkg || !pkg.mp4_url) {
+      toast.info('No Plex package yet — click "Export to Plex" to build one.');
+      return;
+    }
+    // Open the MP4 in a new tab so the user can save it / drop it in Plex.
+    window.open(pkg.mp4_url, '_blank', 'noopener');
+  } catch (e) {
+    toast.error('Could not open Plex package: ' + e.message);
+  }
+}
+
 // Keyboard shortcuts for player (YouTube/Netflix conventions).
 // The shortcuts cheatsheet is disabled because it can trap the player UI.
 document.addEventListener('keydown', (e) => {
@@ -3985,6 +5020,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowDown')  { e.preventDefault(); setVolume(Math.max(0, state.volume - 0.05)); }
   if (e.key === ' ' || e.key === 'k' || e.key === 'K') { e.preventDefault(); togglePlay(); }
   if (e.key === 'm' || e.key === 'M') { e.preventDefault(); toggleMute(); }
+  if (e.key === 'b' || e.key === 'B') { e.preventDefault(); toggleBackgroundMute(); }
   if (e.key === 'c' || e.key === 'C') {
     e.preventDefault();
     toggleSubtitles();
@@ -4157,6 +5193,22 @@ function closeCreateModal() {
   if (!createModal.classList.contains('active')) return;
   createModal.classList.remove('active');
   closeDialog(createModal);
+  // The form is always visible by default; if a previous version of the
+  // modal left it hidden, unhide it here so re-opening shows the inputs.
+  const form = createModal.querySelector('#create-form');
+  if (form) {
+    form.style.display = '';
+    form.hidden = false;
+  }
+  const picker = createModal.querySelector('#seed-picker');
+  if (picker) picker.hidden = true;
+  const host = createModal.querySelector('#modal-progress-host');
+  if (host) host.style.display = 'none';
+  const btn = document.getElementById('btn-submit-create');
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = _createMode === 'queue' ? 'Queue Generation' : 'Begin Generation';
+  }
 }
 
 function setCreateMode(mode) {
@@ -4169,6 +5221,122 @@ function setCreateMode(mode) {
     mode === 'queue' ? 'Queue Generation' : 'Begin Generation';
   if (mode === 'queue' && _queueItems.length === 0) {
     addQueueItem();
+  }
+  updateSeedCountLabel();
+}
+
+// ── Seed picker ──────────────────────────────────────────────────────
+// When the user picks 2-6 seeds, the form's submit button becomes
+// "Generate Seeds" — it asks the LLM for N distinct story ideas, then
+// shows a picker. The user selects one (single) or many (queue), and
+// the chosen ones go through the normal generation pipeline.
+let _seedSuggestions = [];
+let _seedSelectedIdx = new Set();
+let _lastCommonFields = null;   // saved when the user clicks "Generate Seeds"
+
+function updateSeedCountLabel() {
+  const slider = document.getElementById('form-seeds');
+  const pill = document.getElementById('seed-count-pill');
+  if (!slider || !pill) return;
+  const n = parseInt(slider.value, 10);
+  pill.textContent = String(n);
+  slider.style.setProperty('--val', String(n));
+  // Update the submit label so the user knows what'll happen on click
+  const label = document.getElementById('btn-submit-label');
+  if (label) {
+    if (_createMode === 'queue') {
+      label.textContent = n > 1 ? `Generate ${n} Seeds` : 'Queue Generation';
+    } else {
+      label.textContent = n > 1 ? `Generate ${n} Seeds` : 'Begin Generation';
+    }
+  }
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target && e.target.id === 'form-seeds') {
+    updateSeedCountLabel();
+  }
+});
+
+function _resetSeedPicker() {
+  _seedSuggestions = [];
+  _seedSelectedIdx = new Set();
+  const list = document.getElementById('seed-picker-list');
+  if (list) list.innerHTML = '';
+  const summary = document.getElementById('seed-picker-summary');
+  if (summary) summary.textContent = '0 selected';
+  const genBtn = document.getElementById('btn-generate-seeds');
+  if (genBtn) genBtn.disabled = true;
+}
+
+function _showSeedPicker() {
+  document.getElementById('create-form').hidden = true;
+  const picker = document.getElementById('seed-picker');
+  picker.hidden = false;
+}
+
+function _hideSeedPicker() {
+  document.getElementById('create-form').hidden = false;
+  document.getElementById('seed-picker').hidden = true;
+}
+
+function _renderSeedSuggestions(seeds) {
+  _seedSuggestions = seeds;
+  _seedSelectedIdx = new Set();
+  // Default-select the first seed so the user can hit "Generate" with one click
+  if (seeds.length > 0) _seedSelectedIdx.add(0);
+
+  const list = document.getElementById('seed-picker-list');
+  list.innerHTML = seeds.map((s, i) => `
+    <label class="seed-card ${i === 0 ? 'selected' : ''}" data-idx="${i}" role="listitem">
+      <input type="checkbox" class="seed-card-checkbox"
+             data-action="toggle-seed" data-idx="${i}"
+             ${i === 0 ? 'checked' : ''}
+             aria-label="Select seed ${i + 1}: ${escapeHtml(s.title)}" />
+      <div class="seed-card-body">
+        <div class="seed-card-title">${escapeHtml(s.title)}</div>
+        <div class="seed-card-desc">${escapeHtml(s.description || '')}</div>
+        <div class="seed-card-meta">
+          <span class="meta-tag">${escapeHtml(s.style || 'fantasy painterly')}</span>
+          <span class="meta-tag">${escapeHtml(s.tone || 'dramatic')}</span>
+        </div>
+      </div>
+    </label>
+  `).join('');
+  _updateSeedSelectionSummary();
+}
+
+function _toggleSeedSelection(idx) {
+  if (_seedSelectedIdx.has(idx)) _seedSelectedIdx.delete(idx);
+  else _seedSelectedIdx.add(idx);
+  // Reflect in the DOM (the checkbox and the .selected class on the card)
+  const cards = document.querySelectorAll('.seed-card');
+  cards.forEach((card, i) => {
+    const isSel = _seedSelectedIdx.has(i);
+    card.classList.toggle('selected', isSel);
+    const cb = card.querySelector('.seed-card-checkbox');
+    if (cb) cb.checked = isSel;
+  });
+  _updateSeedSelectionSummary();
+}
+
+function _updateSeedSelectionSummary() {
+  const n = _seedSelectedIdx.size;
+  const summary = document.getElementById('seed-picker-summary');
+  if (summary) {
+    summary.textContent = n === 0 ? 'Pick at least one'
+      : n === 1 ? '1 selected'
+      : `${n} selected`;
+  }
+  const genBtn = document.getElementById('btn-generate-seeds');
+  if (genBtn) {
+    genBtn.disabled = n === 0;
+    const label = document.getElementById('btn-generate-seeds-label');
+    if (label) {
+      label.textContent = n <= 1
+        ? 'Generate This Story'
+        : `Generate ${n} Stories`;
+    }
   }
 }
 
@@ -4224,6 +5392,16 @@ async function submitCreate(e) {
     voice_preset: document.getElementById('form-voice').value,
   });
 
+  // ── Seed flow ─────────────────────────────────────────────────────
+  // When the user picks 2+ seeds, "Begin Generation" first asks the LLM
+  // for N distinct story ideas, shows them in a picker, and only kicks
+  // off the actual generation when the user confirms. This means:
+  //   - 1 seed (default): identical to the old one-click flow
+  //   - 2-6 seeds: a two-step flow with a "Back" button so the user can
+  //     tweak the concept if none of the seeds look right.
+  const seedCount = parseInt(document.getElementById('form-seeds').value, 10);
+  const usingSeeds = seedCount > 1;
+
   try {
     if (_createMode === 'queue') {
       // Validate: every queue item must have a concept
@@ -4242,32 +5420,145 @@ async function submitCreate(e) {
         ...commonFields(),
       }));
       const result = await API.submitGenerationQueue(items);
-      showToast(`Queue of ${result.item_count} stories accepted! ID: ${result.queue_id}`, 'success');
+      // Close the modal immediately so the user can navigate freely while
+      // the queue runs in the background. The right-hand progress panel
+      // and the persistent top-right toast are the running indicators.
+      showToast(`Queue of ${result.item_count} stories started in the background.`, 'success', { duration: 5000 });
+      prefillProgressPanel(result.queue_id, `Queue of ${result.item_count} stories`, { kind: 'queue', item_count: result.item_count });
       closeCreateModal();
       resetCreateForm();
-      openProgressPanel();
-    } else {
-      const concept = document.getElementById('form-concept').value;
-      if (!concept || concept.trim().length < 10) {
-        showToast('Story concept must be at least 10 characters.', 'error');
-        return;
-      }
-      const body = {
-        story_concept: concept,
-        ...commonFields(),
-      };
-      const result = await API.submitGeneration(body);
-      showToast('Story generation request submitted! Task ID: ' + result.task_id, 'success');
-      closeCreateModal();
-      document.getElementById('create-form').reset();
-      openProgressPanel();
+      return;
     }
+
+    const concept = document.getElementById('form-concept').value;
+    if (!concept || concept.trim().length < 10) {
+      showToast('Story concept must be at least 10 characters.', 'error');
+      return;
+    }
+
+    // ── Seed branching ────────────────────────────────────────────
+    if (usingSeeds) {
+      // Stash the common fields so the seed-picker's "Generate" handler
+      // can use them. Then fetch the suggestions and show the picker.
+      _lastCommonFields = commonFields();
+      setBusy(btn, true, `<span class="spinner"></span> Brainstorming ${seedCount} seeds…`);
+      try {
+        const result = await API.fetchSeedSuggestions({
+          concept,
+          count: seedCount,
+          style: _lastCommonFields.style,
+          tone: _lastCommonFields.tone,
+          characters: _lastCommonFields.characters,
+        });
+        if (!result || !result.seeds || !result.seeds.length) {
+          showToast('No seeds returned — try a different concept.', 'error');
+          return;
+        }
+        _renderSeedSuggestions(result.seeds);
+        _showSeedPicker();
+      } finally {
+        setBusy(btn, false);
+        updateSeedCountLabel();
+      }
+      return;
+    }
+
+    // Single-seed path: submit directly, no picker.
+    const body = {
+      story_concept: concept,
+      ...commonFields(),
+    };
+    const result = await API.submitGeneration(body);
+    showToast(`Generation started in the background — task ${result.task_id}.`, 'success', { duration: 4000 });
+    prefillProgressPanel(result.task_id, concept, { kind: 'story' });
+    closeCreateModal();
+    resetCreateForm();
   } catch (err) {
     showToast('Failed to submit: ' + err.message, 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = _createMode === 'queue' ? 'Queue Generation' : 'Begin Generation';
+    setBusy(btn, false);
+    updateSeedCountLabel();
   }
+}
+
+async function generateSelectedSeeds() {
+  if (!_seedSelectedIdx.size) return;
+  const btn = document.getElementById('btn-generate-seeds');
+  setBusy(btn, true, '<span class="spinner"></span> Starting…');
+  try {
+    const selected = [..._seedSelectedIdx]
+      .sort((a, b) => a - b)
+      .map(i => _seedSuggestions[i])
+      .filter(Boolean);
+
+    if (!selected.length) {
+      showToast('No seeds selected.', 'warn');
+      return;
+    }
+
+    // The LLM-generated description already contains the idea's hook,
+    // tone, and characters — feed it to the generation pipeline as the
+    // concept and let the normal pipeline pick a title from it.
+    const common = _lastCommonFields || {};
+    const voice = common.voice_preset || 'Dean';
+
+    if (selected.length === 1) {
+      // Single seed → one task in the background.
+      const seed = selected[0];
+      const result = await API.submitGeneration({
+        story_concept: `${seed.title}\n\n${seed.description}`,
+        style: seed.style || common.style || 'fantasy painterly',
+        num_scenes: common.num_scenes || 10,
+        images_per_scene: common.images_per_scene || 5,
+        characters: seed.characters || common.characters || '',
+        tone: seed.tone || common.tone || 'dramatic',
+        voice_preset: voice,
+      });
+      const concept = `${seed.title} — ${seed.description}`;
+      showToast(`"${seed.title}" generating in the background — task ${result.task_id}.`, 'success', { duration: 4000 });
+      prefillProgressPanel(result.task_id, concept, { kind: 'story' });
+    } else {
+      // Multiple seeds → submit as a queue so they run sequentially in
+      // the background without blocking each other.
+      const items = selected.map(seed => ({
+        story_concept: `${seed.title}\n\n${seed.description}`,
+        style: seed.style || common.style || 'fantasy painterly',
+        num_scenes: common.num_scenes || 10,
+        images_per_scene: common.images_per_scene || 5,
+        characters: seed.characters || common.characters || '',
+        tone: seed.tone || common.tone || 'dramatic',
+        voice_preset: voice,
+      }));
+      const result = await API.submitGenerationQueue(items);
+      showToast(`${selected.length} stories queued in the background.`, 'success', { duration: 5000 });
+      prefillProgressPanel(result.queue_id, `Queue of ${selected.length} seeds`, { kind: 'queue', item_count: selected.length });
+    }
+    closeCreateModal();
+    resetCreateForm();
+    _resetSeedPicker();
+  } catch (err) {
+    showToast('Failed to start: ' + err.message, 'error');
+  } finally {
+    setBusy(btn, false);
+  }
+}
+
+function prefillProgressPanel(taskId, concept, extras = {}) {
+  // Insert a synthetic entry into state.tasks so the right-hand panel has
+  // something to show before the WebSocket event arrives (or if the WS is
+  // not connected yet). Uses `id` as the merge key (see WS handler).
+  const existing = state.tasks.find(t => t.id === taskId);
+  if (existing) return;
+  state.tasks.push({
+    id: taskId,
+    status: 'queued',
+    progress: 0,
+    message: 'Queued for generation…',
+    concept: (concept || '').slice(0, 80),
+    ...extras,
+  });
+  openProgressPanel();
+  updateProgressDisplay();
 }
 
 function resetCreateForm() {
@@ -4278,6 +5569,12 @@ function resetCreateForm() {
   document.getElementById('form-images-per-scene').value = '5';
   document.getElementById('form-scenes').value = '10';
   document.getElementById('form-voice').value = 'Dean';
+  // Reset the seed slider to 1 and hide the seed picker
+  const seeds = document.getElementById('form-seeds');
+  if (seeds) seeds.value = '1';
+  _hideSeedPicker();
+  _resetSeedPicker();
+  updateSeedCountLabel();
 }
 
 // Close create modal on overlay click (drag-safe via shared helper)
@@ -4330,6 +5627,13 @@ function toggleProgressPanel() {
   panel.classList.toggle('active');
 }
 
+/** HTML-escape a string for safe interpolation into innerHTML. */
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
 function updateProgressDisplay() {
   const list = document.getElementById('progress-list');
   if (!state.tasks.length) {
@@ -4359,12 +5663,17 @@ function updateProgressDisplay() {
       ? `<span class="progress-item-sub">${t.item_count} stories</span>`
       : '';
     const titlePrefix = isChild ? '<span class="progress-item-child">↳</span> ' : '';
+    // Prefer the resolved story title; fall back to a preview of the
+    // concept; finally use a short id. Never show "undefined".
+    const title = isQueue
+      ? 'Generation queue'
+      : (t.title || t.concept || `Task ${(t.id || '').slice(0, 6) || '—'}`);
     return `
       <div class="progress-item ${isChild ? 'progress-item-child-row' : ''}">
         <div class="progress-status ${statusClass}"></div>
         <div class="progress-item-info">
-          <div class="progress-item-title">${titlePrefix}${isQueue ? 'Queue' : 'Task'} ${t.id}</div>
-          <div class="progress-item-msg">${t.message || t.status} ${sub}</div>
+          <div class="progress-item-title">${titlePrefix}${escapeHtml(title)}</div>
+          <div class="progress-item-msg">${escapeHtml(t.message || t.status || '')} ${sub}</div>
           ${bar}
         </div>
       </div>
@@ -4447,7 +5756,7 @@ const ACTION_HANDLERS = {
   'mode-single':    (el) => setCreateMode('single', el),
   'mode-queue':     (el) => setCreateMode('queue', el),
   'add-queue-item': () => addQueueItem(),
-  'submit-create':  () => {},
+  'submit-create':  (_el, e) => submitCreate(e),
   'close-delete':   () => closeDeleteModal(),
   'confirm-delete': () => executeDeleteStory(),
   'toggle-progress':() => toggleProgressPanel(),
@@ -4469,6 +5778,12 @@ const ACTION_HANDLERS = {
   'improve-loop':    (el) => improveLoop(el.dataset.id),
   'add-images-bulk': (el) => addImagesBulk(el.dataset.id),
   'delete-story':    (el, e) => { if (e) e.stopPropagation(); confirmDeleteStory(el.dataset.id, el); },
+  'regenerate-story':(el) => confirmRegenerateStory(el.dataset.id, el),
+  'close-regen':     () => closeRegenModal(),
+  'confirm-regenerate': () => executeRegenerateStory(),
+  'repair-story':    (el) => confirmRepairStory(el.dataset.id, el),
+  'close-repair':    () => closeRepairModal(),
+  'confirm-repair':  () => executeRepairStory(),
 
   // Row scroll arrows
   'scroll-row':      (el) => scrollRow(el.dataset.row, parseInt(el.dataset.dir || '1', 10)),
@@ -4487,7 +5802,23 @@ const ACTION_HANDLERS = {
 
   // Player scrubber (changed by oninput)
   'set-volume':      (el) => setVolume(el.value),
+  'set-bg-volume':   (el) => setBackgroundVolume(parseInt(el.value, 10) / 100),
+  'toggle-bg-mute':  (el) => toggleBackgroundMute(),
   'player-scrub':    (el) => playerScrub(el.value),
+  'export-plex':     (el) => exportPlexFromButton(el),
+  'open-plex':       (el) => openPlexPackage(el),
+  'dismiss-plex-toast': (el) => {
+    const t = el.closest('.plex-progress-toast');
+    if (t) t.remove();
+  },
+
+  // Seed picker
+  'toggle-seed': (el) => _toggleSeedSelection(parseInt(el.dataset.idx, 10)),
+  'seed-picker-back': () => {
+    _hideSeedPicker();
+    _resetSeedPicker();
+  },
+  'generate-selected-seeds': () => generateSelectedSeeds(),
 };
 
 function updateCcButton(btn) {
@@ -4562,7 +5893,25 @@ function connectWebSocket() {
     try {
       const data = JSON.parse(event.data);
       if (data.type === 'task_update') {
-        const existing = state.tasks.find(t => t.id === data.task_id);
+        // Normalize the payload: WS events use `task_id`, but the rest of
+        // the app expects `id`. This is what was producing "Task undefined"
+        // in the right-hand panel — the synthetic prefill used `id` while
+        // the WS payload used `task_id`, so the merge key was missing.
+        if (data.task_id && !data.id) data.id = data.task_id;
+
+        // Some progress messages contain the generated story title —
+        // e.g. `Story: "Whispers of Progress" (id: whispers-of-progress)`.
+        // Parse that and store it on the task so the panel + toast can
+        // show the real name instead of "Task undefined".
+        if (typeof data.message === 'string') {
+          const m = data.message.match(/^Story:\s*"([^"]+)"\s*\(id:\s*([^)]+)\)/);
+          if (m) {
+            data.title = m[1];
+            data.story_id = m[2];
+          }
+        }
+
+        const existing = state.tasks.find(t => t.id === data.id);
         if (existing) {
           Object.assign(existing, data);
         } else {
@@ -4571,7 +5920,8 @@ function connectWebSocket() {
         }
         updateProgressDisplay();
         if (typeof showGenProgress === 'function') {
-          showGenProgress(data.task_id, data.message, data.progress);
+          showGenProgress(data.id, data.message, data.progress,
+                          data.title || data.story_id);
         }
         if (data.message && data.message.includes('Title slide ready')) {
           setTimeout(() => init(), 250);
@@ -4721,7 +6071,7 @@ setInterval(pollComfyUI, 15000);
 // ═══════════════════════════════════════════════════════════════════════
 // GENERATION PROGRESS TOAST
 // ═══════════════════════════════════════════════════════════════════════
-function showGenProgress(taskId, message, progress) {
+function showGenProgress(taskId, message, progress, title) {
   let toast = document.getElementById('gen-progress-toast');
   if (!toast) {
     toast = document.createElement('div');
@@ -4729,13 +6079,21 @@ function showGenProgress(taskId, message, progress) {
     toast.className = 'gen-progress-toast';
     toast.innerHTML = `
       <div class="toast-header">
-        <span class="toast-title">Generating Story...</span>
+        <span class="toast-title" id="gen-progress-title">Generating Story…</span>
         <button type="button" class="toast-close" data-action="dismiss-gen-toast" aria-label="Dismiss notification">&times;</button>
       </div>
       <div class="progress-bar-track"><div class="progress-bar-fill" id="gen-progress-fill"></div></div>
       <div><span class="toast-message" id="gen-progress-msg"></span><span class="toast-percent" id="gen-progress-pct"></span></div>
     `;
     document.body.appendChild(toast);
+  }
+  const titleEl = document.getElementById('gen-progress-title');
+  if (title) {
+    titleEl.textContent = `Generating: ${title}`;
+  } else if (!titleEl.dataset.placeholder) {
+    // First time we see the toast and we don't have a title yet — keep
+    // the generic placeholder until the server sends the real name.
+    titleEl.textContent = 'Generating Story…';
   }
   document.getElementById('gen-progress-msg').textContent = message || '';
   const pct = Math.round((progress || 0) * 100);
@@ -4744,15 +6102,19 @@ function showGenProgress(taskId, message, progress) {
   // compositor (animating `width` triggers layout on the whole row).
   document.getElementById('gen-progress-fill').style.setProperty('--pct', (progress || 0));
 
-  if (progress >= 1.0 || message?.includes('complete')) {
-    document.querySelector('#gen-progress-toast .toast-title').textContent = '✓ Story Complete!';
-    setTimeout(() => toast.remove(), 5000);
-    // Refresh story list
+  if (progress >= 1.0 || (message && message.includes('complete'))) {
+    titleEl.textContent = `✓ ${title || 'Story'} complete!`;
+    // Keep the toast visible a bit longer (10s) so the user has time to
+    // notice the success state before it fades. The progress panel on
+    // the right remains as the persistent record of all tasks.
+    setTimeout(() => toast.remove(), 10000);
+    // Refresh story list so the new story shows up immediately
     setTimeout(() => init(), 1000);
   }
 }
 
 init();
+updateSeedCountLabel();
 </script>
 </body>
 </html>

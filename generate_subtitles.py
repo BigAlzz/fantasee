@@ -10,9 +10,6 @@ Usage:
     python generate_subtitles.py tts_rampart_s01.mp3 \
         --text "High on the walls..." \
         --output siege_scene01.subs.json
-
-    # Batch: regenerate all subtitle segments for a story
-    python generate_subtitles.py --batch siege
 """
 
 import argparse
@@ -28,25 +25,6 @@ from faster_whisper import WhisperModel
 
 # ── Config ──────────────────────────────────────────────────────────────
 MODEL_SIZE = "base"  # Small enough for CPU, accurate enough for clean TTS
-OUTPUTS = Path(r"E:\hermes\workspace\outputs")
-SIEGE_ROOT = Path(r"E:\hermes\workspace\siege_story")
-
-# Map scene key -> narration file, TTS file, scene number
-SIEGE_SCENES = [
-    ("01", 1), ("02", 2), ("2b", 2.2), ("03", 3), ("04", 4),
-    ("05", 5), ("06", 6), ("07", 7), ("08", 8), ("09", 9),
-    ("10", 10), ("10b", 10.2),
-    ("11", 11), ("12", 12), ("12b", 12.2),
-    ("13", 13), ("14", 14),
-    ("15", 15), ("16", 16), ("17", 17), ("18", 18),
-    ("19", 19), ("19b", 19.2),
-    ("20", 20), ("21", 21), ("21b", 21.2),
-    ("22", 22),
-    ("23", 23), ("24", 24), ("25", 25),
-]
-
-
-
 
 
 
@@ -286,27 +264,12 @@ def process_scene(
 
 def main():
     parser = argparse.ArgumentParser(description="Generate subtitle segments from TTS + narration")
-    parser.add_argument("--batch", choices=["siege"], help="Batch-process all scenes for a story")
     parser.add_argument("audio", nargs="?", help="Single TTS audio file path")
     parser.add_argument("--text", help="Narration text (for single mode)")
     parser.add_argument("--output", help="Output JSON path (for single mode)")
     args = parser.parse_args()
 
-    if args.batch == "siege":
-        os.makedirs(OUTPUTS, exist_ok=True)
-        count = 0
-        for scene_key, _ in SIEGE_SCENES:
-            ok = process_scene(
-                scene_key,
-                narration_dir=SIEGE_ROOT / "narrations",
-                output_dir=OUTPUTS,
-                tts_prefix="rampart",
-            )
-            if ok:
-                count += 1
-        print(f"\nDone. Generated subtitles for {count} scenes.")
-
-    elif args.audio:
+    if args.audio:
         if not args.text:
             parser.error("--text required for single-file mode")
         segments = generate_subtitles(args.audio, args.text)
