@@ -1,0 +1,101 @@
+[2026-06-16 08:22:38] ======================================================================
+[2026-06-16 08:22:38] BATCH IMPROVE PIPELINE STARTED
+[2026-06-16 08:22:38] ======================================================================
+[2026-06-16 08:22:38] Found 5 stories to process
+[2026-06-16 08:22:38] 
+============================================================
+[2026-06-16 08:22:38] Processing: Crown of Steel / Iron Sovereign / Queen's Unyielding Bulwark
+[2026-06-16 08:22:38]   ID: crown-of-steel-iron-sovereign-queen-s-un
+[2026-06-16 08:22:38]   Current: 18 scenes, critic: None (None stars)
+[2026-06-16 08:22:38]   EXTENDING crown-of-steel-iron-sovereign-queen-s-un: requesting 2 new scenes (target_minutes=4)
+[2026-06-16 08:22:38]   EXTEND result: {"status": "already_at_target", "current_minutes": 8.1}
+[2026-06-16 08:22:38]   Already at target
+[2026-06-16 08:22:38]   Running critic on crown-of-steel-iron-sovereign-queen-s-un...
+[2026-06-16 08:22:39]   Critic failed: Traceback (most recent call last):
+  File "C:\dev\fantasee\critic.py", line 1060, in <module>
+    main()
+  File "C:\dev\fantasee\critic.py", line 1023, in main
+    result = review_story(args.story_id)
+[2026-06-16 08:22:39]   IMPROVE-LOOP crown-of-steel-iron-sovereign-queen-s-un: target=4.5 stars, max_rounds=3
+[2026-06-16 08:22:39]   IMPROVE FAILED: 500 {"detail":"Critic failed: Traceback (most recent call last):\n  File \"C:\\dev\\fantasee\\critic.py\", line 1060, in <module>\n    main()\n    ~~~~^^\n  File \"C:\\dev\\fantasee\\critic.py\", line 1023, in main\n    result = review_story(args.story_id)\n  File \"C:\\dev\\fantasee\\critic.py\", line 
+[2026-06-16 08:22:39]   Running critic on crown-of-steel-iron-sovereign-queen-s-un...
+[2026-06-16 08:22:39]   Critic failed: Traceback (most recent call last):
+  File "C:\dev\fantasee\critic.py", line 1060, in <module>
+    main()
+  File "C:\dev\fantasee\critic.py", line 1023, in main
+    result = review_story(args.story_id)
+[2026-06-16 08:22:39]   DONE: None stars (None/10)
+[2026-06-16 08:22:39] 
+============================================================
+[2026-06-16 08:22:39] Processing: The Emerald's Fading Cure
+[2026-06-16 08:22:39]   ID: the-emerald-s-fading-cure
+[2026-06-16 08:22:39]   Current: 10 scenes, critic: 4.8 (5 stars)
+[2026-06-16 08:22:39]   EXTENDING the-emerald-s-fading-cure: requesting 10 new scenes (target_minutes=20)
+[2026-06-16 08:22:39]   EXTEND FAILED: 500 Internal Server Error
+[2026-06-16 08:22:39]   Extension may have failed, continuing with current scene count
+[2026-06-16 08:22:39]   Running critic on the-emerald-s-fading-cure...
+[2026-06-16 08:23:10]   Critic result: 9.7/10 (5 stars)
+[2026-06-16 08:23:10]   Already at 5 stars (9.7/10), skipping improvement
+[2026-06-16 08:23:10]   DONE: 5 stars (9.7/10)
+[2026-06-16 08:23:10] 
+============================================================
+[2026-06-16 08:23:10] Processing: The Shrine of Embers
+[2026-06-16 08:23:10]   ID: the-shrine-of-embers
+[2026-06-16 08:23:10]   Current: 10 scenes, critic: 4.2 (4 stars)
+[2026-06-16 08:23:10]   EXTENDING the-shrine-of-embers: requesting 10 new scenes (target_minutes=20)
+[2026-06-16 08:23:10]   EXTEND FAILED: 500 Internal Server Error
+[2026-06-16 08:23:10]   Extension may have failed, continuing with current scene count
+[2026-06-16 08:23:10]   Running critic on the-shrine-of-embers...
+[2026-06-16 08:23:35]   Critic result: 8.5/10 (4 stars)
+[2026-06-16 08:23:35]   IMPROVE-LOOP the-shrine-of-embers: target=4.5 stars, max_rounds=3
+[2026-06-16 08:25:54]   IMPROVE result: {"status": "max_rounds_reached", "rounds_completed": 3, "final_stars": 4, "final_rating": 8.5, "history": [{"round": 1, "stars": 4, "rating": 8.5, "improved": 3}, {"round": 2, "stars": 4, "rating": 8.5, "improved": 3}, {"round": 3, "stars": 4, "rating": 8.5, "improved": 3}]}
+[2026-06-16 08:25:54]   DONE: 4 stars (8.5/10)
+[2026-06-16 08:25:54] 
+============================================================
+[2026-06-16 08:25:54] Processing: The Silent Test / Trial of Whispers / What Remains After
+[2026-06-16 08:25:54]   ID: the-silent-test-trial-of-whispers-what-r
+[2026-06-16 08:25:54]   Current: 3 scenes, critic: None (None stars)
+[2026-06-16 08:25:54]   EXTENDING the-silent-test-trial-of-whispers-what-r: requesting 17 new scenes (target_minutes=34)
+[2026-06-16 08:25:54]   EXTEND FAILED: 500 Internal Server Error
+[2026-06-16 08:25:54]   Extension may have failed, continuing with current scene count
+[2026-06-16 08:25:54]   Running critic on the-silent-test-trial-of-whispers-what-r...
+[2026-06-16 08:25:54]   Critic failed: Traceback (most recent call last):
+  File "C:\dev\fantasee\critic.py", line 1060, in <module>
+    main()
+  File "C:\dev\fantasee\critic.py", line 1023, in main
+    result = review_story(args.story_id)
+[2026-06-16 08:25:54]   IMPROVE-LOOP the-silent-test-trial-of-whispers-what-r: target=4.5 stars, max_rounds=3
+[2026-06-16 08:25:54]   IMPROVE FAILED: 500 {"detail":"Critic failed: Traceback (most recent call last):\n  File \"C:\\dev\\fantasee\\critic.py\", line 1060, in <module>\n    main()\n    ~~~~^^\n  File \"C:\\dev\\fantasee\\critic.py\", line 1023, in main\n    result = review_story(args.story_id)\n  File \"C:\\dev\\fantasee\\critic.py\", line 
+[2026-06-16 08:25:54]   Running critic on the-silent-test-trial-of-whispers-what-r...
+[2026-06-16 08:25:55]   Critic failed: Traceback (most recent call last):
+  File "C:\dev\fantasee\critic.py", line 1060, in <module>
+    main()
+  File "C:\dev\fantasee\critic.py", line 1023, in main
+    result = review_story(args.story_id)
+[2026-06-16 08:25:55]   DONE: None stars (None/10)
+[2026-06-16 08:25:55] 
+============================================================
+[2026-06-16 08:25:55] Processing: Wings of Ice and Embers
+[2026-06-16 08:25:55]   ID: wings-of-ice-and-embers
+[2026-06-16 08:25:55]   Current: 10 scenes, critic: None (None stars)
+[2026-06-16 08:25:55]   EXTENDING wings-of-ice-and-embers: requesting 10 new scenes (target_minutes=20)
+[2026-06-16 08:25:55]   EXTEND FAILED: 500 Internal Server Error
+[2026-06-16 08:25:55]   Extension may have failed, continuing with current scene count
+[2026-06-16 08:25:55]   Running critic on wings-of-ice-and-embers...
+[2026-06-16 08:26:23]   Critic result: 8.4/10 (4 stars)
+[2026-06-16 08:26:23]   IMPROVE-LOOP wings-of-ice-and-embers: target=4.5 stars, max_rounds=3
+[2026-06-16 08:28:39]   IMPROVE result: {"status": "max_rounds_reached", "rounds_completed": 3, "final_stars": 4, "final_rating": 8.4, "history": [{"round": 1, "stars": 4, "rating": 8.4, "improved": 3}, {"round": 2, "stars": 4, "rating": 8.4, "improved": 3}, {"round": 3, "stars": 4, "rating": 8.4, "improved": 3}]}
+[2026-06-16 08:28:39]   DONE: 4 stars (8.4/10)
+[2026-06-16 08:28:39] 
+======================================================================
+[2026-06-16 08:28:39] BATCH PIPELINE COMPLETE - SUMMARY
+[2026-06-16 08:28:39] ======================================================================
+[2026-06-16 08:28:39]   Crown of Steel / Iron Sovereign / Queen's Unyieldi: 18 scenes | pre=None★ → final=None★ (None/10) | status=improve_failed_ran_critic
+[2026-06-16 08:28:39]   The Emerald's Fading Cure: 10 scenes | pre=5★ → final=5★ (9.7/10) | status=already_at_target
+[2026-06-16 08:28:39]   The Shrine of Embers: 10 scenes | pre=4★ → final=4★ (8.5/10) | status=max_rounds_reached
+[2026-06-16 08:28:39]   The Silent Test / Trial of Whispers / What Remains: 3 scenes | pre=None★ → final=None★ (None/10) | status=improve_failed_ran_critic
+[2026-06-16 08:28:39]   Wings of Ice and Embers: 10 scenes | pre=4★ → final=4★ (8.4/10) | status=max_rounds_reached
+[2026-06-16 08:28:39] 
+Results saved to C:\dev\fantasee\batch_improve_results.json
+[2026-06-16 08:28:39] 
+1/5 stories reached 4.5+ stars

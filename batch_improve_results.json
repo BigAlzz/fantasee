@@ -1,0 +1,101 @@
+[
+  {
+    "id": "crown-of-steel-iron-sovereign-queen-s-un",
+    "title": "Crown of Steel / Iron Sovereign / Queen's Unyielding Bulwark",
+    "start_scenes": 18,
+    "extended_to": 18,
+    "pre_improve_rating": null,
+    "pre_improve_stars": null,
+    "final_stars": null,
+    "final_rating": null,
+    "improve_status": "improve_failed_ran_critic"
+  },
+  {
+    "id": "the-emerald-s-fading-cure",
+    "title": "The Emerald's Fading Cure",
+    "start_scenes": 10,
+    "extended_to": 10,
+    "extend_error": "No response",
+    "pre_improve_rating": 9.7,
+    "pre_improve_stars": 5,
+    "final_stars": 5,
+    "final_rating": 9.7,
+    "improve_status": "already_at_target"
+  },
+  {
+    "id": "the-shrine-of-embers",
+    "title": "The Shrine of Embers",
+    "start_scenes": 10,
+    "extended_to": 10,
+    "extend_error": "No response",
+    "pre_improve_rating": 8.5,
+    "pre_improve_stars": 4,
+    "final_stars": 4,
+    "final_rating": 8.5,
+    "improve_status": "max_rounds_reached",
+    "improve_history": [
+      {
+        "round": 1,
+        "stars": 4,
+        "rating": 8.5,
+        "improved": 3
+      },
+      {
+        "round": 2,
+        "stars": 4,
+        "rating": 8.5,
+        "improved": 3
+      },
+      {
+        "round": 3,
+        "stars": 4,
+        "rating": 8.5,
+        "improved": 3
+      }
+    ]
+  },
+  {
+    "id": "the-silent-test-trial-of-whispers-what-r",
+    "title": "The Silent Test / Trial of Whispers / What Remains After",
+    "start_scenes": 3,
+    "extended_to": 3,
+    "extend_error": "No response",
+    "pre_improve_rating": null,
+    "pre_improve_stars": null,
+    "final_stars": null,
+    "final_rating": null,
+    "improve_status": "improve_failed_ran_critic"
+  },
+  {
+    "id": "wings-of-ice-and-embers",
+    "title": "Wings of Ice and Embers",
+    "start_scenes": 10,
+    "extended_to": 10,
+    "extend_error": "No response",
+    "pre_improve_rating": 8.4,
+    "pre_improve_stars": 4,
+    "final_stars": 4,
+    "final_rating": 8.4,
+    "improve_status": "max_rounds_reached",
+    "improve_history": [
+      {
+        "round": 1,
+        "stars": 4,
+        "rating": 8.4,
+        "improved": 3
+      },
+      {
+        "round": 2,
+        "stars": 4,
+        "rating": 8.4,
+        "improved": 3
+      },
+      {
+        "round": 3,
+        "stars": 4,
+        "rating": 8.4,
+        "improved": 3
+      }
+    ]
+  }
+]

@@ -10,30 +10,84 @@
    ROOT VARIABLES — Netflix-inspired dark cinema palette
    ══════════════════════════════════════════════════════════════════════ */
 :root {
+  /* Surfaces (dark, Vercel-Geist-inspired 10-step neutral) */
   --bg-primary: #141414;
   --bg-secondary: #1a1a2e;
   --bg-elevated: #1f1f2e;
   --bg-card: #2a2a3e;
   --bg-hover: #333348;
   --bg-input: #2a2a3e;
+
+  /* Text */
   --text-primary: #ffffff;
   --text-secondary: #b3b3b3;
   --text-muted: #808080;
+  --text-inverse: #000000;
+
+  /* Accent (brand) */
   --accent: #e50914;
   --accent-hover: #ff0a16;
   --accent-glow: rgba(229, 9, 20, 0.3);
   --accent-subtle: rgba(229, 9, 20, 0.15);
+  --accent-glow-end: #ff6b6b;     /* gradient endpoint for progress bars */
+
+  /* Semantic status colors */
+  --success: #46d369;             /* match-percentage, "done" indicator */
+  --success-bg: rgba(0, 200, 83, 0.15);
+  --success-fg: #00c853;
+  --warn: #ffb74d;                /* "in progress" pulse */
+  --warn-running: #ffa500;        /* progress-status.running */
+  --danger: #ff5252;              /* "needs work" / "rough" */
+  --danger-bg: rgba(244, 67, 54, 0.18);
+  --danger-fg: #ff7066;
+  --rating: #f5c518;              /* IMDB-style star yellow */
+  --info: #29b6f6;                /* "strong" badge */
+  --info-bg: rgba(41, 182, 246, 0.15);
+
+  /* Borders & elevation */
   --border: rgba(255,255,255,0.08);
   --border-hover: rgba(255,255,255,0.15);
+  --focus-ring: rgba(229, 9, 20, 0.6);
+
+  /* Radii */
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* Shadows */
   --shadow-card: 0 2px 8px rgba(0,0,0,0.3);
   --shadow-lg: 0 8px 30px rgba(0,0,0,0.5);
   --shadow-hero: 0 4px 60px rgba(0,0,0,0.6);
+
+  /* Layout */
   --nav-height: 68px;
+  --content-pad: 48px;
+  --content-pad-mobile: 16px;
+
+  /* Type — modular weights */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+  --fw-black: 900;
+
+  /* Motion — single source of truth, plus speed variants */
   --transition: 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --transition-fast: 0.12s cubic-bezier(0.2, 0, 0, 1);
+  --transition-slow: 0.4s cubic-bezier(0.2, 0, 0, 1);
+  --ease-out-expressive: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* z-index scale */
+  --z-nav: 1000;
+  --z-toast: 3000;
+  --z-modal: 2000;
+  --z-player: 1100;
+  --z-progress-panel: 1500;
+  --z-credits: 1500;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -51,7 +105,9 @@ html {
 body {
   background: var(--bg-primary);
   min-height: 100vh;
-  overflow-x: hidden;
+  /* overflow-x: hidden removed — it was preventing inner .row-scroll
+     containers from showing their horizontal scrollbars. Page-level
+     overflow is naturally bounded by the .row padding. */
 }
 
 a { color: inherit; text-decoration: none; }
@@ -74,8 +130,8 @@ img { display: block; max-width: 100%; }
   background: linear-gradient(180deg, rgba(20,20,20,0.95) 0%, rgba(20,20,20,0) 100%);
   display: flex;
   align-items: center;
-  padding: 0 48px;
-  z-index: 1000;
+  padding: 0 var(--content-pad);
+  z-index: var(--z-nav);
   transition: background var(--transition);
 }
 .navbar.scrolled {
@@ -131,6 +187,90 @@ img { display: block; max-width: 100%; }
   display: flex;
   align-items: center;
   gap: 16px;
+}
+.comfyui-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 20px;
+  font-size: 11px;
+  color: #999;
+  cursor: default;
+  transition: background var(--transition);
+}
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #666;
+  transition: background 0.3s;
+}
+.badge-dot.green { background: #4caf50; box-shadow: 0 0 6px #4caf5088; }
+.badge-dot.yellow { background: #ff9800; box-shadow: 0 0 6px #ff980088; }
+.badge-dot.red { background: #f44336; box-shadow: 0 0 6px #f4433688; }
+
+/* ── Generation Progress Toast ──────────────────────────────────────── */
+.gen-progress-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: var(--z-toast);
+  min-width: 340px;
+  max-width: 440px;
+  background: rgba(18, 18, 18, 0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.gen-progress-toast .toast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.gen-progress-toast .toast-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+.gen-progress-toast .toast-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 16px;
+  cursor: pointer;
+}
+.gen-progress-toast .progress-bar-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  margin-bottom: 8px;
+}
+.gen-progress-toast .progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  /* transform-only animation — animating `width` triggers layout on the
+     whole row. With transform: scaleX we only repaint the fill bar. */
+  transform: scaleX(var(--pct, 0));
+  transform-origin: left center;
+  transition: transform 0.5s ease;
+  width: 100%;
+}
+.gen-progress-toast .toast-message {
+  font-size: 12px;
+  color: #999;
+}
+.gen-progress-toast .toast-percent {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: 8px;
 }
 .btn-nav-create {
   padding: 8px 18px;
@@ -195,7 +335,7 @@ img { display: block; max-width: 100%; }
   flex-direction: column;
   justify-content: flex-end;
   height: 100%;
-  padding: 0 48px 120px;
+  padding: 0 var(--content-pad) 120px;
   max-width: 720px;
 }
 .hero-badge {
@@ -210,7 +350,7 @@ img { display: block; max-width: 100%; }
   margin-bottom: 12px;
 }
 .hero-badge span {
-  color: #46d369;
+  color: var(--success);
 }
 .hero-title {
   font-size: clamp(36px, 5vw, 64px);
@@ -229,8 +369,8 @@ img { display: block; max-width: 100%; }
   margin-bottom: 16px;
 }
 .hero-meta .match {
-  color: #46d369;
-  font-weight: 600;
+  color: var(--success);
+  font-weight: var(--fw-semibold);
 }
 .hero-meta .tag {
   padding: 2px 8px;
@@ -307,6 +447,15 @@ img { display: block; max-width: 100%; }
   background: rgba(255,255,255,0.2);
   transform: scale(1.03);
 }
+.btn-secondary.btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger-fg);
+  border: 1px solid rgba(244,67,54,0.35);
+}
+.btn-secondary.btn-danger:hover {
+  background: rgba(244,67,54,0.32);
+  color: var(--text-primary);
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    CONTENT ROWS
@@ -318,7 +467,7 @@ img { display: block; max-width: 100%; }
   padding-bottom: 60px;
 }
 .row {
-  padding: 0 48px;
+  padding: 0 var(--content-pad);
   margin-bottom: 40px;
 }
 .row-header {
@@ -341,12 +490,51 @@ img { display: block; max-width: 100%; }
   display: flex;
   gap: 10px;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 8px;
   scroll-behavior: smooth;
   scroll-snap-type: x mandatory;
+  /* Force the container to allow horizontal overflow even when its
+     children fit, by giving it a min-width based on its content. */
+  min-width: 0;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
 }
-.row-scroll::-webkit-scrollbar { height: 4px; }
-.row-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+.row-scroll::-webkit-scrollbar { height: 6px; }
+.row-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 3px; }
+.row-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+.row-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
+.row-scroll:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); }
+
+/* Row scroll arrow buttons */
+.row-scroll-wrap { position: relative; }
+.row-scroll-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  width: 40px;
+  height: 64px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 22px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+.row-scroll-wrap:hover .row-scroll-arrow { opacity: 1; }
+.row-scroll-arrow:hover { background: rgba(0,0,0,0.9); }
+.row-scroll-arrow.left { left: 8px; }
+.row-scroll-arrow.right { right: 8px; }
+.row-scroll-arrow:disabled { opacity: 0 !important; cursor: default; }
 
 /* ══════════════════════════════════════════════════════════════════════
    STORY CARDS
@@ -473,7 +661,7 @@ img { display: block; max-width: 100%; }
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 900;
+  z-index: 900;          /* sits between nav and modal */
   background: var(--bg-primary);
   overflow-y: auto;
 }
@@ -545,7 +733,7 @@ img { display: block; max-width: 100%; }
   margin-bottom: 20px;
   flex-wrap: wrap;
 }
-.detail-meta .match { color: #46d369; font-weight: 600; }
+.detail-meta .match { color: var(--success); font-weight: var(--fw-semibold); }
 .detail-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .detail-tags span {
   font-size: 12px;
@@ -626,6 +814,36 @@ img { display: block; max-width: 100%; }
   overflow: hidden;
 }
 
+/* Scene action buttons (appear on hover) */
+.scene-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.scene-card:hover .scene-actions {
+  opacity: 1;
+}
+.scene-action-btn {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.scene-action-btn:hover {
+  background: rgba(255,255,255,0.25);
+}
+.scene-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    PLAYER VIEW — scene-by-scene fullscreen
    ══════════════════════════════════════════════════════════════════════ */
@@ -633,7 +851,7 @@ img { display: block; max-width: 100%; }
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 1100;
+  z-index: var(--z-player);
   background: #000;
 }
 .player-page.active { display: flex; flex-direction: column; }
@@ -647,6 +865,107 @@ img { display: block; max-width: 100%; }
   position: relative;
   background: #000;
   overflow: hidden;
+}
+
+/* Image placeholder — shown when player image fails to load
+   (missing file, 404, or scene has no images yet). */
+.image-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-muted);
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  text-align: center;
+  padding: 24px;
+}
+.image-placeholder p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+}
+.image-placeholder p.image-placeholder-hint {
+  font-size: 13px;
+  font-weight: var(--fw-regular);
+  color: var(--text-muted);
+  max-width: 320px;
+}
+.image-placeholder svg {
+  opacity: 0.5;
+}
+
+/* Keyboard shortcut cheatsheet overlay (player) */
+.shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-modal) + 50);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+}
+.shortcuts-overlay {
+  display: none !important;
+}
+.shortcuts-content {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  max-width: 460px;
+  width: 90%;
+  box-shadow: var(--shadow-lg);
+}
+.shortcuts-title {
+  font-size: 22px;
+  font-weight: var(--fw-extrabold);
+  margin: 0 0 4px;
+}
+.shortcuts-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 20px;
+}
+.shortcuts-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px 20px;
+  margin: 0 0 24px;
+}
+.shortcuts-list dt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: 'Inter', monospace;
+  color: var(--text-secondary);
+}
+.shortcuts-list dt span { color: var(--text-muted); }
+.shortcuts-list dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+}
+kbd {
+  display: inline-block;
+  padding: 3px 8px;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  line-height: 1;
+  min-width: 22px;
+  text-align: center;
 }
 
 .player-topbar {
@@ -712,7 +1031,11 @@ img { display: block; max-width: 100%; }
   height: 100%;
   background: var(--accent);
   border-radius: 2px;
-  transition: width 0.3s;
+  /* transform-only — see .gen-progress-toast .progress-bar-fill */
+  transform: scaleX(var(--pct, 0));
+  transform-origin: left center;
+  transition: transform 0.3s var(--ease-out-expressive);
+  width: 100%;
 }
 
 .player-main {
@@ -745,6 +1068,12 @@ img { display: block; max-width: 100%; }
 .player-image.ken-sway {
   animation: kenSwayRight 25s ease-in-out infinite;
 }
+.player-image.ken-pan-left {
+  animation: kenPanLeft 22s ease-in-out forwards;
+}
+.player-image.ken-pan-right {
+  animation: kenPanRight 22s ease-in-out forwards;
+}
 
 @keyframes kenZoomIn {
   0%   { transform: scale(1.0); }
@@ -766,6 +1095,14 @@ img { display: block; max-width: 100%; }
   0%   { transform: translate(-1%, 0.5%); }
   50%  { transform: translate(1%, -0.5%); }
   100% { transform: translate(-1%, 0.5%); }
+}
+@keyframes kenPanLeft {
+  0%   { transform: translateX(2%); }
+  100% { transform: translateX(-2%); }
+}
+@keyframes kenPanRight {
+  0%   { transform: translateX(-2%); }
+  100% { transform: translateX(2%); }
 }
 .player-controls {
   position: absolute;
@@ -839,12 +1176,18 @@ input.volume-slider::-moz-range-thumb {
   border: none;
 }
 
-/* Subtitles overlay — elegant, responsive positioning */
+/* Subtitles overlay — elegant, responsive positioning.
+   Uses transform: translateY instead of `bottom` to keep the move on
+   the compositor (avoids layout reflow when toggling controls). */
 .player-subtitles {
   position: absolute;
+  /* Default vertical position is encoded as a translateY offset.
+     With controls visible: shifted up so they sit above the scrubber.
+     With controls hidden: the .controls-hidden modifier flips to 0. */
   bottom: clamp(80px, 15vh, 200px);
   left: 50%;
-  transform: translateX(-50%);
+  --subtitle-y: 0px;
+  transform: translate(-50%, var(--subtitle-y));
   max-width: 80%;
   width: auto;
   padding: 10px 24px;
@@ -857,7 +1200,7 @@ input.volume-slider::-moz-range-thumb {
   pointer-events: none;
   z-index: 5;
   opacity: 0;
-  transition: opacity 0.3s ease, bottom 0.4s ease;
+  transition: opacity 0.3s ease, transform 0.4s ease;
   text-shadow: 0 1px 3px rgba(0,0,0,0.5);
   /* Max 3 lines */
   display: -webkit-box;
@@ -870,7 +1213,7 @@ input.volume-slider::-moz-range-thumb {
 
 /* Subtitles go lower when controls are hidden — clean cinematic look */
 .player-page.controls-hidden .player-subtitles {
-  bottom: 20px;
+  --subtitle-y: calc(20px - clamp(80px, 15vh, 200px));
 }
 
 .player-subtitles.visible {
@@ -974,7 +1317,7 @@ input.volume-slider::-moz-range-thumb {
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 1500;
+  z-index: var(--z-credits);
   background: rgba(0,0,0,0.85);
   backdrop-filter: blur(8px);
   align-items: center;
@@ -1055,7 +1398,7 @@ input.volume-slider::-moz-range-thumb {
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: var(--z-modal);
   background: rgba(0,0,0,0.7);
   backdrop-filter: blur(4px);
   align-items: center;
@@ -1173,6 +1516,74 @@ input.volume-slider::-moz-range-thumb {
   transform: none;
 }
 
+/* Create-mode tabs (Single / Queue) */
+.mode-tab {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-muted);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.mode-tab:hover { background: rgba(255,255,255,0.12); color: var(--text-primary); }
+.mode-tab.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* Queue items list */
+#queue-items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.queue-item {
+  display: grid;
+  grid-template-columns: 28px 1fr 32px;
+  gap: 8px;
+  align-items: start;
+}
+.queue-item-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(229,9,20,0.2);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  margin-top: 8px;
+}
+.queue-item-input { min-height: 60px; font-size: 14px; }
+.queue-item-remove {
+  width: 32px;
+  height: 32px;
+  margin-top: 8px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-muted);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-sm);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.queue-item-remove:hover { background: rgba(244,67,54,0.3); color: #fff; }
+.btn-queue-add {
+  width: 100%;
+  padding: 10px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary);
+  border: 1px dashed rgba(255,255,255,0.2);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.btn-queue-add:hover { background: rgba(255,255,255,0.1); }
+
 /* ══════════════════════════════════════════════════════════════════════
    GENERATION PROGRESS PANEL
    ══════════════════════════════════════════════════════════════════════ */
@@ -1181,7 +1592,7 @@ input.volume-slider::-moz-range-thumb {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 1500;
+  z-index: var(--z-progress-panel);
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
@@ -1221,12 +1632,32 @@ input.volume-slider::-moz-range-thumb {
   flex-shrink: 0;
 }
 .progress-status.queued { background: var(--text-muted); }
-.progress-status.running { background: #ffa500; animation: pulse 1.5s infinite; }
-.progress-status.done { background: #46d369; }
+.progress-status.running { background: var(--warn-running); animation: pulse 1.5s infinite; }
+.progress-status.done { background: var(--success); }
 .progress-status.error { background: var(--accent); }
 .progress-item-info { flex: 1; min-width: 0; }
 .progress-item-title { font-size: 13px; font-weight: 500; }
 .progress-item-msg { font-size: 11px; color: var(--text-muted); }
+.progress-item-sub { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
+.progress-item-child { color: var(--text-muted); margin-right: 4px; font-weight: 400; }
+.progress-item-child-row { padding-left: 24px; opacity: 0.85; }
+
+.progress-bar-outer {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-bar-inner {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-glow-end));
+  /* transform-only */
+  transform: scaleX(var(--pct, 0));
+  transform-origin: left center;
+  transition: transform 0.4s ease;
+  width: 100%;
+}
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -1234,28 +1665,343 @@ input.volume-slider::-moz-range-thumb {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   RESPONSIVE
+   CRITIC RATING — Story cards + detail review
    ══════════════════════════════════════════════════════════════════════ */
+
+/* Card star rating */
+.story-card-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+.story-card-rating .stars {
+  color: var(--rating);
+  letter-spacing: 1px;
+  font-size: 14px;
+}
+.story-card-rating .badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-secondary);
+}
+.story-card-rating .badge.excellent { background: var(--success-bg); color: var(--success-fg); }
+.story-card-rating .badge.strong { background: var(--info-bg); color: var(--info); }
+.story-card-rating .badge.good { background: rgba(255,183,77,0.15); color: var(--warn); }
+.story-card-rating .badge.decent { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+.story-card-rating .badge.needs-work { background: rgba(255,82,82,0.15); color: var(--danger); }
+.story-card-rating .badge.rough { background: rgba(255,82,82,0.2); color: var(--danger); }
+
+/* Detail review section */
+.review-section {
+  margin: 24px 0;
+  padding: 24px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+.review-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.review-stars {
+  font-size: 28px;
+  color: var(--rating);
+  letter-spacing: 2px;
+}
+.review-rating {
+  font-size: 20px;
+  font-weight: var(--fw-bold);
+  color: var(--text-primary);
+}
+.review-badge {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  text-transform: uppercase;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-secondary);
+}
+.review-badge.excellent { background: var(--success-bg); color: var(--success-fg); }
+.review-badge.strong { background: var(--info-bg); color: var(--info); }
+.review-badge.good { background: rgba(255,183,77,0.15); color: var(--warn); }
+.review-badge.decent { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+.review-badge.needs-work { background: rgba(255,82,82,0.15); color: var(--danger); }
+.review-badge.rough { background: rgba(255,82,82,0.2); color: var(--danger); }
+
+.review-summary {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.review-summary strong { color: var(--text-primary); }
+.review-summary em { color: var(--accent); }
+
+.review-categories {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.review-category {
+  background: var(--bg-card);
+  padding: 12px;
+  border-radius: var(--radius-md);
+}
+.review-category-name {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.review-category-bar {
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.review-category-fill {
+  height: 100%;
+  border-radius: 3px;
+  /* transform-only */
+  transform: scaleX(var(--pct, 0));
+  transform-origin: left center;
+  transition: transform 0.5s ease;
+  width: 100%;
+}
+.review-category-fill.high { background: var(--success-fg); }
+.review-category-fill.medium { background: var(--warn); }
+.review-category-fill.low { background: var(--danger); }
+.review-category-score {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.review-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.review-columns h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+.review-columns ul {
+  list-style: none;
+  padding: 0;
+}
+.review-columns li {
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 4px 0;
+  padding-left: 16px;
+  position: relative;
+}
+.review-columns.strengths li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--success-fg);
+  font-weight: var(--fw-bold);
+}
+.review-columns.weaknesses li::before {
+  content: "⚠";
+  position: absolute;
+  left: 0;
+  color: var(--warn);
+}
+
+/* Run Critic button spinner */
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: var(--text-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   GLOBAL FOCUS RING, MOTION SAFETY, SKIP LINK
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Modern focus ring that only shows on keyboard nav, not mouse clicks.
+   Replaces the default browser blue ring and the per-element outlines. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Default ring on buttons/links — slightly more generous */
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
+  outline-offset: 3px;
+}
+/* Form inputs get a softer ring via box-shadow (existing pattern) — keep
+   the :focus-visible rule from removing the visual signal. */
+.form-input:focus-visible, .form-textarea:focus-visible, .form-select:focus-visible {
+  outline: none; /* box-shadow already provides a clear focus state */
+}
+
+/* Skip link — appears only when keyboard-focused */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 8px;
+  z-index: var(--z-toast);
+  padding: 10px 16px;
+  background: var(--accent);
+  color: var(--text-primary);
+  font-weight: var(--fw-semibold);
+  font-size: 14px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: top var(--transition-fast);
+}
+.skip-link:focus { top: 8px; }
+
+/* Visually-hidden helper for screen-reader-only labels (used for icon buttons) */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
+
+/* Reduced motion — universal guard. Disables ALL animations & transitions,
+   turns off smooth scrolling. Per web.dev: keeps state-change transitions
+   (opacity 0.01ms is fine) but kills the bigger motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .player-image.ken-zoom-in,
+  .player-image.ken-zoom-out,
+  .player-image.ken-pan-up,
+  .player-image.ken-pan-down,
+  .player-image.ken-sway { animation: none !important; }
+  .loading-skeleton { animation: none !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   HAMBURGER NAV (mobile) + RESPONSIVE BREAKPOINTS
+   ══════════════════════════════════════════════════════════════════════ */
+.hamburger {
+  display: none;
+  width: 40px; height: 40px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+.hamburger:hover { background: rgba(255,255,255,0.08); }
+
 @media (max-width: 768px) {
-  .navbar { padding: 0 16px; }
-  .navbar-links { display: none; }
-  .hero-content { padding: 0 16px 80px; }
+  .navbar { padding: 0 var(--content-pad-mobile); }
+  .navbar-links {
+    display: none;
+    position: absolute;
+    top: var(--nav-height);
+    left: 0; right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: rgba(20, 20, 20, 0.98);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 8px var(--content-pad-mobile) 16px;
+  }
+  .navbar-links.open { display: flex; }
+  .navbar-links a {
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .navbar-links a.active::after { display: none; }
+  .navbar-links a.active { color: var(--accent); }
+  .hamburger { display: inline-flex; }
+  .hero-content { padding: 0 var(--content-pad-mobile) 80px; }
   .hero-title { font-size: 28px; }
   .hero-meta { flex-wrap: wrap; }
-  .row { padding: 0 16px; }
+  .row { padding: 0 var(--content-pad-mobile); }
   .story-card { flex: 0 0 200px; }
-  .detail-content { padding: 0 16px 40px; }
+  .detail-content { padding: 0 var(--content-pad-mobile) 40px; }
   .detail-title { font-size: 28px; }
-  .detail-close { right: 16px; top: 80px; }
+  .detail-close { right: var(--content-pad-mobile); top: 80px; }
   .scene-grid { grid-template-columns: 1fr; }
   .modal { padding: 24px; }
   .form-row { grid-template-columns: 1fr; }
-  .player-controls { padding: 24px 16px; }
+  .player-controls { padding: 24px var(--content-pad-mobile); }
   .player-progress-bar { width: 100px; }
   .volume-slider { width: 40px; }
   .player-subtitles { font-size: 18px; max-width: 90%; padding: 6px 12px; }
   #btn-volume { width: 36px; height: 36px; }
+  /* Stack toasts above progress panel on mobile */
+  .gen-progress-toast, .toast {
+    left: var(--content-pad-mobile);
+    right: var(--content-pad-mobile);
+    bottom: 88px;
+  }
+  .progress-panel {
+    left: var(--content-pad-mobile);
+    right: var(--content-pad-mobile);
+    width: auto;
+  }
 }
+
+/* Tablet: tighter padding, more comfortable grids */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .navbar, .row { padding-left: 32px; padding-right: 32px; }
+  .hero-content { padding-left: 32px; padding-right: 32px; }
+  .detail-content { padding-left: 32px; padding-right: 32px; max-width: 100%; }
+  .story-card { flex: 0 0 240px; }
+}
+
+/* Landscape phones: hero shouldn't cover the navbar */
+@media (max-width: 900px) and (orientation: landscape) {
+  .hero { height: 60vh; min-height: 360px; }
+  .detail-backdrop { height: 45vh; min-height: 320px; }
+}
+
+/* Ultrawide: cap content width so lines don't get too long */
+@media (min-width: 1800px) {
+  .hero-content { max-width: 900px; }
+  .detail-content { max-width: 1280px; }
+  .row { padding-left: 80px; padding-right: 80px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   RESPONSIVE (legacy single-breakpoint block — kept for compatibility;
+   the real responsive rules are in the HAMBURGER + RESPONSIVE section
+   above. This stub remains to prevent an empty selector list. The mobile
+   media query has been removed because the new block already covers
+   768px+ with stacked hamburger nav, full-width toasts, etc.)
+   ══════════════════════════════════════════════════════════════════════ */
 
 /* ══════════════════════════════════════════════════════════════════════
    LOADING STATES
@@ -1273,7 +2019,7 @@ input.volume-slider::-moz-range-thumb {
   position: fixed;
   bottom: 80px;
   right: 24px;
-  z-index: 3000;
+  z-index: var(--z-toast);
   padding: 14px 20px;
   background: var(--bg-secondary);
   border-radius: var(--radius-md);
@@ -1286,12 +2032,18 @@ input.volume-slider::-moz-range-thumb {
   gap: 10px;
   transform: translateY(20px);
   opacity: 0;
-  transition: all 0.3s ease;
+  /* specific-property transition — `transition: all` would also animate
+     color/border-color which we don't want on every state change. */
+  transition: transform var(--transition-fast) var(--ease-out-expressive),
+              opacity var(--transition-fast) var(--ease-out-expressive);
   pointer-events: none;
+  max-width: 420px;
 }
-.toast.visible { transform: translateY(0); opacity: 1; }
-.toast.success { border-color: #46d369; }
+.toast.visible { transform: translateY(0); opacity: 1; pointer-events: auto; }
+.toast.success { border-color: var(--success); }
 .toast.error { border-color: var(--accent); }
+.toast.warn { border-color: var(--warn); }
+.toast.info { border-color: var(--info); }
 
 /* Empty state */
 .empty-state {
@@ -1306,42 +2058,65 @@ input.volume-slider::-moz-range-thumb {
 </head>
 <body>
 
+<!-- Skip link — appears only when keyboard-focused, jumps to main content -->
+<a class="skip-link" href="#browse-view">Skip to main content</a>
+
 <!-- ══════════════════════════════════════════════════════════════════════
      NAVBAR
      ══════════════════════════════════════════════════════════════════════ -->
-<nav class="navbar" id="navbar">
-  <div class="navbar-logo">
-    <span class="logo-icon">&#x25B6;</span>
-    Story Viewer
+<nav class="navbar" id="navbar" aria-label="Primary">
+  <div class="navbar-logo" data-action="go-browse" role="link" tabindex="0">
+    <span class="logo-icon" aria-hidden="true">
+      <!-- Inline SVG logo — was a Unicode ▶ emoji; scales identically cross-platform -->
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+    </span>
+    FantaSee
   </div>
-  <div class="navbar-links">
-    <a href="#" class="active" data-view="browse">Browse</a>
-    <a href="#" data-view="create">Create</a>
+  <div class="navbar-links" id="navbar-links">
+    <a href="#" class="active" data-view="browse" data-action="nav-browse" aria-current="page">Browse</a>
+    <a href="#" data-view="create" data-action="nav-create">Create</a>
   </div>
   <div class="navbar-spacer"></div>
   <div class="navbar-right">
-    <button class="btn-nav-create" onclick="openCreateModal()">+ Create Story</button>
+    <button type="button" class="comfyui-badge" id="comfyui-badge" data-action="open-workers"
+            title="ComfyUI workers status" aria-label="ComfyUI workers status">
+      <span class="badge-dot" id="comfyui-dot" aria-hidden="true"></span>
+      <span id="comfyui-label" aria-live="polite">ComfyUI</span>
+    </button>
+    <button type="button" class="btn-nav-create" data-action="open-create">+ Create Story</button>
+    <!-- Mobile hamburger — hidden on desktop, shown via @media (max-width:768px) -->
+    <button type="button" class="hamburger" data-action="toggle-nav"
+            aria-label="Open navigation menu" aria-expanded="false" aria-controls="navbar-links">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
   </div>
 </nav>
 
 <!-- ══════════════════════════════════════════════════════════════════════
      BROWSE VIEW
      ══════════════════════════════════════════════════════════════════════ -->
-<div id="browse-view">
+<main id="browse-view" tabindex="-1">
   <!-- Hero banner will be injected here -->
   <div id="hero-container"></div>
 
   <div class="content-rows" id="content-rows">
     <!-- Story rows injected by JS -->
   </div>
-</div>
+</main>
 
 <!-- ══════════════════════════════════════════════════════════════════════
      STORY DETAIL PAGE
      ══════════════════════════════════════════════════════════════════════ -->
-<div class="detail-page" id="detail-page">
+<div class="detail-page" id="detail-page" role="dialog" aria-modal="true" aria-labelledby="detail-title" tabindex="-1">
   <div class="detail-backdrop" id="detail-backdrop">
-    <button class="detail-close" onclick="closeDetail()">&times;</button>
+    <button class="detail-close" data-action="close-detail" aria-label="Close detail page">&times;</button>
   </div>
   <div class="detail-content" id="detail-content">
     <!-- Injected by JS -->
@@ -1351,73 +2126,76 @@ input.volume-slider::-moz-range-thumb {
 <!-- ══════════════════════════════════════════════════════════════════════
      PLAYER VIEW
      ══════════════════════════════════════════════════════════════════════ -->
-<div class="player-page" id="player-page">
+<div class="player-page" id="player-page" role="region" aria-label="Story player">
   <div class="player-topbar" id="player-topbar">
-    <button class="player-back" onclick="closePlayer()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <button type="button" class="player-back" data-action="close-player" aria-label="Back to detail">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
       Back
     </button>
-    <button class="player-create-btn" onclick="closePlayer();setTimeout(openCreateModal,350)" title="Create a new story">+ Create</button>
+    <button type="button" class="player-create-btn" data-action="player-create" aria-label="Create a new story">+ Create</button>
     <div class="player-progress">
-      <span id="player-progress-label">1 / 10</span>
-      <div class="player-progress-bar">
-        <div class="player-progress-fill" id="player-progress-fill" style="width: 10%"></div>
+      <span id="player-progress-label" aria-live="polite">1 / 10</span>
+      <div class="player-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+           aria-valuenow="10" aria-label="Story progress" id="player-progress-bar">
+        <div class="player-progress-fill" id="player-progress-fill" style="--pct: 0.1"></div>
       </div>
     </div>
   </div>
   <div class="player-image-container">
     <!-- Audio status overlay -->
-    <div class="audio-indicator" id="audio-indicator" title="Audio status">
+    <div class="audio-indicator" id="audio-indicator" title="Audio status" aria-hidden="true">
       <span id="audio-icon">🔊</span>
     </div>
     <!-- Click-to-play overlay (shown when autoplay is blocked) -->
-    <div class="play-overlay" id="play-overlay" onclick="handlePlayClick()" style="display:none">
-      <div class="play-overlay-icon">▶</div>
+    <div class="play-overlay" id="play-overlay" data-action="play-click" style="display:none" role="button" tabindex="0" aria-label="Tap to start audio">
+      <div class="play-overlay-icon" aria-hidden="true">▶</div>
       <div class="play-overlay-label">Tap to start audio</div>
     </div>
-    <img id="player-image" src="" alt="Scene" class="player-image" />
-    <div class="player-subtitles" id="player-subtitles"></div>
-    <audio id="player-audio" preload="auto" style="display:none"></audio>
+    <img id="player-image" src="" alt="Scene" class="player-image" width="1920" height="1080" />
+    <div class="player-subtitles" id="player-subtitles" aria-live="polite" aria-atomic="true"></div>
+    <audio id="player-audio" preload="auto" style="display:none" crossorigin="anonymous"></audio>
   </div>
   <div class="player-controls" id="player-controls">
     <div class="player-scrubber">
-      <button class="player-btn" onclick="playerPrev()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+      <button type="button" class="player-btn" data-action="player-prev" aria-label="Previous scene">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
       </button>
-      <button class="player-btn" onclick="playerPrev()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+      <button type="button" class="player-btn" data-action="player-prev" aria-label="Previous scene">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
       </button>
       <!-- Play / Pause -->
-      <button class="player-btn" id="btn-play" onclick="togglePlay()" title="Play / Pause">
-        <svg id="play-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <button type="button" class="player-btn" id="btn-play" data-action="toggle-play" aria-label="Play" title="Play / Pause (Space)">
+        <svg id="play-icon" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M8 5v14l11-7z"/>
         </svg>
       </button>
       <!-- Volume controls -->
-      <button class="player-btn" id="btn-volume" onclick="toggleMute()" title="Mute / Unmute">
-        <svg id="volume-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+      <button type="button" class="player-btn" id="btn-volume" data-action="toggle-mute" aria-label="Mute" title="Mute / Unmute (M)">
+        <svg id="volume-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
           <path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
         </svg>
       </button>
-      <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.05" value="1" oninput="setVolume(this.value)" title="Volume">
-      <input type="range" id="player-scrub" min="0" max="100" value="0" oninput="playerScrub(this.value)">
-      <button class="player-btn" onclick="playerNext()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+      <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.05" value="1"
+             data-action="set-volume" aria-label="Volume" title="Volume">
+      <input type="range" id="player-scrub" min="0" max="100" value="0"
+             data-action="player-scrub" aria-label="Scene scrubber" title="Scrub through scenes">
+      <button type="button" class="player-btn" data-action="player-next" aria-label="Next scene">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
       </button>
-      <button class="player-btn" onclick="playerNext()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+      <button type="button" class="player-btn" data-action="player-next" aria-label="Next scene">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
       </button>
-      <span class="player-btn-text" id="player-scene-counter">1 / 30</span>
-      <button class="player-btn cc-btn" id="btn-cc" onclick="toggleSubtitles()" title="Toggle subtitles">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <span class="player-btn-text" id="player-scene-counter" aria-live="polite">1 / 30</span>
+      <button type="button" class="player-btn cc-btn" id="btn-cc" data-action="toggle-subs" aria-label="Enable subtitles" aria-pressed="true" title="Toggle subtitles (C)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
           <rect x="2" y="5" width="20" height="14" rx="2"/>
           <path d="M7 10.5c0-.83.67-1.5 1.5-1.5h1c.83 0 1.5.67 1.5 1.5v3c0 .83-.67 1.5-1.5 1.5h-1c-.83 0-1.5-.67-1.5-1.5V10.5z"/>
           <path d="M13 10.5c0-.83.67-1.5 1.5-1.5h1c.83 0 1.5.67 1.5 1.5v3c0 .83-.67 1.5-1.5 1.5h-1c-.83 0-1.5-.67-1.5-1.5V10.5z"/>
         </svg>
       </button>
-      <button class="player-btn" id="btn-fullscreen" onclick="toggleFullscreen()" title="Fullscreen (f)">
-        <svg id="fullscreen-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <button type="button" class="player-btn" id="btn-fullscreen" data-action="toggle-fullscreen" aria-label="Enter fullscreen" title="Fullscreen (F)">
+        <svg id="fullscreen-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
         </svg>
       </button>
@@ -1428,9 +2206,9 @@ input.volume-slider::-moz-range-thumb {
 <!-- ══════════════════════════════════════════════════════════════════════
      CREDITS OVERLAY
      ══════════════════════════════════════════════════════════════════════ -->
-<div class="credits-overlay" id="credits-overlay">
+<div class="credits-overlay" id="credits-overlay" role="dialog" aria-modal="true" aria-labelledby="credits-title" tabindex="-1">
   <div class="credits-content">
-    <div class="credits-icon">
+    <div class="credits-icon" aria-hidden="true">
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
@@ -1438,12 +2216,12 @@ input.volume-slider::-moz-range-thumb {
     </div>
     <h1 class="credits-title" id="credits-title">Story Title</h1>
     <p class="credits-subtitle" id="credits-subtitle"></p>
-    <div class="credits-divider"></div>
+    <div class="credits-divider" aria-hidden="true"></div>
     <p class="credits-the-end">The End</p>
     <p class="credits-stats" id="credits-stats"></p>
     <div class="credits-actions">
-      <button class="btn-primary" onclick="closeCredits(); closePlayer();">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <button type="button" class="btn-primary" data-action="credits-back">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         Back to Browse
       </button>
     </div>
@@ -1453,24 +2231,40 @@ input.volume-slider::-moz-range-thumb {
 <!-- ══════════════════════════════════════════════════════════════════════
      CREATE STORY MODAL
      ══════════════════════════════════════════════════════════════════════ -->
-<div class="modal-overlay" id="create-modal">
-  <div class="modal">
+<div class="modal-overlay" id="create-modal" data-dialog="create">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="create-modal-title" aria-describedby="create-modal-desc" tabindex="-1">
     <div class="modal-header">
       <div>
-        <div class="modal-title">Create New Story</div>
-        <div class="modal-desc">Describe a story and watch it come to life through AI-generated scenes.</div>
+        <div class="modal-title" id="create-modal-title">Create New Story</div>
+        <div class="modal-desc" id="create-modal-desc">Describe a story and watch it come to life through AI-generated scenes.</div>
       </div>
-      <button class="modal-close" onclick="closeCreateModal()">&times;</button>
+      <button type="button" class="modal-close" data-action="close-create" aria-label="Close create story dialog">&times;</button>
     </div>
     <form id="create-form" onsubmit="submitCreate(event)">
       <div class="form-group">
-        <label class="form-label">Story Concept</label>
-        <textarea class="form-textarea" id="form-concept" placeholder="Describe your story idea... e.g. A lone ranger tracks a mysterious beast through an enchanted forest" required></textarea>
-        <div class="form-hint">Be descriptive — setting, mood, and key characters.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <label class="form-label" style="margin:0">Story Concept</label>
+          <div role="group" aria-label="Generation mode" style="display:flex;gap:6px">
+            <button type="button" class="mode-tab active" id="mode-single" data-action="mode-single" aria-pressed="true">Single</button>
+            <button type="button" class="mode-tab" id="mode-queue" data-action="mode-queue" aria-pressed="false">Queue</button>
+          </div>
+        </div>
+        <div id="single-concept-area">
+          <label for="form-concept" class="visually-hidden">Story concept</label>
+          <textarea class="form-textarea" id="form-concept"
+                    placeholder="Describe your story idea... e.g. A lone ranger tracks a mysterious beast through an enchanted forest"
+                    aria-describedby="form-concept-hint" required></textarea>
+          <div class="form-hint" id="form-concept-hint">Be descriptive — setting, mood, and key characters.</div>
+        </div>
+        <div id="queue-concept-area" style="display:none">
+          <div id="queue-items"></div>
+          <button type="button" class="btn-queue-add" data-action="add-queue-item">+ Add another concept to queue</button>
+          <div class="form-hint">Each concept will be generated as its own story, one after the other. You can navigate away and watch other stories while the queue runs in the background.</div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Style</label>
+          <label class="form-label" for="form-style">Style</label>
           <select class="form-select" id="form-style">
             <option value="fantasy painterly">Fantasy / Painterly</option>
             <option value="anime">Anime</option>
@@ -1480,7 +2274,7 @@ input.volume-slider::-moz-range-thumb {
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">Number of Scenes</label>
+          <label class="form-label" for="form-scenes">Number of Scenes</label>
           <select class="form-select" id="form-scenes">
             <option value="5">5 (Quick)</option>
             <option value="10" selected>10 (Standard)</option>
@@ -1491,40 +2285,106 @@ input.volume-slider::-moz-range-thumb {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Images per Scene</label>
+          <label class="form-label" for="form-images-per-scene">Images per Scene</label>
           <input type="number" class="form-input" id="form-images-per-scene"
-                 value="1" min="1" max="10" step="1"
+                 value="5" min="1" max="10" step="1"
+                 aria-describedby="form-images-hint"
                  title="Target images per scene — generator will try to create this many" />
+          <div class="form-hint" id="form-images-hint">More images = more variety per scene</div>
         </div>
         <div class="form-group">
-          <label class="form-label">Tone</label>
+          <label class="form-label" for="form-tone">Tone</label>
           <select class="form-select" id="form-tone">
             <option value="dramatic">Dramatic</option>
             <option value="dark">Dark / Grim</option>
+            <option value="epic">Epic / Grand</option>
             <option value="heroic">Heroic</option>
             <option value="mysterious">Mysterious</option>
             <option value="lighthearted">Lighthearted</option>
+            <option value="comedic">Comedic</option>
+            <option value="romantic">Romantic</option>
+            <option value="melancholic">Melancholic</option>
+            <option value="hopeful">Hopeful</option>
+            <option value="suspenseful">Suspenseful</option>
+            <option value="whimsical">Whimsical</option>
+            <option value="epic-fantasy">Epic Fantasy</option>
+            <option value="noir">Noir</option>
+            <option value="lyrical">Lyrical / Poetic</option>
+            <option value="gritty">Gritty</option>
+            <option value="manhwa">Manhwa (Korean webtoon)</option>
           </select>
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Characters (optional)</label>
-        <input class="form-input" id="form-characters" placeholder="e.g. Aldric the veteran, Lira the archer" />
+        <label class="form-label" for="form-voice">Narrator Voice</label>
+        <select class="form-select" id="form-voice">
+          <option value="Dean">Dean (Deep Male) — Default</option>
+          <option value="Milo">Milo (Warm Male)</option>
+          <option value="Mia">Mia (Warm Female)</option>
+          <option value="Chloe">Chloe (Soft Female)</option>
+        </select>
       </div>
-      <button type="submit" class="btn-submit" id="btn-submit-create">
+      <div class="form-group">
+        <label class="form-label" for="form-characters">Characters (optional)</label>
+        <input class="form-input" id="form-characters"
+               placeholder="e.g. Aldric the veteran, Lira the archer"
+               aria-describedby="form-characters-hint" />
+        <div class="form-hint" id="form-characters-hint">Comma-separated names + brief descriptors</div>
+      </div>
+      <button type="submit" class="btn-submit" id="btn-submit-create" data-action="submit-create">
         Begin Generation
       </button>
     </form>
   </div>
 </div>
 
+<!-- ComfyUI workers modal -->
+<div class="modal-overlay" id="workers-modal" data-dialog="workers">
+  <div class="modal-content modal" role="dialog" aria-modal="true" aria-labelledby="workers-modal-title" tabindex="-1">
+    <button type="button" class="modal-close" data-action="close-workers" aria-label="Close workers dialog">&times;</button>
+    <h2 style="margin:0 0 12px 0" id="workers-modal-title">ComfyUI Workers</h2>
+    <p style="margin:0 0 12px 0;color:var(--text-muted);font-size:13px">
+      Image generation runs in parallel across these workers. Click one to manage it.
+    </p>
+    <div id="workers-modal-list" style="margin-bottom:16px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+      <button type="button" class="btn-secondary" data-action="workers-spawn">+ Spawn CPU</button>
+      <button type="button" class="btn-secondary" data-action="workers-kill">- Kill CPU</button>
+      <button type="button" class="btn-secondary" data-action="workers-refresh">Refresh</button>
+      <button type="button" class="btn-secondary" data-action="close-workers">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal-overlay" id="delete-modal" data-dialog="delete">
+  <div class="modal-content modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title-heading" aria-describedby="delete-modal-title" tabindex="-1">
+    <button type="button" class="modal-close" data-action="close-delete" aria-label="Close delete dialog">&times;</button>
+    <h2 style="margin:0 0 8px 0" id="delete-modal-title-heading">Delete story?</h2>
+    <p id="delete-modal-title" style="margin:0 0 16px 0;color:var(--text-muted)"></p>
+    <div id="delete-modal-summary" style="background:var(--bg-elevated);border-radius:6px;padding:12px;margin-bottom:16px;font-size:13px;line-height:1.6"></div>
+    <div id="delete-modal-files" style="max-height:200px;overflow-y:auto;background:var(--bg-elevated);border-radius:6px;padding:10px 12px;font-family:monospace;font-size:12px;color:var(--text-muted);margin-bottom:16px;display:none"></div>
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer">
+      <input type="checkbox" id="delete-modal-backup" />
+      <span style="font-size:13px">Save a backup in <code>outputs/.trash/</code> first</span>
+    </label>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button type="button" class="btn-secondary" data-action="close-delete">Cancel</button>
+      <button type="button" class="btn-primary" id="btn-confirm-delete" style="background:#d32f2f" data-action="confirm-delete">
+        Delete permanently
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════════════════════════════════════════════════════════════
      PROGRESS PANEL
      ══════════════════════════════════════════════════════════════════════ -->
-<div class="progress-panel" id="progress-panel">
+<div class="progress-panel" id="progress-panel" role="status" aria-live="polite" aria-label="Generation tasks">
   <div class="progress-panel-header">
     <span>Generation Tasks</span>
-    <button style="font-size:12px;color:var(--text-muted)" onclick="toggleProgressPanel()">&#x2013;</button>
+    <button type="button" style="font-size:12px;color:var(--text-muted)"
+            data-action="toggle-progress" aria-label="Hide progress panel">&#x2013;</button>
   </div>
   <div class="progress-list" id="progress-list">
     <div class="empty-state" style="padding:20px">
@@ -1536,7 +2396,30 @@ input.volume-slider::-moz-range-thumb {
 <!-- ══════════════════════════════════════════════════════════════════════
      TOAST
      ══════════════════════════════════════════════════════════════════════ -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     KEYBOARD SHORTCUT CHEATSHEET (player)
+     Press ? to open. Matches YouTube/Netflix conventions.
+     ══════════════════════════════════════════════════════════════════════ -->
+<div class="shortcuts-overlay" id="shortcuts-overlay" role="dialog" aria-modal="true"
+     aria-labelledby="shortcuts-title" tabindex="-1" hidden>
+  <div class="shortcuts-content">
+    <h2 id="shortcuts-title" class="shortcuts-title">Keyboard Shortcuts</h2>
+    <p class="shortcuts-subtitle">Player only — Esc to close</p>
+    <dl class="shortcuts-list">
+      <dt><kbd>Space</kbd> <span>or</span> <kbd>K</kbd></dt><dd>Play / Pause</dd>
+      <dt><kbd>←</kbd> <span>/</span> <kbd>→</kbd></dt><dd>Previous / Next scene</dd>
+      <dt><kbd>↑</kbd> <span>/</span> <kbd>↓</kbd></dt><dd>Volume up / down</dd>
+      <dt><kbd>M</kbd></dt><dd>Mute / Unmute</dd>
+      <dt><kbd>F</kbd></dt><dd>Fullscreen</dd>
+      <dt><kbd>C</kbd></dt><dd>Captions (subtitles)</dd>
+      <dt><kbd>?</kbd></dt><dd>Show this cheatsheet</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Close player / dialog</dd>
+    </dl>
+    <button type="button" class="btn-secondary" data-action="close-shortcuts">Got it</button>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════════════════════════════════
      JAVASCRIPT — APPLICATION
@@ -1555,19 +2438,182 @@ const state = {
   volume: 1,
   muted: false,
   _sceneChanging: false,
+  _wsBackoff: 0,                 // exponential backoff for WS reconnect
+  _dialogFocusStack: [],         // for openDialog/closeDialog focus restore
 };
+
+// ═══════════════════════════════════════════════════════════════════════
+// UTILITIES — focus management, rAF, throttling, debouncing
+// ═══════════════════════════════════════════════════════════════════════
+
+/** rAF-debounce: guarantee fn runs at most once per animation frame.
+ *  Used for hot listeners (scroll, mousemove, timeupdate) so we batch
+ *  work into the compositor frame budget instead of firing on every event. */
+function rafDebounce(fn) {
+  let ticking = false;
+  return function (...args) {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      ticking = false;
+      fn.apply(this, args);
+    });
+  };
+}
+
+/** Debounce — fires fn only after `wait` ms of inactivity. */
+function debounce(fn, wait) {
+  let t;
+  return function (...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
+/** Find first focusable element inside `root`. */
+function getFocusable(root) {
+  if (!root) return [];
+  return Array.from(root.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), '
+    + 'select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  ));
+}
+
+/** Open a modal/dialog with proper focus management. Pushes the trigger
+ *  onto a stack and traps Tab inside the dialog while open. */
+function openDialog(overlay) {
+  if (!overlay) return;
+  const dialog = overlay.querySelector('[role="dialog"]') || overlay;
+  state._dialogFocusStack.push({
+    overlay,
+    trigger: document.activeElement,
+  });
+  // Make the dialog itself focusable, then focus the first focusable child
+  // (or the close button, or the dialog itself as a last resort).
+  dialog.setAttribute('tabindex', '-1');
+  const focusable = getFocusable(dialog);
+  const target = focusable[0] || overlay.querySelector('.modal-close') || dialog;
+  target.focus();
+  // Tab/Shift+Tab trap
+  dialog._trapHandler = (e) => {
+    if (e.key !== 'Tab') return;
+    const f = getFocusable(dialog);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault(); first.focus();
+    }
+  };
+  dialog.addEventListener('keydown', dialog._trapHandler);
+}
+
+/** Close a modal/dialog and restore focus to the trigger that opened it. */
+function closeDialog(overlay) {
+  if (!overlay) return;
+  const dialog = overlay.querySelector('[role="dialog"]') || overlay;
+  if (dialog._trapHandler) {
+    dialog.removeEventListener('keydown', dialog._trapHandler);
+    dialog._trapHandler = null;
+  }
+  const stack = state._dialogFocusStack;
+  const entry = stack.pop();
+  if (entry && entry.trigger && typeof entry.trigger.focus === 'function') {
+    entry.trigger.focus();
+  }
+}
+
+/** Set/clear aria-busy on a button while a network request is in flight. */
+function setBusy(btn, busy, busyLabel) {
+  if (!btn) return;
+  if (busy) {
+    btn._origDisabled = btn.disabled;
+    btn._origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    if (busyLabel) btn.innerHTML = busyLabel;
+  } else {
+    btn.disabled = btn._origDisabled || false;
+    btn.removeAttribute('aria-busy');
+    if (btn._origText) btn.innerHTML = btn._origText;
+  }
+}
+
+/** Get a query string param. */
+function qsParam(name) {
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+/** Replacement for window.prompt() — shows a styled modal with a single
+ *  text input and OK/Cancel buttons. Returns a Promise<string|null> where
+ *  null means cancelled. Avoids the native alert/prompt/confirm dialogs
+ *  which are a universal pro-UI "no". */
+function promptModal({ title, label, defaultValue = '', placeholder = '', okText = 'OK', cancelText = 'Cancel' }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay active';
+    overlay.setAttribute('data-dialog', 'prompt');
+    overlay.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="prompt-title" tabindex="-1" style="max-width:420px">
+        <div class="modal-header">
+          <div class="modal-title" id="prompt-title">${title}</div>
+        </div>
+        <div class="form-group">
+          ${label ? `<label class="form-label" for="prompt-input">${label}</label>` : ''}
+          <input class="form-input" id="prompt-input" type="text"
+                 value="${defaultValue}" placeholder="${placeholder}" />
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+          <button type="button" class="btn-secondary" data-prompt-action="cancel">${cancelText}</button>
+          <button type="button" class="btn-accent" data-prompt-action="ok">${okText}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const input = overlay.querySelector('#prompt-input');
+    input.focus(); input.select();
+    openDialog(overlay);
+
+    const cleanup = (result) => {
+      closeDialog(overlay);
+      overlay.remove();
+      resolve(result);
+    };
+    overlay.addEventListener('click', (e) => {
+      if (e.target.dataset.promptAction === 'ok') cleanup(input.value || null);
+      if (e.target.dataset.promptAction === 'cancel') cleanup(null);
+      // Click on backdrop closes too — but only if mousedown also started on backdrop
+      if (e.target === overlay && e._startedOnOverlay) cleanup(null);
+    });
+    overlay.addEventListener('mousedown', (e) => { e._startedOnOverlay = (e.target === overlay); });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); cleanup(input.value || null); }
+      if (e.key === 'Escape') { e.preventDefault(); cleanup(null); }
+    });
+  });
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // API
 // ═══════════════════════════════════════════════════════════════════════
 const API = {
   async fetchStories() {
-    const res = await fetch('/api/stories');
-    const data = await res.json();
-    return data.stories;
+    // Fetch both pre-built and generated stories
+    const [builtRes, genRes] = await Promise.all([
+      fetch('/api/stories'),
+      fetch('/api/generated-stories').catch(() => ({ json: () => ({ stories: [] }) })),
+    ]);
+    const built = await builtRes.json();
+    const gen = await genRes.json();
+    return [...(built.stories || []), ...(gen.stories || [])];
   },
   async fetchStory(id) {
-    const res = await fetch(`/api/stories/${id}`);
+    // Try pre-built first, then generated
+    let res = await fetch(`/api/stories/${id}`);
+    if (!res.ok) {
+      res = await fetch(`/api/generated-stories/${id}`);
+    }
     return res.json();
   },
   async submitGeneration(body) {
@@ -1578,47 +2624,94 @@ const API = {
     });
     return res.json();
   },
+  async submitGenerationQueue(items) {
+    const res = await fetch('/api/generate/queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+    return res.json();
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════════
 // SVG ICONS (inline helpers)
 // ═══════════════════════════════════════════════════════════════════════
 const ICONS = {
-  play: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
-  info: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+  play: '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+  // Was previously a checkmark by mistake; now a proper info-in-circle.
+  info: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
 };
 
 // ═══════════════════════════════════════════════════════════════════════
 // HERO BANNER
 // ═══════════════════════════════════════════════════════════════════════
+
+/** Pick the first usable image URL from a story, or '' if none. Tries
+ * hero_image, then scene image_urls, then scene image_filenames. */
+function pickHeroImage(story) {
+  if (!story) return '';
+  if (story.hero_image) {
+    return story.hero_image.startsWith('/') ? story.hero_image : `/images/${story.hero_image}`;
+  }
+  if (story.scenes && story.scenes[0]) {
+    const s0 = story.scenes[0];
+    if (s0.image_urls && s0.image_urls[0]) return s0.image_urls[0];
+    if (s0.image_filenames && s0.image_filenames[0]) {
+      return `/generated-images/${story.id}/${s0.image_filenames[0]}`;
+    }
+  }
+  return '';
+}
+
+/** Choose the first story (from a list) that has any usable image URL. */
+function pickFeaturedStory(stories) {
+  if (!stories || !stories.length) return null;
+  // First try the natural first story
+  for (const s of stories) {
+    if (pickHeroImage(s)) return s;
+  }
+  // No story has an image — return the first one anyway so we can
+  // show the gradient placeholder
+  return stories[0];
+}
+
 function renderHero(story) {
-  const heroUrl = story.hero_image ? `/images/${story.hero_image}` : '';
   const container = document.getElementById('hero-container');
   if (!story) {
     container.innerHTML = '';
     return;
   }
+  const heroUrl = pickHeroImage(story);
+  // When no image is available, use a Netflix-style gradient placeholder
+  // (no background-image so the CSS-defined gradient shows through).
+  const backdropStyle = heroUrl
+    ? `background-image: url('${heroUrl}')`
+    : `background: radial-gradient(ellipse at 30% 40%, rgba(229,9,20,0.35) 0%, transparent 60%),
+       radial-gradient(ellipse at 70% 60%, rgba(80,40,180,0.35) 0%, transparent 60%),
+       linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)`;
+
   container.innerHTML = `
     <div class="hero">
-      <div class="hero-backdrop" style="background-image: url('${heroUrl}')"></div>
+      <div class="hero-backdrop" style="${backdropStyle}"></div>
       <div class="hero-content">
         <div class="hero-badge">
           <span>${story.title}</span>
         </div>
         <h1 class="hero-title">${story.subtitle || story.title}</h1>
         <div class="hero-meta">
-          <span class="match">98% Match</span>
-          <span>${story.year || '2025'}</span>
+          ${story.critic_stars ? `<span class="match">${(story.critic_rating || story.critic_stars * 20)}% Match</span>` : ''}
+          <span>${story.year || new Date().getFullYear()}</span>
           ${(story.tags || []).slice(0, 3).map(t => `<span class="tag">${t}</span>`).join('')}
           <span>${story.scene_count} Scenes</span>
         </div>
         <p class="hero-desc">${story.description || ''}</p>
         <div class="hero-actions">
-          <button class="btn-primary" onclick="openPlayer('${story.id}', 0)">
+          <button class="btn-primary" data-action="open-scene" data-id="${story.id}" data-scene-idx="0">
             ${ICONS.play}
             Play
           </button>
-          <button class="btn-secondary" onclick="openDetail('${story.id}')">
+          <button class="btn-secondary" data-action="open-detail" data-id="${story.id}">
             ${ICONS.info}
             More Info
           </button>
@@ -1653,15 +2746,23 @@ function renderCards(stories) {
         <h2 class="row-title">My Stories</h2>
         <span class="row-count">${stories.length} stories</span>
       </div>
-      <div class="row-scroll">
+      <div class="row-scroll-wrap">
+        <button class="row-scroll-arrow left" data-row="row-main"
+                data-action="scroll-row" data-dir="-1" aria-label="Scroll My Stories left">&#8249;</button>
+        <div class="row-scroll" id="row-scroll-row-main">
         ${stories.map(s => {
-          const imgUrl = s.hero_image ? `/images/${s.hero_image}` : '';
+          // Handle generated stories: hero_image may not exist, use first scene image
+          let imgUrl = '';
+          if (s.hero_image) {
+            // hero_image could be a full path (generated stories) or just a filename (pre-built)
+            imgUrl = s.hero_image.includes('/') ? `/${s.hero_image}` : `/images/${s.hero_image}`;
+          }
           const savedIdx = getProgress(s.id);
-          const resumeBadge = savedIdx !== null ? `<div class="resume-badge">Resume Scene ${savedIdx + 1}</div>` : '';
+          const resumeBadge = savedIdx !== null ? `<div class="resume-badge" aria-label="Resume at scene ${savedIdx + 1}">Resume Scene ${savedIdx + 1}</div>` : '';
           return `
-            <div class="story-card" onclick="openDetail('${s.id}')" title="${s.title}">
+            <div class="story-card" data-action="open-detail" data-id="${s.id}" role="link" tabindex="0" title="${s.title}">
               <div class="story-card-img-wrap">
-                <img class="story-card-img" src="${imgUrl}" alt="${s.title}" loading="lazy"
+                <img class="story-card-img" src="${imgUrl}" alt="${s.title}" loading="lazy" decoding="async" width="280" height="158"
                      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
                 <div class="card-overlay" style="display:none;align-items:center;justify-content:center;background:var(--bg-elevated)">
                   <span class="play-badge">${ICONS.play} ${s.title}</span>
@@ -1674,10 +2775,18 @@ function renderCards(stories) {
                 <div class="story-card-tags">
                   ${(s.tags || []).slice(0, 3).map(t => `<span>${t}</span>`).join('')}
                 </div>
+                ${s.critic_stars ? `
+                <div class="story-card-rating" aria-label="${s.critic_stars} of 5 stars">
+                  <span class="stars" aria-hidden="true">${'★'.repeat(s.critic_stars)}${'☆'.repeat(5 - s.critic_stars)}</span>
+                  ${s.critic_badge ? `<span class="badge ${s.critic_badge.toLowerCase().replace(/\s+/g, '-')}">${s.critic_badge}</span>` : ''}
+                </div>` : ''}
               </div>
             </div>
           `;
         }).join('')}
+        </div>
+        <button class="row-scroll-arrow right" data-row="row-main"
+                data-action="scroll-row" data-dir="1" aria-label="Scroll My Stories right">&#8250;</button>
       </div>
     </div>
   `;
@@ -1691,20 +2800,28 @@ function renderCards(stories) {
     });
   });
 
+  let rowIdx = 0;
   Object.entries(tags).forEach(([tag, tagStories]) => {
     if (tagStories.length < 2) return;
+    rowIdx++;
+    const rowId = `row-tag-${rowIdx}`;
     html += `
       <div class="row">
         <div class="row-header">
           <h2 class="row-title">${tag.charAt(0).toUpperCase() + tag.slice(1)}</h2>
           <span class="row-count">${tagStories.length} stories</span>
         </div>
-        <div class="row-scroll">
+        <div class="row-scroll-wrap">
+          <button class="row-scroll-arrow left" data-row="${rowId}"
+                  data-action="scroll-row" data-dir="-1" aria-label="Scroll ${tag} left">&#8249;</button>
+          <div class="row-scroll" id="row-scroll-${rowId}">
           ${tagStories.map(s => {
-            const imgUrl = s.hero_image ? `/images/${s.hero_image}` : '';
+            const imgUrl = s.hero_image
+              ? (s.hero_image.includes('/') ? `/${s.hero_image}` : `/images/${s.hero_image}`)
+              : '';
             return `
-              <div class="story-card" onclick="openDetail('${s.id}')">
-                <img class="story-card-img" src="${imgUrl}" alt="${s.title}" loading="lazy"
+              <div class="story-card" data-action="open-detail" data-id="${s.id}" role="link" tabindex="0">
+                <img class="story-card-img" src="${imgUrl}" alt="${s.title}" loading="lazy" decoding="async" width="280" height="158"
                      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
                 <div class="card-overlay" style="display:none;align-items:center;justify-content:center;background:var(--bg-elevated)">
                   <span class="play-badge">${ICONS.play} ${s.title}</span>
@@ -1712,17 +2829,61 @@ function renderCards(stories) {
                 <div class="story-card-body">
                   <div class="story-card-title">${s.title}</div>
                   <div class="story-card-subtitle">${s.subtitle || ''}</div>
+                  ${s.critic_stars ? `
+                  <div class="story-card-rating" aria-label="${s.critic_stars} of 5 stars">
+                    <span class="stars" aria-hidden="true">${'★'.repeat(s.critic_stars)}${'☆'.repeat(5 - s.critic_stars)}</span>
+                  </div>` : ''}
                 </div>
               </div>
-            `;
-          }).join('')}
+          `;
+        }).join('')}
+          </div>
+          <button class="row-scroll-arrow right" data-row="${rowId}"
+                  data-action="scroll-row" data-dir="1" aria-label="Scroll ${tag} right">&#8250;</button>
         </div>
       </div>
     `;
   });
 
   container.innerHTML = html;
+
+  // Update arrow disabled state after layout
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.row-scroll').forEach(el => updateRowArrows(el.id));
+  });
 }
+
+function scrollRow(rowId, direction) {
+  const el = document.getElementById(`row-scroll-${rowId}`);
+  if (!el) return;
+  // Scroll by ~80% of visible width
+  const amount = el.clientWidth * 0.8 * direction;
+  el.scrollBy({ left: amount, behavior: 'smooth' });
+}
+
+function updateRowArrows(scrollId) {
+  const el = document.getElementById(scrollId);
+  if (!el) return;
+  const wrap = el.closest('.row-scroll-wrap');
+  if (!wrap) return;
+  const leftBtn = wrap.querySelector('.row-scroll-arrow.left');
+  const rightBtn = wrap.querySelector('.row-scroll-arrow.right');
+  if (leftBtn) leftBtn.disabled = el.scrollLeft <= 1;
+  if (rightBtn) rightBtn.disabled = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+}
+
+// Wire up scroll listeners on every .row-scroll so the arrows enable/disable
+// when the user scrolls manually (mouse wheel, touch, scrollbar drag).
+// rAF-coalesced to avoid layout thrash on every scroll event.
+const _coalescedRowArrows = rafDebounce(() => {
+  document.querySelectorAll('.row-scroll').forEach(el => updateRowArrows(el.id));
+});
+document.addEventListener('scroll', (e) => {
+  const el = e.target;
+  if (el && el.classList && el.classList.contains('row-scroll')) {
+    _coalescedRowArrows();
+  }
+}, { passive: true, capture: true });
 
 // ═══════════════════════════════════════════════════════════════════════
 // STORY DETAIL
@@ -1731,86 +2892,657 @@ async function openDetail(storyId) {
   const story = await API.fetchStory(storyId);
   state.currentDetail = story;
 
-  const heroUrl = story.hero_image ? `/images/${story.hero_image}` : '';
-  document.getElementById('detail-backdrop').style.backgroundImage = `url('${heroUrl}')`;
-
-  const scenesHtml = (story.scenes || []).map((scene, i) => {
-    const imgUrl = scene.image_filenames && scene.image_filenames[0]
-      ? `/images/${scene.image_filenames[0]}`
+    const heroUrl = story.hero_image
+      ? (story.hero_image.startsWith('/') ? story.hero_image : `/images/${story.hero_image}`)
       : '';
-    const promptPreview = scene.prompt ? scene.prompt.slice(0, 120) + (scene.prompt.length > 120 ? '...' : '') : '';
-    return `
-      <div class="scene-card" onclick="openPlayer('${story.id}', ${i})">
-        <img class="scene-card-thumb" src="${imgUrl}" alt="${scene.title}" loading="lazy"
-             onerror="this.style.background='var(--bg-card)'">
-        <div class="scene-card-info">
-          <div class="scene-card-num">Scene ${scene.scene}</div>
-          <div class="scene-card-title">${scene.title}</div>
-          <div class="scene-card-prompt">${promptPreview}</div>
+    document.getElementById('detail-backdrop').style.backgroundImage = `url('${heroUrl}')`;
+
+    const scenesHtml = (story.scenes || []).map((scene, i) => {
+      const imgUrl = (scene.image_urls && scene.image_urls[0])
+        ? scene.image_urls[0]
+        : (scene.image_filenames && scene.image_filenames[0]
+          ? `/generated-images/${story.id}/${scene.image_filenames[0]}` : '');
+      const promptPreview = scene.prompt ? scene.prompt.slice(0, 120) + (scene.prompt.length > 120 ? '...' : '') : '';
+      const imgCount = (scene.image_filenames || []).length;
+      return `
+        <div class="scene-card" data-action="open-scene" data-id="${story.id}" data-scene-idx="${i}" role="link" tabindex="0">
+          <img class="scene-card-thumb" src="${imgUrl}" alt="Scene ${scene.scene}: ${scene.title || ''}" loading="lazy" decoding="async" width="120" height="68"
+               onerror="this.style.background='var(--bg-card)'">
+          <div class="scene-card-info">
+            <div class="scene-card-num">Scene ${scene.scene} ${imgCount > 1 ? '· ' + imgCount + ' imgs' : ''}</div>
+            <div class="scene-card-title">${scene.title}</div>
+            <div class="scene-card-prompt">${promptPreview}</div>
+            <div class="scene-actions">
+              <button class="scene-action-btn" data-action="regen-scene"
+                      data-id="${story.id}" data-idx="${i}"
+                      aria-label="Regenerate image for scene ${i + 1}">🔄 Regen</button>
+              <button class="scene-action-btn" data-action="add-scene-image"
+                      data-id="${story.id}" data-idx="${i}"
+                      aria-label="Add image to scene ${i + 1}">➕ Img</button>
+              <button class="scene-action-btn" data-action="refine-scene"
+                      data-id="${story.id}" data-idx="${i}"
+                      aria-label="Refine prompt for scene ${i + 1}">✨ Refine</button>
+            </div>
+          </div>
         </div>
+      `;
+    }).join('');
+
+    // Fetch critic review
+    let reviewHtml = '';
+    try {
+      const reviewRes = await fetch(`/api/generated-stories/${story.id}/review`);
+      if (reviewRes.ok) {
+        const review = await reviewRes.json();
+        const r = review.review || {};
+        const categories = r.categories || [];
+        const stars = r.stars || 0;
+        const rating = r.rating || 0;
+        const badge = r.badge || '';
+        const badgeClass = badge.toLowerCase().replace(/\s+/g, '-');
+
+        const categoriesHtml = categories.map(c => {
+          const pct = Math.round((c.score / c.max_score) * 100);
+          const fillClass = pct >= 70 ? 'high' : pct >= 50 ? 'medium' : 'low';
+          return `
+            <div class="review-category">
+              <div class="review-category-name">${c.name}</div>
+              <div class="review-category-bar">
+                <div class="review-category-fill ${fillClass}" style="--pct:${pct / 100}"></div>
+              </div>
+              <div class="review-category-score">${c.score.toFixed(1)}/10</div>
+            </div>
+          `;
+        }).join('');
+
+        const worksHtml = (r.what_works || []).map(w => `<li>${w}</li>`).join('');
+        const needsHtml = (r.needs_work || []).map(w => `<li>${w}</li>`).join('');
+
+        // LLM review if available
+        const llm = review.llm_review || {};
+        let llmHtml = '';
+        if (llm.summary) {
+          llmHtml = `
+            <div class="review-summary" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+              <strong>AI Story Review:</strong> ${llm.summary}
+              ${llm.improvement_suggestion ? `<br><em>Suggestion: ${llm.improvement_suggestion}</em>` : ''}
+            </div>
+          `;
+        }
+
+        reviewHtml = `
+          <div class="review-section" id="critic-review">
+            <div class="review-header">
+              <span class="review-stars">${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}</span>
+              <span class="review-rating">${rating}/5</span>
+              ${badge ? `<span class="review-badge ${badgeClass}">${badge}</span>` : ''}
+            </div>
+            <div class="review-summary">${r.summary || ''}</div>
+            <div class="review-categories">${categoriesHtml}</div>
+            <div class="review-columns">
+              <div class="review-columns strengths">
+                <h4>What Works</h4>
+                <ul>${worksHtml}</ul>
+              </div>
+              <div class="review-columns weaknesses">
+                <h4>Needs Improvement</h4>
+                <ul>${needsHtml}</ul>
+              </div>
+            </div>
+            ${llmHtml}
+          </div>
+        `;
+      }
+    } catch (e) {
+      // No review available — that's fine
+    }
+
+    document.getElementById('detail-content').innerHTML = `
+      <h1 class="detail-title" id="detail-title">${story.title}</h1>
+      <div class="detail-subtitle">${story.subtitle || ''}</div>
+      <div class="detail-actions">
+        <button class="btn-primary" data-action="open-scene" data-id="${story.id}" data-scene-idx="0">
+          ${ICONS.play}
+          Play All
+        </button>` + (getProgress(story.id) !== null ? `
+        <button class="btn-accent" data-action="open-player-resume" data-id="${story.id}" data-resume-idx="${getProgress(story.id)}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          Resume (Scene ${getProgress(story.id) + 1})
+        </button>` : '') + `
+        <button class="btn-secondary" id="btn-critic" data-action="run-critic" data-id="${story.id}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+          Run Critic
+        </button>
+        <button class="btn-secondary" id="btn-improve" data-action="improve-story" data-id="${story.id}">
+          ✨ Improve Story
+        </button>
+        <button class="btn-secondary" id="btn-render" data-action="render-story" data-id="${story.id}">
+          🎬 Re-render
+        </button>
+        <button class="btn-secondary" id="btn-extend" data-action="extend-story" data-id="${story.id}">
+          ⏱️ Extend
+        </button>
+        <button class="btn-secondary" id="btn-improve-loop" data-action="improve-loop" data-id="${story.id}">
+          🔄 Improve Loop
+        </button>
+        <button class="btn-secondary" id="btn-add-images" data-action="add-images-bulk" data-id="${story.id}">
+          🖼️ Add Images
+        </button>
+        <button class="btn-secondary btn-danger" id="btn-delete" data-action="delete-story" data-id="${story.id}">
+          🗑️ Delete
+        </button>
+        <button class="btn-secondary" data-action="close-detail">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          Close
+        </button>
+      </div>
+      <div class="detail-meta">
+        ${story.critic_stars ? `<span class="match">${(story.critic_rating || story.critic_stars * 20)}% Match</span>` : ''}
+        <span>${story.year || new Date().getFullYear()}</span>
+        <span>${story.scene_count} Scenes</span>
+        <span id="detail-duration"></span>
+      </div>
+      <div class="detail-tags">
+        ${(story.tags || []).map(t => `<span>${t}</span>`).join('')}
+      </div>
+      <p class="detail-desc">${story.description || story.synopsis || ''}</p>
+      ${reviewHtml}
+      <div class="scene-section-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Scenes
+      </div>
+      <div class="scene-grid">
+        ${scenesHtml}
       </div>
     `;
-  }).join('');
 
-  document.getElementById('detail-content').innerHTML = `
-    <h1 class="detail-title">${story.title}</h1>
-    <div class="detail-subtitle">${story.subtitle || ''}</div>
-    <div class="detail-actions">
-      <button class="btn-primary" onclick="openPlayer('${story.id}', 0)">
-        ${ICONS.play}
-        Play All
-      </button>` + (getProgress(story.id) !== null ? `
-      <button class="btn-accent" onclick="openPlayer('${story.id}', ${getProgress(story.id)})">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-        Resume (Scene ${getProgress(story.id) + 1})
-      </button>` : '') + `
-      <button class="btn-secondary" onclick="closeDetail()">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        Close
-      </button>
-    </div>
-    <div class="detail-meta">
-      <span class="match">98% Match</span>
-      <span>${story.year || '2025'}</span>
-      <span>${story.scene_count} Scenes</span>
-    </div>
-    <div class="detail-tags">
-      ${(story.tags || []).map(t => `<span>${t}</span>`).join('')}
-    </div>
-    <p class="detail-desc">${story.description || story.synopsis || ''}</p>
-    <div class="scene-section-title">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-      Scenes
-    </div>
-    <div class="scene-grid">
-      ${scenesHtml}
-    </div>
-  `;
+    const detailPage = document.getElementById('detail-page');
+    detailPage.classList.add('active');
+    detailPage.scrollTop = 0;
+    openDialog(detailPage);
+  }
 
-  document.getElementById('detail-page').classList.add('active');
-  document.getElementById('detail-page').scrollTop = 0;
+  function closeDetail() {
+    const detailPage = document.getElementById('detail-page');
+    if (!detailPage.classList.contains('active')) return;
+    detailPage.classList.remove('active');
+    state.currentDetail = null;
+    closeDialog(detailPage);
+  }
+
+  async function runCritic(storyId) {
+    const btn = document.getElementById('btn-critic');
+    setBusy(btn, true, '<span class="spinner"></span> Running…');
+    try {
+      const res = await fetch(`/api/generated-stories/${storyId}/run-critic`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(`Critic failed: ${err.detail || 'Unknown error'}`);
+        return;
+      }
+      // Refresh the detail page to show updated review
+      await openDetail(storyId);
+    } catch (e) {
+      toast.error(`Critic error: ${e.message}`);
+    } finally {
+      setBusy(btn, false);
+    }
+  }
+
+// ═══════════════════════════════════════════════════════════════════════
+// SCENE-LEVEL ACTIONS (Regenerate, Add Image, Refine Prompt)
+// ═══════════════════════════════════════════════════════════════════════
+
+async function regenerateScene(storyId, idx, btn) {
+  setBusy(btn, true, '<span class="spinner"></span> Working…');
+  try {
+    const res = await fetch(`/api/stories/${storyId}/scenes/${idx}/regenerate`, { method: 'POST' });
+    if (res.ok) {
+      btn.textContent = '✅ Done';
+      setTimeout(() => { btn.disabled = false; btn.textContent = '🔄 Regen'; btn.removeAttribute('aria-busy'); }, 2000);
+      openDetail(storyId);
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      btn.textContent = '❌ Failed';
+      toast.error(`Regenerate failed: ${err.detail}`);
+      setTimeout(() => { btn.disabled = false; btn.textContent = '🔄 Regen'; btn.removeAttribute('aria-busy'); }, 3000);
+    }
+  } catch(e) {
+    btn.textContent = '❌ Error';
+    setTimeout(() => { btn.disabled = false; btn.textContent = '🔄 Regen'; btn.removeAttribute('aria-busy'); }, 3000);
+  }
 }
 
-function closeDetail() {
-  document.getElementById('detail-page').classList.remove('active');
-  state.currentDetail = null;
+async function addSceneImage(storyId, idx, btn) {
+  setBusy(btn, true, '<span class="spinner"></span> Adding…');
+  try {
+    const res = await fetch(`/api/stories/${storyId}/scenes/${idx}/add-image`, { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      btn.textContent = `✅ ${data.total_images} imgs`;
+      setTimeout(() => { btn.disabled = false; btn.textContent = '➕ Img'; btn.removeAttribute('aria-busy'); }, 2000);
+      openDetail(storyId);
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      btn.textContent = '❌ Failed';
+      toast.error(`Add image failed: ${err.detail}`);
+      setTimeout(() => { btn.disabled = false; btn.textContent = '➕ Img'; btn.removeAttribute('aria-busy'); }, 3000);
+    }
+  } catch(e) {
+    btn.textContent = '❌ Error';
+    setTimeout(() => { btn.disabled = false; btn.textContent = '➕ Img'; btn.removeAttribute('aria-busy'); }, 3000);
+  }
 }
+
+async function refineScenePrompt(storyId, idx, btn) {
+  const instruction = await promptModal({
+    title: 'Refine prompt',
+    label: 'Refinement direction (optional)',
+    placeholder: 'e.g. Make it darker, add a dragon, focus on the sword…',
+    okText: 'Refine',
+  });
+  setBusy(btn, true, '<span class="spinner"></span> Refining…');
+  try {
+    const body = instruction ? { instruction } : {};
+    const res = await fetch(`/api/stories/${storyId}/scenes/${idx}/refine-prompt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      btn.textContent = '✅ Refined';
+      setTimeout(() => { btn.disabled = false; btn.textContent = '✨ Refine'; btn.removeAttribute('aria-busy'); }, 2000);
+      openDetail(storyId);
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      btn.textContent = '❌ Failed';
+      toast.error(`Refine failed: ${err.detail}`);
+      setTimeout(() => { btn.disabled = false; btn.textContent = '✨ Refine'; btn.removeAttribute('aria-busy'); }, 3000);
+    }
+  } catch(e) {
+    btn.textContent = '❌ Error';
+    setTimeout(() => { btn.disabled = false; btn.textContent = '✨ Refine'; btn.removeAttribute('aria-busy'); }, 3000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// STORY-LEVEL ACTIONS (Improve, Re-render)
+// ═══════════════════════════════════════════════════════════════════════
+
+async function improveStory(storyId) {
+  const btn = document.getElementById('btn-improve');
+  setBusy(btn, true, '<span class="spinner"></span> Improving…');
+  try {
+    const res = await fetch(`/api/stories/${storyId}/improve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ max_scenes: 3 }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      toast.success(`Improved ${data.improved_scenes.length} scenes. Render: ${data.render_ok ? '✓' : '✗'}`);
+      openDetail(storyId);
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      toast.error(`Improve failed: ${err.detail}`);
+    }
+  } catch(e) {
+    toast.error(`Error: ${e.message}`);
+  } finally {
+    setBusy(btn, false);
+  }
+}
+
+async function renderStory(storyId) {
+  const btn = document.getElementById('btn-render');
+  setBusy(btn, true, '<span class="spinner"></span> Rendering…');
+  try {
+    const res = await fetch(`/api/stories/${storyId}/render`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.status === 'no_op') {
+        toast.warn(`⚠️ ${data.message || 'No scenes rendered'}`);
+      } else {
+        toast.success(data.message || `Render complete! (${data.scenes_rendered ?? '?'} scene(s))`);
+      }
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      toast.error(`Render failed: ${err.detail}`);
+    }
+  } catch(e) {
+    toast.error(`Error: ${e.message}`);
+  } finally {
+    setBusy(btn, false);
+  }
+}
+
+// ── Extend Story ───────────────────────────────────────────────────────
+async function extendStory(storyId) {
+  const minutesStr = await promptModal({
+    title: 'Extend story',
+    label: 'Target total duration (minutes)',
+    defaultValue: '30',
+    okText: 'Extend',
+  });
+  const minutes = minutesStr;
+  if (!minutes) return;
+  const btn = document.getElementById('btn-extend');
+  setBusy(btn, true, '<span class="spinner"></span> Extending…');
+  try {
+    const res = await fetch(`/api/stories/${storyId}/extend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_minutes: parseFloat(minutes), images_per_scene: 2, voice: 'Dean' }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      toast.success(`Added ${data.new_scenes_added} scenes. Total: ${data.total_scenes} scenes, ~${data.estimated_minutes}min`);
+      openDetail(storyId);
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      toast.error(`Extend failed: ${err.detail}`);
+    }
+  } catch(e) { toast.error(`Error: ${e.message}`); }
+  finally { setBusy(btn, false); }
+}
+
+// ── Improve Loop ───────────────────────────────────────────────────────
+async function improveLoop(storyId) {
+  const roundsStr = await promptModal({
+    title: 'Improve Loop',
+    label: 'Max improvement rounds (1–5)',
+    defaultValue: '3',
+    okText: 'Start',
+  });
+  const rounds = roundsStr;
+  if (!rounds) return;
+  const btn = document.getElementById('btn-improve-loop');
+  setBusy(btn, true, '<span class="spinner"></span> Improving…');
+  try {
+    const res = await fetch(`/api/stories/${storyId}/improve-loop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_stars: 4.0, max_rounds: parseInt(rounds), max_scenes_per_round: 3, images_per_scene: 2 }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const msg = data.status === 'target_reached'
+        ? `Target reached in ${data.rounds_completed} rounds! Stars: ${data.final_stars}`
+        : `Completed ${data.rounds_completed} rounds. Stars: ${data.final_stars}, Rating: ${data.final_rating}`;
+      toast.warn(msg);
+      openDetail(storyId);
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      toast.error(`Improve loop failed: ${err.detail}`);
+    }
+  } catch(e) { toast.error(`Error: ${e.message}`); }
+  finally { setBusy(btn, false); }
+}
+
+// ── Delete Story ────────────────────────────────────────────────────────
+let _deleteTarget = null;  // { storyId, title, btn }
+
+async function confirmDeleteStory(storyId, btn) {
+  // Find the story to get the title for the confirmation
+  const allStories = await API.fetchStories();
+  const story = allStories.find(s => s.id === storyId);
+  const title = story ? story.title : storyId;
+
+  _deleteTarget = { storyId, title, btn };
+  document.getElementById('delete-modal-title').textContent = `"${title}"`;
+
+  // Preview the on-disk payload before asking for confirmation
+  const summaryEl = document.getElementById('delete-modal-summary');
+  const filesEl = document.getElementById('delete-modal-files');
+  const confirmBtn = document.getElementById('btn-confirm-delete');
+  setBusy(confirmBtn, true, '<span class="spinner"></span>Loading…');
+  summaryEl.textContent = 'Scanning outputs/ for this story…';
+
+  try {
+    const preview = await fetch(`/api/stories/${encodeURIComponent(storyId)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: false }),
+    });
+    const data = await preview.json();
+    if (data.status === 'preview') {
+      const sizeMb = (data.bytes_freed / 1024 / 1024).toFixed(1);
+      summaryEl.innerHTML =
+        `<b>${data.files_count}</b> files · <b>${sizeMb} MB</b> on disk<br>` +
+        `<span style="color:var(--text-muted)">Includes images, audio, video, subtitle files, manifest, and review</span>`;
+      if (data.files_sample && data.files_sample.length) {
+        filesEl.style.display = 'block';
+        filesEl.innerHTML = data.files_sample
+          .map(f => `<div>${f.path}</div>`)
+          .join('') + (data.more_files ? `<div style="margin-top:6px;color:var(--accent)">… and ${data.more_files} more</div>` : '');
+      } else {
+        filesEl.style.display = 'none';
+      }
+    } else {
+      summaryEl.textContent = data.note || 'Story not found on disk.';
+    }
+  } catch (e) {
+    summaryEl.textContent = `Could not preview: ${e.message}`;
+    console.warn('[delete] preview failed', e);
+  }
+  setBusy(confirmBtn, false);
+
+  const deleteModal = document.getElementById('delete-modal');
+  deleteModal.classList.add('active');
+  openDialog(deleteModal);
+}
+
+function closeDeleteModal() {
+  const deleteModal = document.getElementById('delete-modal');
+  if (!deleteModal.classList.contains('active')) return;
+  deleteModal.classList.remove('active');
+  _deleteTarget = null;
+  closeDialog(deleteModal);
+}
+
+// ── ComfyUI Workers Modal ──────────────────────────────────────────────
+async function openWorkersModal() {
+  const workersModal = document.getElementById('workers-modal');
+  workersModal.classList.add('active');
+  openDialog(workersModal);
+  await workersAction('refresh');
+}
+
+function closeWorkersModal() {
+  const workersModal = document.getElementById('workers-modal');
+  if (!workersModal.classList.contains('active')) return;
+  workersModal.classList.remove('active');
+  closeDialog(workersModal);
+}
+
+async function workersAction(action) {
+  const listEl = document.getElementById('workers-modal-list');
+  listEl.innerHTML = '<div style="padding:12px;color:var(--text-muted)">Working...</div>';
+
+  let res, data;
+  try {
+    if (action === 'refresh') {
+      res = await fetch('/api/comfyui/workers');
+      data = await res.json();
+    } else if (action === 'spawn-cpu') {
+      res = await fetch('/api/comfyui/workers/spawn-cpu', { method: 'POST' });
+      data = await res.json();
+    } else if (action === 'kill-cpu') {
+      res = await fetch('/api/comfyui/workers/kill-cpu', { method: 'POST' });
+      data = await res.json();
+    }
+  } catch (e) {
+    listEl.innerHTML = `<div style="color:#ff7066;padding:12px">Error: ${e.message}</div>`;
+    return;
+  }
+
+  if (!res.ok) {
+    listEl.innerHTML = `<div style="color:#ff7066;padding:12px">Failed: ${data.detail || data.error || res.status}</div>`;
+    return;
+  }
+
+  // Render the worker list
+  const workers = data.workers || [];
+  if (workers.length === 0) {
+    listEl.innerHTML = `<div style="padding:16px;color:var(--text-muted);text-align:center">No workers running. Click "+ Spawn CPU" to start one.</div>`;
+  } else {
+    listEl.innerHTML = workers.map(w => {
+      const port = w.url ? new URL(w.url).port : '?';
+      const q = (w.queue_running || 0) + (w.queue_pending || 0);
+      const kind = (w.kind || 'manual').toUpperCase();
+      const status = w.running ? 'running' : 'stopped';
+      const statusColor = w.running ? '#46d369' : '#f44336';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg-elevated);border-radius:6px;margin-bottom:6px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${statusColor}"></span>
+        <span style="font-weight:600;min-width:60px">${kind}</span>
+        <span style="color:var(--text-muted)">:${port}</span>
+        <span style="margin-left:auto;color:var(--text-muted);font-size:12px">queue ${q}</span>
+        <span style="font-size:11px;color:${statusColor}">${status}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Update the navbar badge too
+  pollComfyUI();
+}
+
+// Close modals on overlay click. Uses a mousedown/mouseup match to
+// avoid the drag-bug: if the user clicks-and-drags from inside the
+// modal to the backdrop, mouseup is on the backdrop but mousedown was
+// on the inner element, so we don't close. This is the same pattern
+// recommended by the WAI-ARIA Authoring Practices.
+function attachBackdropDismiss(overlay, closer) {
+  let downOnBackdrop = false;
+  overlay.addEventListener('mousedown', (e) => {
+    downOnBackdrop = (e.target === overlay);
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay && downOnBackdrop) closer();
+    downOnBackdrop = false;
+  });
+}
+attachBackdropDismiss(document.getElementById('workers-modal'), closeWorkersModal);
+attachBackdropDismiss(document.getElementById('shortcuts-overlay'), closeShortcuts);
+
+async function executeDeleteStory() {
+  if (!_deleteTarget) return;
+  const { storyId, btn } = _deleteTarget;
+  const backup = document.getElementById('delete-modal-backup').checked;
+  const confirmBtn = document.getElementById('btn-confirm-delete');
+  setBusy(confirmBtn, true, '<span class="spinner"></span>Deleting…');
+  setBusy(btn, true, '🗑️ Deleting…');
+
+  try {
+    const res = await fetch(`/api/stories/${encodeURIComponent(storyId)}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true, backup }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.status !== 'ok') {
+      throw new Error(data.detail || data.error || 'Delete failed');
+    }
+    const sizeMb = (data.bytes_freed / 1024 / 1024).toFixed(1);
+    const backupNote = data.backup_path ? ` (backup at ${data.backup_path})` : '';
+    showToast(`🗑️ Deleted "${storyId}" — ${data.deleted} files, ${sizeMb} MB${backupNote}`, 'success');
+    closeDeleteModal();
+    closeDetail();
+    // Refresh the story list so the card disappears
+    const stories = await API.fetchStories();
+    state.stories = stories;
+    if (stories.length) {
+      renderHero(pickFeaturedStory(stories));
+      renderCards(stories);
+    } else {
+      document.getElementById('hero-container').innerHTML = '';
+      renderCards([]);
+    }
+    // Clear player progress for this story (stored under PROGRESS_KEY as
+    // {storyId: sceneIndex})
+    try {
+      const all = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+      if (storyId in all) {
+        delete all[storyId];
+        localStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
+      }
+    } catch (e) {}
+  } catch (e) {
+    showToast(`Delete failed: ${e.message}`, 'error');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Delete permanently';
+    if (btn) { btn.disabled = false; btn.innerHTML = '🗑️ Delete'; }
+  }
+}
+
+// Close delete modal on overlay click + Escape (drag-safe via shared helper)
+attachBackdropDismiss(document.getElementById('delete-modal'), closeDeleteModal);
+
+// ── Bulk Add Images ────────────────────────────────────────────────────
+async function addImagesBulk(storyId) {
+  const perSceneStr = await promptModal({
+    title: 'Add Images',
+    label: 'Images per scene (1–5)',
+    defaultValue: '2',
+    okText: 'Generate',
+  });
+  const perScene = perSceneStr;
+  if (!perScene) return;
+  const btn = document.getElementById('btn-add-images');
+  setBusy(btn, true, '<span class="spinner"></span> Adding…');
+  try {
+    const res = await fetch(`/api/stories/${storyId}/add-images`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images_per_scene: parseInt(perScene) }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      toast.success(`Added ${data.total_added} images total.`);
+      openDetail(storyId);
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      toast.error(`Add images failed: ${err.detail}`);
+    }
+  } catch(e) { toast.error(`Error: ${e.message}`); }
+  if (btn) { btn.disabled = false; btn.innerHTML = '🖼️ Add Images'; }
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════
 // PLAYER
 // ═══════════════════════════════════════════════════════════════════════
 async function openPlayer(storyId, sceneIndex) {
-  const story = await API.fetchStory(storyId);
+  let story;
+  try {
+    story = await API.fetchStory(storyId);
+  } catch (e) {
+    toast.error('Could not load story: ' + e.message);
+    console.warn('[player] fetchStory failed', e);
+    return;
+  }
+  if (!story || !story.scenes || !story.scenes.length) {
+    toast.warn('This story has no scenes yet. Generate images first.');
+    return;
+  }
   state.playerStory = story;
   state.playerIndex = Math.max(0, Math.min(sceneIndex, story.scenes.length - 1));
-  document.getElementById('player-page').classList.add('active');
+  const playerPage = document.getElementById('player-page');
+  playerPage.classList.add('active');
   // Initialize audio state
   const audioEl = document.getElementById('player-audio');
   audioEl.volume = state.volume;
   audioEl.muted = state.muted;
   updateVolumeIcon();
-  document.getElementById('btn-cc').classList.toggle('active', state.subtitlesOn);
+  const ccBtn = document.getElementById('btn-cc');
+  ccBtn.classList.toggle('active', state.subtitlesOn);
+  updateCcButton(ccBtn);
   updatePlayer();
+  // Move focus to play button so keyboard users can hit space immediately
+  document.getElementById('btn-play').focus();
 }
 
 function closePlayer() {
@@ -1828,9 +3560,13 @@ function updatePlayer() {
   const scene = scenes[idx];
   if (!scene) return;
 
-  const imgUrl = scene.image_filenames && scene.image_filenames[0]
-    ? `/images/${scene.image_filenames[0]}`
-    : '';
+  // Handle both pre-built (image_filenames + /images/) and generated (image_urls) stories
+  let imgUrl = '';
+  if (scene.image_urls && scene.image_urls[0]) {
+    imgUrl = scene.image_urls[0]; // Already a full URL path from generated stories
+  } else if (scene.image_filenames && scene.image_filenames[0]) {
+    imgUrl = `/images/${scene.image_filenames[0]}`;
+  }
 
   const img = document.getElementById('player-image');
   const prevSrc = img.src;
@@ -1838,12 +3574,40 @@ function updatePlayer() {
   if (prevSrc !== newSrc) {
     // Apply Ken Burns cinematic animation on scene change
     img.src = newSrc;
-    img.alt = scene.title;
+    img.alt = scene.title ? `Scene ${idx + 1}: ${scene.title}` : `Scene ${idx + 1}`;
     applyKenBurns(img);
   } else {
     img.src = newSrc;
-    img.alt = scene.title;
+    img.alt = scene.title ? `Scene ${idx + 1}: ${scene.title}` : `Scene ${idx + 1}`;
   }
+  // Image error handler — show a placeholder when the source is broken
+  // (e.g. story has no images, file is missing, or 404).
+  img.onerror = () => {
+    img.onerror = null;
+    img.removeAttribute('src');
+    img.alt = `Scene ${idx + 1} image unavailable`;
+    // Inject a styled placeholder div if not already present
+    if (!img.parentElement.querySelector('.image-placeholder')) {
+      const ph = document.createElement('div');
+      ph.className = 'image-placeholder';
+      ph.innerHTML = `
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <path d="M21 15l-5-5L5 21"/>
+        </svg>
+        <p>Scene ${idx + 1}${scene.title ? ': ' + scene.title : ''}</p>
+        <p class="image-placeholder-hint">No image available — generate images to see this scene</p>
+      `;
+      img.style.display = 'none';
+      img.insertAdjacentElement('afterend', ph);
+    }
+  };
+  // Clear any prior placeholder when src changes successfully
+  const priorPlaceholder = img.parentElement.querySelector('.image-placeholder');
+  if (priorPlaceholder) priorPlaceholder.remove();
+  if (img.style.display === 'none') img.style.display = '';
   // Subtitles: build sentence segments for audio-synced display
   const subEl = document.getElementById('player-subtitles');
   const narration = scene.narration || scene.narration_text || scene.narrative || '';
@@ -1871,7 +3635,10 @@ function updatePlayer() {
   subEl.classList.toggle('visible', state.subtitlesOn);
 
   document.getElementById('player-progress-label').textContent = `${idx + 1} / ${scenes.length}`;
-  document.getElementById('player-progress-fill').style.width = `${((idx + 1) / scenes.length) * 100}%`;
+  // Use --pct CSS variable so the transform: scaleX() bar animates on the
+  // compositor instead of triggering layout via `width` changes.
+  const pct = scenes.length > 0 ? (idx + 1) / scenes.length : 0;
+  document.getElementById('player-progress-fill').style.setProperty('--pct', pct);
   document.getElementById('player-scene-counter').textContent = `${idx + 1} / ${scenes.length}`;
 
   const scrub = document.getElementById('player-scrub');
@@ -1882,15 +3649,27 @@ function updatePlayer() {
   const audioIndicator = document.getElementById('audio-indicator');
   const audioIcon = document.getElementById('audio-icon');
   const playOverlay = document.getElementById('play-overlay');
-  if (scene.audio_file) {
+  if (scene.audio_file || scene.audio_url) {
+    // Handle both pre-built (audio_file) and generated (audio_url) stories
+    const audioSrc = scene.audio_url || `/audio/${scene.audio_file}`;
     audioIndicator.style.display = 'flex';
     audioIcon.textContent = '🔊';
-    if (audioEl.src !== `/audio/${scene.audio_file}`) {
+    if (audioEl.src !== audioSrc) {
       state._sceneChanging = true; // Suppress pause → showControls during transition
       audioEl.pause();
-      audioEl.src = `/audio/${scene.audio_file}`;
+      audioEl.src = audioSrc;
       audioEl.currentTime = 0;
       audioEl.load();
+      // Audio error handler — surface "no audio" gracefully. Without
+      // this the play overlay gets stuck and the user can't proceed.
+      audioEl.onerror = () => {
+        audioEl.onerror = null;
+        audioIndicator.classList.add('muted');
+        audioIcon.textContent = '⚠';
+        audioIndicator.title = 'Audio unavailable for this scene';
+        state._sceneChanging = false;
+        playOverlay.style.display = 'none';
+      };
       // Try autoplay; show tap-to-play overlay if blocked
       audioEl.play().then(() => {
         // Scene transition complete — allow pause event to show controls again
@@ -1922,22 +3701,24 @@ function updatePlayer() {
 
 // ═══════════════════════════════════════════════════════════════════════
 // PROGRESS (localStorage)
+// Bump the version key on schema changes so a future migration can
+// detect old data and not silently corrupt it.
 // ═══════════════════════════════════════════════════════════════════════
-const PROGRESS_KEY = 'story_viewer_progress';
+const PROGRESS_KEY = 'fantasee_progress_v1';
 
 function saveProgress(storyId, sceneIndex) {
   try {
     const all = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
     all[storyId] = sceneIndex;
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
-  } catch (e) { /* localStorage may be unavailable */ }
+  } catch (e) { console.warn('[progress] save failed (localStorage may be full / disabled):', e); }
 }
 
 function getProgress(storyId) {
   try {
     const all = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
     return all[storyId] !== undefined ? all[storyId] : null;
-  } catch (e) { return null; }
+  } catch (e) { console.warn('[progress] read failed:', e); return null; }
 }
 
 function clearProgress(storyId) {
@@ -1945,7 +3726,7 @@ function clearProgress(storyId) {
     const all = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
     delete all[storyId];
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
-  } catch (e) { /* ignore */ }
+  } catch (e) { console.warn('[progress] clear failed:', e); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2000,11 +3781,14 @@ function updateSubtitleFromTime(currentTime) {
   subEl.textContent = text;
 }
 
-// Wire up audio timeupdate for subtitle sync
-document.getElementById('player-audio').addEventListener('timeupdate', () => {
+// Wire up audio timeupdate for subtitle sync — rAF-coalesced so we
+// never run more than once per animation frame (the browser fires
+// timeupdate ~4 Hz, but we only need the latest value per frame).
+const _coalescedSubtitleUpdate = rafDebounce(() => {
   if (!state.subtitlesOn) return;
   updateSubtitleFromTime(document.getElementById('player-audio').currentTime);
 });
+document.getElementById('player-audio').addEventListener('timeupdate', _coalescedSubtitleUpdate);
 
 // ═══════════════════════════════════════════════════════════════════════
 // AUDIO (tap-to-play)
@@ -2102,7 +3886,9 @@ function playerPrev() {
 }
 
 function playerScrub(val) {
-  state.playerIndex = parseInt(val);
+  const newIdx = parseInt(val, 10);
+  if (Number.isNaN(newIdx) || newIdx === state.playerIndex) return;
+  state.playerIndex = newIdx;
   updatePlayer();
 }
 
@@ -2181,31 +3967,65 @@ function updateVolumeIcon() {
   }
 }
 
-// Keyboard shortcuts for player
+// Keyboard shortcuts for player (YouTube/Netflix conventions).
+// The shortcuts cheatsheet is disabled because it can trap the player UI.
 document.addEventListener('keydown', (e) => {
-  if (!document.getElementById('player-page').classList.contains('active')) return;
+  const playerActive = document.getElementById('player-page').classList.contains('active');
+  const shortcutsOpen = !document.getElementById('shortcuts-overlay').hidden;
+  // Esc always closes whatever dialog is open
+  if (e.key === 'Escape') {
+    if (shortcutsOpen) { closeShortcuts(); e.preventDefault(); return; }
+    if (playerActive) { closePlayer(); e.preventDefault(); return; }
+  }
+  if (!playerActive) return;
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
   if (e.key === 'ArrowRight') { e.preventDefault(); playerNext(); }
-  if (e.key === 'ArrowLeft') { e.preventDefault(); playerPrev(); }
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); playerPrev(); }
+  if (e.key === 'ArrowUp')    { e.preventDefault(); setVolume(Math.min(1, state.volume + 0.05)); }
+  if (e.key === 'ArrowDown')  { e.preventDefault(); setVolume(Math.max(0, state.volume - 0.05)); }
   if (e.key === ' ' || e.key === 'k' || e.key === 'K') { e.preventDefault(); togglePlay(); }
   if (e.key === 'm' || e.key === 'M') { e.preventDefault(); toggleMute(); }
-  if (e.key === 'c' || e.key === 'C') { e.preventDefault(); toggleSubtitles(); }
+  if (e.key === 'c' || e.key === 'C') {
+    e.preventDefault();
+    toggleSubtitles();
+    updateCcButton(document.getElementById('btn-cc'));
+  }
   if (e.key === 'f' || e.key === 'F') { e.preventDefault(); toggleFullscreen(); }
-  if (e.key === 'Escape') { closePlayer(); }
 });
 
+function openShortcuts() {
+  const overlay = document.getElementById('shortcuts-overlay');
+  overlay.hidden = true;
+}
+function closeShortcuts() {
+  const overlay = document.getElementById('shortcuts-overlay');
+  overlay.hidden = true;
+  closeDialog(overlay);
+}
+
 // ── Ken Burns ──────────────────────────────────────────────────
-// Pick a random cinematic animation for the current scene image.
-// Animations: zoom-in, zoom-out, pan-up, pan-down, dissolve.
+// Pick a cinematic animation biased by the image's aspect ratio.
+// Widescreen → pan (horizontal motion reads better on wide frames).
+// Portrait  → zoom (vertical motion reads better on tall frames).
+// Avoid picking the same direction as the previous scene so transitions
+// don't bounce (e.g. pan-up → pan-down).
+const _KEN_LAST_EFFECT = { value: null };
 function applyKenBurns(img) {
   const effects = ['ken-zoom-in', 'ken-zoom-out', 'ken-pan-up', 'ken-pan-down', 'ken-sway'];
-  // Remove any previous animation
   for (const cls of effects) img.classList.remove(cls);
   img.style.animation = 'none';
-  // Force reflow to restart animation
+  // Force reflow to restart the CSS animation
   void img.offsetWidth;
-  // Pick random effect
-  const choice = effects[Math.floor(Math.random() * effects.length)];
+  // Bias by aspect ratio once the image has naturalWidth
+  const ar = (img.naturalWidth && img.naturalHeight) ? img.naturalWidth / img.naturalHeight : 16 / 9;
+  let pool;
+  if (ar > 1.5)        pool = ['ken-zoom-in', 'ken-pan-left', 'ken-pan-right', 'ken-sway'];
+  else if (ar < 0.8)   pool = ['ken-zoom-in', 'ken-zoom-out', 'ken-pan-up', 'ken-pan-down'];
+  else                 pool = effects;
+  // Don't repeat the same effect as the previous scene
+  const filtered = pool.filter(e => e !== _KEN_LAST_EFFECT.value);
+  const choice = filtered[Math.floor(Math.random() * filtered.length)];
+  _KEN_LAST_EFFECT.value = choice;
   img.classList.add(choice);
 }
 
@@ -2261,7 +4081,9 @@ function hideControls() {
   const audioEl = document.getElementById('player-audio');
   const controls = document.getElementById('player-controls');
   const topbar = document.getElementById('player-topbar');
-  if (controls._isHover || topbar._isHover) return; // Don't hide while hovering
+  // Use :hover pseudo-class via matches() instead of an _isHover property.
+  // This avoids the leak where the property survives element reuse.
+  if (controls.matches(':hover') || topbar.matches(':hover')) return;
   const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement);
   // In fullscreen: always hide after timeout (immersive). Normal: only hide when playing.
   if (isFS || (audioEl && !audioEl.paused)) {
@@ -2290,13 +4112,15 @@ document.addEventListener('mousemove', (e) => {
   scheduleHide();
 });
 
-// Keep controls visible while hovering over controls
+// Keep controls visible while hovering over controls. The hide logic
+// uses :hover via element.matches() — these listeners just trigger the
+// show/scheduleHide cycle so controls reappear when the pointer enters.
 const controlsEl = document.getElementById('player-controls');
 const topbarEl = document.getElementById('player-topbar');
-controlsEl.addEventListener('mouseenter', () => { controlsEl._isHover = true; showControls(); clearTimeout(playerHideTimer); });
-controlsEl.addEventListener('mouseleave', () => { controlsEl._isHover = false; scheduleHide(); });
-topbarEl.addEventListener('mouseenter', () => { topbarEl._isHover = true; showControls(); clearTimeout(playerHideTimer); });
-topbarEl.addEventListener('mouseleave', () => { topbarEl._isHover = false; scheduleHide(); });
+controlsEl.addEventListener('mouseenter', () => { showControls(); clearTimeout(playerHideTimer); });
+controlsEl.addEventListener('mouseleave', () => { scheduleHide(); });
+topbarEl.addEventListener('mouseenter', () => { showControls(); clearTimeout(playerHideTimer); });
+topbarEl.addEventListener('mouseleave', () => { scheduleHide(); });
 
 // Keep controls visible when paused, hide when playing (after timer)
 document.getElementById('player-audio').addEventListener('play', () => {
@@ -2312,53 +4136,186 @@ document.getElementById('player-audio').addEventListener('pause', () => {
 // ═══════════════════════════════════════════════════════════════════════
 // CREATE MODAL
 // ═══════════════════════════════════════════════════════════════════════
+
+// Queue mode state
+let _createMode = 'single';
+let _queueItems = [];
+
 function openCreateModal() {
-  document.getElementById('create-modal').classList.add('active');
+  const createModal = document.getElementById('create-modal');
+  createModal.classList.add('active');
+  openDialog(createModal);
+  // Focus the concept textarea so the user can start typing immediately
+  setTimeout(() => {
+    const ta = document.getElementById('form-concept');
+    if (ta) ta.focus();
+  }, 50);
 }
 
 function closeCreateModal() {
-  document.getElementById('create-modal').classList.remove('active');
+  const createModal = document.getElementById('create-modal');
+  if (!createModal.classList.contains('active')) return;
+  createModal.classList.remove('active');
+  closeDialog(createModal);
 }
+
+function setCreateMode(mode) {
+  _createMode = mode;
+  document.getElementById('mode-single').classList.toggle('active', mode === 'single');
+  document.getElementById('mode-queue').classList.toggle('active', mode === 'queue');
+  document.getElementById('single-concept-area').style.display = mode === 'single' ? 'block' : 'none';
+  document.getElementById('queue-concept-area').style.display = mode === 'queue' ? 'block' : 'none';
+  document.getElementById('btn-submit-create').textContent =
+    mode === 'queue' ? 'Queue Generation' : 'Begin Generation';
+  if (mode === 'queue' && _queueItems.length === 0) {
+    addQueueItem();
+  }
+}
+
+function addQueueItem() {
+  const idx = _queueItems.length;
+  _queueItems.push({ concept: '' });
+  renderQueueItems();
+  // focus the new textarea
+  setTimeout(() => {
+    const ta = document.querySelector(`#queue-items textarea[data-idx="${idx}"]`);
+    if (ta) ta.focus();
+  }, 0);
+}
+
+function removeQueueItem(idx) {
+  _queueItems.splice(idx, 1);
+  renderQueueItems();
+}
+
+function renderQueueItems() {
+  const container = document.getElementById('queue-items');
+  container.innerHTML = _queueItems.map((it, i) => `
+    <div class="queue-item">
+      <span class="queue-item-num">${i + 1}</span>
+      <textarea class="form-textarea queue-item-input" data-queue-input="${i}"
+        placeholder="Concept ${i + 1}..."
+        aria-label="Concept ${i + 1}">${it.concept || ''}</textarea>
+      <button type="button" class="queue-item-remove" data-action="remove-queue-item" data-idx="${i}" aria-label="Remove concept ${i + 1}">&times;</button>
+    </div>
+  `).join('');
+}
+
+// Delegated input handler for queue items — replaces inline oninput which
+// had a footgun of interpolating unescaped i into a JS expression.
+document.getElementById('queue-items').addEventListener('input', (e) => {
+  const ta = e.target.closest('[data-queue-input]');
+  if (!ta) return;
+  const idx = parseInt(ta.dataset.queueInput, 10);
+  if (_queueItems[idx]) _queueItems[idx].concept = ta.value;
+});
 
 async function submitCreate(e) {
   e.preventDefault();
   const btn = document.getElementById('btn-submit-create');
-  btn.disabled = true;
-  btn.textContent = 'Submitting...';
+  setBusy(btn, true, '<span class="spinner"></span> Submitting…');
 
-  const body = {
-    story_concept: document.getElementById('form-concept').value,
+  const commonFields = () => ({
     style: document.getElementById('form-style').value,
     num_scenes: parseInt(document.getElementById('form-scenes').value),
     images_per_scene: parseInt(document.getElementById('form-images-per-scene').value),
     characters: document.getElementById('form-characters').value,
     tone: document.getElementById('form-tone').value,
-  };
+    voice_preset: document.getElementById('form-voice').value,
+  });
 
   try {
-    const result = await API.submitGeneration(body);
-    showToast('Story generation request submitted! Task ID: ' + result.task_id, 'success');
-    closeCreateModal();
-    document.getElementById('create-form').reset();
-    openProgressPanel();
+    if (_createMode === 'queue') {
+      // Validate: every queue item must have a concept
+      const valid = _queueItems
+        .map((it, i) => ({ ...it, idx: i }))
+        .filter(it => it.concept && it.concept.trim().length >= 10);
+      if (valid.length === 0) {
+        showToast('Add at least one concept (10+ characters) to the queue.', 'error');
+        return;
+      }
+      if (valid.length !== _queueItems.length) {
+        showToast(`${_queueItems.length - valid.length} queue item(s) skipped (too short).`, 'warn');
+      }
+      const items = valid.map(it => ({
+        story_concept: it.concept.trim(),
+        ...commonFields(),
+      }));
+      const result = await API.submitGenerationQueue(items);
+      showToast(`Queue of ${result.item_count} stories accepted! ID: ${result.queue_id}`, 'success');
+      closeCreateModal();
+      resetCreateForm();
+      openProgressPanel();
+    } else {
+      const concept = document.getElementById('form-concept').value;
+      if (!concept || concept.trim().length < 10) {
+        showToast('Story concept must be at least 10 characters.', 'error');
+        return;
+      }
+      const body = {
+        story_concept: concept,
+        ...commonFields(),
+      };
+      const result = await API.submitGeneration(body);
+      showToast('Story generation request submitted! Task ID: ' + result.task_id, 'success');
+      closeCreateModal();
+      document.getElementById('create-form').reset();
+      openProgressPanel();
+    }
   } catch (err) {
     showToast('Failed to submit: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Begin Generation';
+    btn.textContent = _createMode === 'queue' ? 'Queue Generation' : 'Begin Generation';
   }
 }
 
-// Close modal on overlay click
-document.getElementById('create-modal').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) closeCreateModal();
-});
+function resetCreateForm() {
+  document.getElementById('create-form').reset();
+  _queueItems = [];
+  renderQueueItems();
+  // restore defaults that reset() wipes
+  document.getElementById('form-images-per-scene').value = '5';
+  document.getElementById('form-scenes').value = '10';
+  document.getElementById('form-voice').value = 'Dean';
+}
 
-// Escape key for modal
+// Close create modal on overlay click (drag-safe via shared helper)
+attachBackdropDismiss(document.getElementById('create-modal'), closeCreateModal);
+
+// Global Escape key handler for ANY active modal — closes the most
+// recently opened one. Also handled inside openDialog's keydown trap.
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && document.getElementById('create-modal').classList.contains('active')) {
-    closeCreateModal();
+  if (e.key !== 'Escape') return;
+  // Only act if the focused element isn't an input/textarea/select
+  // (let them handle their own Escape for IME etc.)
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+
+  const shortcutsOverlay = document.getElementById('shortcuts-overlay');
+  if (shortcutsOverlay && !shortcutsOverlay.hidden) {
+    e.preventDefault();
+    closeShortcuts();
+    return;
   }
+
+  // Try modals in reverse-open order
+  for (let i = state._dialogFocusStack.length - 1; i >= 0; i--) {
+    const entry = state._dialogFocusStack[i];
+    if (!entry || !entry.overlay) continue;
+    const id = entry.overlay.id;
+    if (id === 'create-modal') return closeCreateModal();
+    if (id === 'workers-modal') return closeWorkersModal();
+    if (id === 'delete-modal') return closeDeleteModal();
+    if (id === 'prompt') { closeDialog(entry.overlay); entry.overlay.remove(); return; }
+    if (id === 'shortcuts-overlay') return closeShortcuts();
+  }
+  // Fallback: if a modal is active but not in our stack, close by class
+  if (document.getElementById('create-modal').classList.contains('active')) closeCreateModal();
+  else if (document.getElementById('workers-modal').classList.contains('active')) closeWorkersModal();
+  else if (document.getElementById('delete-modal').classList.contains('active')) closeDeleteModal();
+  else if (document.getElementById('detail-page').classList.contains('active')) closeDetail();
+  else if (document.getElementById('player-page').classList.contains('active')) closePlayer();
+  else if (document.getElementById('credits-overlay').classList.contains('active')) closeCredits();
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2383,68 +4340,219 @@ function updateProgressDisplay() {
     `;
     return;
   }
-  list.innerHTML = state.tasks.map(t => {
+  // Group sub-tasks under their parent queue
+  const queueTasks = state.tasks.filter(t => (t.kind === 'queue' || t.id?.startsWith('q-')));
+  const subTasks = state.tasks.filter(t => t.parent);
+  const topLevel = state.tasks.filter(t =>
+    !t.parent && !(t.kind === 'queue' || t.id?.startsWith('q-'))
+  );
+  const childrenOf = (parentId) => subTasks.filter(t => t.parent === parentId);
+
+  const renderItem = (t, isChild = false) => {
     const statusClass = t.status === 'running' ? 'running' : t.status === 'done' ? 'done' : t.status === 'error' ? 'error' : 'queued';
+    const pct = Math.round((t.progress || 0) * 100);
+    const isQueue = t.kind === 'queue' || t.id?.startsWith('q-');
+    const bar = isQueue
+      ? `<div class="progress-bar-outer" style="margin-top:4px"><div class="progress-bar-inner" style="width:${pct}%"></div></div>`
+      : '';
+    const sub = isQueue && t.item_count
+      ? `<span class="progress-item-sub">${t.item_count} stories</span>`
+      : '';
+    const titlePrefix = isChild ? '<span class="progress-item-child">↳</span> ' : '';
     return `
-      <div class="progress-item">
+      <div class="progress-item ${isChild ? 'progress-item-child-row' : ''}">
         <div class="progress-status ${statusClass}"></div>
         <div class="progress-item-info">
-          <div class="progress-item-title">Task ${t.id}</div>
-          <div class="progress-item-msg">${t.message || t.status}</div>
+          <div class="progress-item-title">${titlePrefix}${isQueue ? 'Queue' : 'Task'} ${t.id}</div>
+          <div class="progress-item-msg">${t.message || t.status} ${sub}</div>
+          ${bar}
         </div>
       </div>
     `;
-  }).join('');
+  };
+
+  const html = [];
+  // Render top-level single tasks first
+  for (const t of topLevel) {
+    html.push(renderItem(t));
+  }
+  // Then queue tasks with their sub-tasks indented
+  for (const q of queueTasks) {
+    html.push(renderItem(q));
+    for (const c of childrenOf(q.id)) {
+      html.push(renderItem(c, true));
+    }
+  }
+  list.innerHTML = html.join('');
 }
 
 // ═══════════════════════════════════════════════════════════════════════
 // TOAST
 // ═══════════════════════════════════════════════════════════════════════
 let toastTimeout;
-function showToast(message, type = '') {
+function showToast(message, type = '', opts = {}) {
   const el = document.getElementById('toast');
   el.textContent = message;
+  // Reset all variant classes then add the requested one.
   el.className = 'toast ' + type;
+  el.setAttribute('role', type === 'error' ? 'alert' : 'status');
   clearTimeout(toastTimeout);
-  // Force reflow
+  // Force reflow so the transition fires when text changes.
   void el.offsetWidth;
   el.classList.add('visible');
-  toastTimeout = setTimeout(() => el.classList.remove('visible'), 4000);
+  const duration = opts.duration ?? 4000;
+  if (duration > 0) {
+    toastTimeout = setTimeout(() => el.classList.remove('visible'), duration);
+  }
 }
 
+/** Shorthand toast variants — replace the 21 alert() calls. */
+const toast = {
+  success: (msg, opts) => showToast(msg, 'success', opts),
+  error:   (msg, opts) => showToast(msg, 'error',   opts),
+  warn:    (msg, opts) => showToast(msg, 'warn',    opts),
+  info:    (msg, opts) => showToast(msg, 'info',    opts),
+};
+
 // ═══════════════════════════════════════════════════════════════════════
-// NAVBAR SCROLL EFFECT
+// DELEGATED CLICK HANDLER — data-action="..." routing
+// One listener on document routes every interactive element by its
+// data-action attribute. Replaces the 52 inline onclick= handlers.
 // ═══════════════════════════════════════════════════════════════════════
-let lastScroll = 0;
-window.addEventListener('scroll', () => {
+const ACTION_HANDLERS = {
+  // Navigation
+  'nav-browse': () => goBrowse(),
+  'nav-create': () => openCreateModal(),
+  'go-browse':  () => goBrowse(),
+  'toggle-nav': (el) => {
+    const links = document.getElementById('navbar-links');
+    const open = links.classList.toggle('open');
+    el.setAttribute('aria-expanded', String(open));
+  },
+  'open-create':    () => openCreateModal(),
+  'close-create':   () => closeCreateModal(),
+  'open-workers':   () => openWorkersModal(),
+  'close-workers':  () => closeWorkersModal(),
+  'close-detail':   () => closeDetail(),
+  'close-player':   () => closePlayer(),
+  'player-create':  () => { closePlayer(); setTimeout(openCreateModal, 350); },
+  'play-click':     () => handlePlayClick(),
+  'toggle-play':    () => togglePlay(),
+  'toggle-mute':    () => toggleMute(),
+  'player-prev':    () => playerPrev(),
+  'player-next':    () => playerNext(),
+  'toggle-subs':    (el) => { toggleSubtitles(); updateCcButton(el); },
+  'toggle-fullscreen': () => toggleFullscreen(),
+  'credits-back':   () => { closeCredits(); closePlayer(); },
+  'mode-single':    (el) => setCreateMode('single', el),
+  'mode-queue':     (el) => setCreateMode('queue', el),
+  'add-queue-item': () => addQueueItem(),
+  'submit-create':  () => {},
+  'close-delete':   () => closeDeleteModal(),
+  'confirm-delete': () => executeDeleteStory(),
+  'toggle-progress':() => toggleProgressPanel(),
+  'workers-spawn':  () => workersAction('spawn-cpu'),
+  'workers-kill':   () => workersAction('kill-cpu'),
+  'workers-refresh':() => workersAction('refresh'),
+
+  // Story / scene / card actions
+  'open-detail':     (el) => openDetail(el.dataset.id),
+  'open-scene':      (el) => openPlayer(el.dataset.id, parseInt(el.dataset.sceneIdx || '0', 10)),
+  'open-player-resume': (el) => openPlayer(el.dataset.id, parseInt(el.dataset.resumeIdx || '0', 10)),
+  'regen-scene':     (el, e) => { if (e) e.stopPropagation(); regenerateScene(el.dataset.id, parseInt(el.dataset.idx, 10), el); },
+  'add-scene-image': (el, e) => { if (e) e.stopPropagation(); addSceneImage(el.dataset.id, parseInt(el.dataset.idx, 10), el); },
+  'refine-scene':    (el, e) => { if (e) e.stopPropagation(); refineScenePrompt(el.dataset.id, parseInt(el.dataset.idx, 10), el); },
+  'run-critic':      (el) => runCritic(el.dataset.id),
+  'improve-story':   (el) => improveStory(el.dataset.id),
+  'render-story':    (el) => renderStory(el.dataset.id),
+  'extend-story':    (el) => extendStory(el.dataset.id),
+  'improve-loop':    (el) => improveLoop(el.dataset.id),
+  'add-images-bulk': (el) => addImagesBulk(el.dataset.id),
+  'delete-story':    (el, e) => { if (e) e.stopPropagation(); confirmDeleteStory(el.dataset.id, el); },
+
+  // Row scroll arrows
+  'scroll-row':      (el) => scrollRow(el.dataset.row, parseInt(el.dataset.dir || '1', 10)),
+
+  // Queue items
+  'remove-queue-item': (el) => removeQueueItem(parseInt(el.dataset.idx, 10)),
+
+  // Generation progress toast dismiss
+  'dismiss-gen-toast': (el) => {
+    const t = el.closest('.gen-progress-toast');
+    if (t) t.remove();
+  },
+
+  // Keyboard shortcut cheatsheet
+  'close-shortcuts': () => closeShortcuts(),
+
+  // Player scrubber (changed by oninput)
+  'set-volume':      (el) => setVolume(el.value),
+  'player-scrub':    (el) => playerScrub(el.value),
+};
+
+function updateCcButton(btn) {
+  if (!btn) return;
+  const on = state.subtitlesOn;
+  btn.setAttribute('aria-pressed', String(on));
+  btn.setAttribute('aria-label', on ? 'Disable subtitles' : 'Enable subtitles');
+}
+
+function goBrowse() {
+  document.querySelectorAll('.navbar-links a').forEach(l => {
+    l.classList.remove('active');
+    l.removeAttribute('aria-current');
+  });
+  const browseLink = document.querySelector('.navbar-links a[data-view="browse"]');
+  if (browseLink) {
+    browseLink.classList.add('active');
+    browseLink.setAttribute('aria-current', 'page');
+  }
+  closeDetail();
+  closePlayer();
+  // Smooth-scroll only if user has not asked for reduced motion.
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' });
+}
+
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const action = el.dataset.action;
+  const handler = ACTION_HANDLERS[action];
+  if (!handler) return;
+  e.preventDefault();
+  handler(el, e);
+});
+
+document.addEventListener('keydown', (e) => {
+  // Enter/Space activate any element with role="link" and tabindex
+  // (like the logo, which is now keyboard-accessible).
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const role = el.getAttribute('role');
+  if (role !== 'link' && role !== 'button') return;
+  if (el.tagName === 'A' || el.tagName === 'BUTTON') return; // native
+  e.preventDefault();
+  el.click();
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// NAVBAR SCROLL EFFECT — rAF-coalesced so we never miss a frame.
+// ═══════════════════════════════════════════════════════════════════════
+const updateNavbarScrolled = rafDebounce(() => {
   const navbar = document.getElementById('navbar');
+  if (!navbar) return;
   if (window.scrollY > 50) {
     navbar.classList.add('scrolled');
   } else {
     navbar.classList.remove('scrolled');
   }
-  lastScroll = window.scrollY;
 });
+window.addEventListener('scroll', updateNavbarScrolled, { passive: true });
 
 // ═══════════════════════════════════════════════════════════════════════
-// NAVBAR LINKS
-// ═══════════════════════════════════════════════════════════════════════
-document.querySelectorAll('.navbar-links a').forEach(link => {
-  link.addEventListener('click', (e) => {
-    e.preventDefault();
-    document.querySelectorAll('.navbar-links a').forEach(l => l.classList.remove('active'));
-    link.classList.add('active');
-    const view = link.dataset.view;
-    if (view === 'create') {
-      openCreateModal();
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// WEBSOCKET
+// WEBSOCKET — exponential backoff on reconnect
 // ═══════════════════════════════════════════════════════════════════════
 let ws = null;
 function connectWebSocket() {
@@ -2462,18 +4570,28 @@ function connectWebSocket() {
           openProgressPanel();
         }
         updateProgressDisplay();
+        if (typeof showGenProgress === 'function') {
+          showGenProgress(data.task_id, data.message, data.progress);
+        }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[ws] malformed message', e);
+    }
   };
-  ws.onclose = () => setTimeout(connectWebSocket, 3000);
+  ws.onclose = () => {
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 32s, capped at 60s.
+    state._wsBackoff = Math.min(Math.max(state._wsBackoff * 2 || 1000, 1000), 60000);
+    setTimeout(connectWebSocket, state._wsBackoff);
+  };
   ws.onerror = () => ws.close();
+  ws.onopen = () => { state._wsBackoff = 0; };  // reset on successful connect
 }
 setTimeout(connectWebSocket, 1000);
 
-// Send periodic ping to keep alive
+// Send periodic ping to keep alive (only when connection is healthy)
 setInterval(() => {
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send('ping');
+    try { ws.send('ping'); } catch (e) { /* ignore */ }
   }
 }, 30000);
 
@@ -2481,26 +4599,153 @@ setInterval(() => {
 // INIT
 // ═══════════════════════════════════════════════════════════════════════
 async function init() {
+  // First-paint skeleton — shown while the initial fetch is in flight
+  // so the user gets an immediate visual response instead of a blank
+  // viewport. The skeleton matches the final layout's shape, so the
+  // transition to real content has zero layout shift.
+  showInitialSkeleton();
   try {
     const stories = await API.fetchStories();
     state.stories = stories;
 
     if (stories.length > 0) {
-      renderHero(stories[0]);
+      renderHero(pickFeaturedStory(stories));
       renderCards(stories);
     } else {
       document.getElementById('hero-container').innerHTML = '';
       renderCards([]);
     }
   } catch (err) {
-    console.error('Failed to load stories:', err);
+    console.warn('[init] failed to load stories:', err);
     document.getElementById('hero-container').innerHTML = `
       <div class="empty-state" style="padding:120px 20px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <h3>Connection Error</h3>
         <p>Could not load stories. Make sure the backend server is running.</p>
       </div>
     `;
+  }
+}
+
+function showInitialSkeleton() {
+  // Skeleton hero + 2 skeleton rows. Mirrors the final layout exactly.
+  const heroContainer = document.getElementById('hero-container');
+  const contentRows = document.getElementById('content-rows');
+  if (heroContainer) {
+    heroContainer.innerHTML = `
+      <div class="hero" aria-busy="true" aria-label="Loading stories">
+        <div class="loading-skeleton" style="position:absolute;inset:0"></div>
+        <div class="hero-content">
+          <div class="loading-skeleton" style="height:24px;width:120px;margin-bottom:12px"></div>
+          <div class="loading-skeleton" style="height:64px;width:60%;margin-bottom:16px"></div>
+          <div class="loading-skeleton" style="height:16px;width:80%;margin-bottom:8px"></div>
+          <div class="loading-skeleton" style="height:16px;width:60%"></div>
+        </div>
+      </div>
+    `;
+  }
+  if (contentRows) {
+    contentRows.innerHTML = `
+      <div class="row"><div class="row-header"><div class="loading-skeleton" style="height:24px;width:160px"></div></div>
+        <div class="row-scroll" style="gap:10px">
+          ${Array.from({ length: 6 }, () => `
+            <div class="loading-skeleton" style="flex:0 0 280px;height:200px;border-radius:var(--radius-md)"></div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// COMFYUI HEALTH BADGE
+// ═══════════════════════════════════════════════════════════════════════
+async function pollComfyUI() {
+  const dot = document.getElementById('comfyui-dot');
+  const label = document.getElementById('comfyui-label');
+  const badge = document.getElementById('comfyui-badge');
+  try {
+    const res = await fetch('/api/comfyui/workers');
+    const data = await res.json();
+    const workers = (data.workers || []).filter(w => w.running);
+    const n = workers.length;
+    if (n === 0) {
+      dot.className = 'badge-dot red';
+      label.textContent = 'ComfyUI ✕';
+      badge.title = 'No ComfyUI workers running. Start with: start.bat gpu1';
+      return;
+    }
+    // Pick a label based on what's running
+    const kinds = new Set(workers.map(w => w.kind || 'manual'));
+    const totalQueue = workers.reduce(
+      (sum, w) => sum + (w.queue_running || 0) + (w.queue_pending || 0), 0);
+
+    let prefix;
+    if (n >= 2) {
+      // Multiple workers — max parallelism
+      prefix = 'ComfyUI Max';
+    } else if (kinds.has('cpu') && !kinds.has('gpu')) {
+      prefix = 'ComfyUI CPU';
+    } else if (kinds.has('gpu') && !kinds.has('cpu')) {
+      prefix = 'ComfyUI GPU';
+    } else if (kinds.has('gpu') && kinds.has('cpu')) {
+      prefix = 'ComfyUI Max';
+    } else {
+      prefix = 'ComfyUI';
+    }
+
+    const suffix = totalQueue > 0 ? ` (${totalQueue})` : '';
+    label.textContent = prefix + suffix;
+    dot.className = 'badge-dot ' + (totalQueue > 0 ? 'yellow' : 'green');
+
+    // Tooltip with per-worker details
+    const lines = workers.map(w => {
+      const port = w.url ? new URL(w.url).port : '?';
+      const q = ((w.queue_running || 0) + (w.queue_pending || 0));
+      const kind = w.kind || 'manual';
+      return `${kind.toUpperCase()} :${port}  queue=${q}  ${w.running ? '✓' : '✗'}`;
+    });
+    badge.title = lines.join('\n') + (data.auto_spawn_enabled ? '\n(auto-spawn CPU: enabled)' : '');
+  } catch (e) {
+    dot.className = 'badge-dot red';
+    label.textContent = 'ComfyUI ?';
+    badge.title = 'Could not reach server: ' + e.message;
+  }
+}
+pollComfyUI();
+setInterval(pollComfyUI, 15000);
+
+// ═══════════════════════════════════════════════════════════════════════
+// GENERATION PROGRESS TOAST
+// ═══════════════════════════════════════════════════════════════════════
+function showGenProgress(taskId, message, progress) {
+  let toast = document.getElementById('gen-progress-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'gen-progress-toast';
+    toast.className = 'gen-progress-toast';
+    toast.innerHTML = `
+      <div class="toast-header">
+        <span class="toast-title">Generating Story...</span>
+        <button type="button" class="toast-close" data-action="dismiss-gen-toast" aria-label="Dismiss notification">&times;</button>
+      </div>
+      <div class="progress-bar-track"><div class="progress-bar-fill" id="gen-progress-fill"></div></div>
+      <div><span class="toast-message" id="gen-progress-msg"></span><span class="toast-percent" id="gen-progress-pct"></span></div>
+    `;
+    document.body.appendChild(toast);
+  }
+  document.getElementById('gen-progress-msg').textContent = message || '';
+  const pct = Math.round((progress || 0) * 100);
+  document.getElementById('gen-progress-pct').textContent = pct > 0 ? `${pct}%` : '';
+  // Use --pct CSS variable so the transform: scaleX() bar stays on the
+  // compositor (animating `width` triggers layout on the whole row).
+  document.getElementById('gen-progress-fill').style.setProperty('--pct', (progress || 0));
+
+  if (progress >= 1.0 || message?.includes('complete')) {
+    document.querySelector('#gen-progress-toast .toast-title').textContent = '✓ Story Complete!';
+    setTimeout(() => toast.remove(), 5000);
+    // Refresh story list
+    setTimeout(() => init(), 1000);
   }
 }
 

@@ -1,0 +1,288 @@
+{
+  "id": "the-emerald-s-fading-cure",
+  "title": "The Emerald's Fading Cure",
+  "subtitle": "A dragon rider discovers her emerald dragon is sick with a f",
+  "description": "Her dragon\u2019s viridescence bleaches to bone with each fevered breath, a dying jewel against her saddle. She must now outrun the creeping pallor into the heart of the mountains, seeking the forgotten shrine where light still pools as liquid cure. But the path winds through blighted woods, past hunters who covet hide and hoard, and up stone spires where the wind wails with a jealous, turning voice.",
+  "tags": [
+    "fantasy painterly",
+    "dramatic",
+    "generated"
+  ],
+  "generated": true,
+  "scenes": [
+    {
+      "scene": "01",
+      "title": "The Fading Light",
+      "prompt": "A wide, dramatic shot from a low angle looks up at Kaelen, a determined dragon rider with auburn hair in a long braid, wearing practical leather armor and a fur-lined cloak. She kneels on the stone ledge of a high mountain roost, one hand resting on the massive, beautiful snout of her dragon, Veridian. Veridian, an emerald-scaled dragon, lies listlessly, his brilliant green scales dull and streaked with a sickly, ashen grey. His breathing is shallow, puffs of grey smoke trailing from his nostrils. The light of a setting sun casts long, melancholy shadows across the scene, bathing the rocks in deep orange and purple hues. The color palette is muted, dominated by greys and fading greens, reflecting the dragon's sickness.",
+      "narrative": "Kaelen discovers her dragon, Veridian, is gravely ill. His once-vibrant emerald scales are leaching color, turning a dull, lifeless grey. His feverish breath comes in weak puffs. She realizes this is no ordinary ailment and that their bond is weakening.",
+      "narration": "Here, at the edge of the world, a rider finds her other half dying. The great dragon Veridian, whose scales once held the light of deep forests, now lies fevered and fading. His breath is smoke and ruin. Kaelen sees not just a sickness in his body, but a fading in his soul, a color leeching from their shared sky. This is an ancient malady, one that whispers of an ending. But she is a rider. They do not accept endings. ",
+      "narration_text": "Here, at the edge of the world, a rider finds her other half dying. The great dragon Veridian, whose scales once held the light of deep forests, now lies fevered and fading. His breath is smoke and ruin. Kaelen sees not just a sickness in his body, but a fading in his soul, a color leeching from their shared sky. This is an ancient malady, one that whispers of an ending. But she is a rider. They do not accept endings. ",
+      "seed": 1015234090,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s01_The_Fading_Light_01_00001_.png",
+        "the-emerald-s-fading-cure_s01_The_Fading_Light_02_00001_.png",
+        "the-emerald-s-fading-cure_s01_The_Fading_Light_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s01.wav",
+      "audio_duration": 40.96,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s01.json"
+    },
+    {
+      "scene": "02",
+      "title": "Whispers of the Shrine",
+      "prompt": "Interior of a cozy, cluttered rider's lodge. Kaelen, still in her leather armor, leans over a massive, ancient tome spread on a rough-hewn wooden table. Her face is illuminated by the warm, flickering light of a candle, casting sharp shadows that highlight her worried frown and the intensity in her eyes. She points a finger at an illustration of a mountain peak crowned with a radiant, intricate shrine. Veridian is curled in the background, a massive, grey-streaked shape taking up most of the floor, his eye half-open and dull. The scene is a mix of warm candlelight and cool blue moonlight from a nearby window, creating a tense, intimate atmosphere.",
+      "narrative": "Kaelen searches desperately through old records and legends. She finds a glimmer of hope in a story of a forgotten healing shrine high in the Stormcrest Mountains, said to be powered by the lifeblood of the earth itself. It is their only chance.",
+      "narration": "In the archives of forgotten lore, she finds a whisper. Not of a cure, but of a source. The shrine of Aethelgard, they called it. A place where the mountain\u2019s own heart beats, where the ancient power that gave dragons their fire can mend what is broken. It is a legend, a myth told to hatchlings. But legends are built on the bones of truth. And Kaelen has nothing left to believe in but truth, and a dying dragon. ",
+      "narration_text": "In the archives of forgotten lore, she finds a whisper. Not of a cure, but of a source. The shrine of Aethelgard, they called it. A place where the mountain\u2019s own heart beats, where the ancient power that gave dragons their fire can mend what is broken. It is a legend, a myth told to hatchlings. But legends are built on the bones of truth. And Kaelen has nothing left to believe in but truth, and a dying dragon. ",
+      "seed": 3432355683,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s02_Whispers_of_the_Shrine_01_00001_.png",
+        "the-emerald-s-fading-cure_s02_Whispers_of_the_Shrine_02_00001_.png",
+        "the-emerald-s-fading-cure_s02_Whispers_of_the_Shrine_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s02.wav",
+      "audio_duration": 38.08,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s02.json"
+    },
+    {
+      "scene": "03",
+      "title": "Into the Blighted Wood",
+      "prompt": "Kaelen, looking small and resolute, stands at the edge of a forest. The trees here are twisted and wrong, their bark a sickly grey-purple, their leaves blackened and curled. A thick, low-lying, greenish mist clings to the ground, obscuring the path. Veridian walks behind her, his head low, each step heavy, his grey-scaled body a stark, mournful contrast to the corrupted forest. The light is diffused and eerie, coming from no discernible source, casting no shadows but giving everything a flat, unsettling glow. The camera angle is from behind, following them into the ominous wood, emphasizing the oppressive atmosphere.",
+      "narrative": "Their journey begins through the Whisperwood, a forest corrupted by a lingering dark magic. The very air seems hostile, and Veridian\u2019s sickness makes him vulnerable to its draining influence. The path is treacherous and unwelcoming.",
+      "narration": "The path to the shrine does not begin with a climb, but a descent into blight. The Whisperwood stands before them, a forest sick with its own ancient fever. The trees twist not in growth, but in pain. Here, the air itself is a poison, and every shadow seems to reach. For a healthy dragon, this wood is a challenge. For Veridian, each step is a battle against the very land that seeks to claim his fading light. ",
+      "narration_text": "The path to the shrine does not begin with a climb, but a descent into blight. The Whisperwood stands before them, a forest sick with its own ancient fever. The trees twist not in growth, but in pain. Here, the air itself is a poison, and every shadow seems to reach. For a healthy dragon, this wood is a challenge. For Veridian, each step is a battle against the very land that seeks to claim his fading light. ",
+      "seed": 3760599255,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s03_Into_the_Blighted_Wood_01_00001_.png",
+        "the-emerald-s-fading-cure_s03_Into_the_Blighted_Wood_02_00001_.png",
+        "the-emerald-s-fading-cure_s03_Into_the_Blighted_Wood_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s03.wav",
+      "audio_duration": 39.84,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s03.json"
+    },
+    {
+      "scene": "04",
+      "title": "Hunters in the Gloom",
+      "prompt": "A tense, mid-level shot through the corrupted, grey-purple trees. Kaelen crouches behind a massive, moss-covered boulder, one hand on the hilt of her sword, her eyes wide with alarm. She looks back at Veridian, who is pressed against the boulder, trying to make his enormous form small, a look of pain in his dull eyes. In the murky distance, three figures are barely visible\u2014silhouettes of men in heavy plate and leather, carrying long, cruel-looking crossbows and dragon-lances. They move with purpose through the blighted trees. The lighting is dim and shadowy, with shafts of sickly green light piercing the canopy, creating a sense of lurking danger.",
+      "narrative": "They are not alone in the wood. Dragon hunters, drawn by the scent of a vulnerable, sick dragon, patrol the blight. Kaelen must use the terrain to hide, knowing a confrontation would be fatal in Veridian\u2019s weakened state.",
+      "narration": "The wood keeps its own secrets, and not all of them are trees. The dragon hunters move through the gloom like wraiths, their armor scuffed, their weapons stained. They smell sickness. They smell opportunity. Kaelen\u2019s heart hammers against her ribs. Veridian cannot fight. He can barely stand. She becomes a shadow, guiding him from boulder to hollow, praying the corrupted forest that seeks to drain him will also hide him from those who wish to spill his last drop of life. ",
+      "narration_text": "The wood keeps its own secrets, and not all of them are trees. The dragon hunters move through the gloom like wraiths, their armor scuffed, their weapons stained. They smell sickness. They smell opportunity. Kaelen\u2019s heart hammers against her ribs. Veridian cannot fight. He can barely stand. She becomes a shadow, guiding him from boulder to hollow, praying the corrupted forest that seeks to drain him will also hide him from those who wish to spill his last drop of life. ",
+      "seed": 1772954230,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s04_Hunters_in_the_Gloom_01_00001_.png",
+        "the-emerald-s-fading-cure_s04_Hunters_in_the_Gloom_02_00001_.png",
+        "the-emerald-s-fading-cure_s04_Hunters_in_the_Gloom_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s04.wav",
+      "audio_duration": 42.72,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s04.json"
+    },
+    {
+      "scene": "05",
+      "title": "The Cost of the Path",
+      "prompt": "Kaelen is shown in a moment of tender desperation. She kneels in a small clearing, her leather gloves off, her bare hands pressing against Veridian\u2019s flank. Faint, wispy trails of silvery light\u2014her own life force, her rider\u2019s bond\u2014flow from her hands into the dragon\u2019s grey scales. Her face is pale, etched with strain, sweat beading on her forehead, but her expression is one of fierce determination. Veridian\u2019s eye is closed, and a single, perfect emerald scale on his brow briefly glows with its old light before fading again. The scene is framed closely, focusing on the connection between them, with the twisted forest a soft-focus backdrop.",
+      "narrative": "To keep Veridian moving, Kaelen must share her own strength with him through their rider\u2019s bond. It is a draining sacrifice, weakening her physically, but it reignites a flicker of his old vitality long enough to press on.",
+      "narration": "The bond between rider and dragon is more than a saddle and a shared sky. It is a thread of the soul. And now, Kaelen pulls upon that thread, not for flight, but for life. She pours her own warmth, her own energy, into her dying friend. It is agony, a hollowing sensation. But for a moment, a single scale remembers its green. A flicker. Enough. It is always enough to take one more step toward hope. ",
+      "narration_text": "The bond between rider and dragon is more than a saddle and a shared sky. It is a thread of the soul. And now, Kaelen pulls upon that thread, not for flight, but for life. She pours her own warmth, her own energy, into her dying friend. It is agony, a hollowing sensation. But for a moment, a single scale remembers its green. A flicker. Enough. It is always enough to take one more step toward hope. ",
+      "seed": 2889528395,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s05_The_Cost_of_the_Path_01_00001_.png",
+        "the-emerald-s-fading-cure_s05_The_Cost_of_the_Path_02_00001_.png",
+        "the-emerald-s-fading-cure_s05_The_Cost_of_the_Path_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s05.wav",
+      "audio_duration": 40.0,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s05.json"
+    },
+    {
+      "scene": "06",
+      "title": "The Stormcrest Ascent",
+      "prompt": "A breathtaking, wide-angle shot from below. Kaelen and Veridian begin the arduous climb up the Stormcrest Mountains. The path is a thin, treacherous ribbon of rock carved into a sheer cliff face. Below them, the blighted forest spreads out like a dark, unhealthy carpet. Above, the peaks are shrouded in storm clouds that swirl with unnatural speed. The wind is visible as streaks of mist and snow, battering against them. Kaelen\u2019s cloak whips violently around her, and she has one hand on Veridian\u2019s neck, guiding him as he uses his claws to find purchase. The color palette shifts to harsh greys, whites, and deep blues, with dramatic, high-contrast lighting from the storm clouds.",
+      "narrative": "Leaving the forest behind, they face the physical climb up the Stormcrest Mountains. The wind here is not merely strong; it seems malevolent, a final barrier that tests their resolve to its breaking point.",
+      "narration": "They leave the sickness of the forest below, only to meet the fury of the mountain. The Stormcrest does not welcome pilgrims. It guards its secrets with claws of stone and breath of hurricane. The wind screams, a physical wall of force that seeks to tear them from the cliff and cast them into oblivion. This is not a path; it is a test. A trial of will against the raw, unfeeling power of the world. ",
+      "narration_text": "They leave the sickness of the forest below, only to meet the fury of the mountain. The Stormcrest does not welcome pilgrims. It guards its secrets with claws of stone and breath of hurricane. The wind screams, a physical wall of force that seeks to tear them from the cliff and cast them into oblivion. This is not a path; it is a test. A trial of will against the raw, unfeeling power of the world. ",
+      "seed": 960910481,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s06_The_Stormcrest_Ascent_01_00001_.png",
+        "the-emerald-s-fading-cure_s06_The_Stormcrest_Ascent_02_00001_.png",
+        "the-emerald-s-fading-cure_s06_The_Stormcrest_Ascent_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s06.wav",
+      "audio_duration": 34.24,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s06.json"
+    },
+    {
+      "scene": "07",
+      "title": "The Wind\u2019s Betrayal",
+      "prompt": "A dynamic, chaotic scene. A monstrous gust of wind, rendered almost as a visible, swirling vortex of grey-blue energy, slams into Veridian\u2019s side as he clings to the narrow path. Kaelen is thrown off her feet, sliding toward the edge, her fingers scrabbling for a handhold on the icy rock. Her face is a mask of pure terror and exertion. Veridian lets out a silent roar, his wings instinctively flaring out to act as a shield for Kaelen, straining against the gale. The camera angle is tilted, enhancing the sense of vertigo and instability. The lighting is stark, with the dark storm clouds above and the terrifying drop below.",
+      "narrative": "At a critical, exposed point on the climb, a vicious wind shear strikes. It nearly tears them from the mountain. In a moment of instinct, Veridian sacrifices his own stability to protect Kaelen, taking the brunt of the gale and worsening his condition.",
+      "narration": "The mountain\u2019s will is clear: *turn back*. A blast of wind, cold and malicious, strikes like a battering ram. Kaelen is gone, her world a dizzying spin toward the abyss. Then, a shadow falls over her. Veridian, her dying friend, extends a wing not for flight, but for sacrifice. He becomes her shield, his body screaming in protest as he absorbs the fury meant for them both. He does not fly. He endures. For her. ",
+      "narration_text": "The mountain\u2019s will is clear: *turn back*. A blast of wind, cold and malicious, strikes like a battering ram. Kaelen is gone, her world a dizzying spin toward the abyss. Then, a shadow falls over her. Veridian, her dying friend, extends a wing not for flight, but for sacrifice. He becomes her shield, his body screaming in protest as he absorbs the fury meant for them both. He does not fly. He endures. For her. ",
+      "seed": 4106631415,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s07_The_Wind_s_Betrayal_01_00001_.png",
+        "the-emerald-s-fading-cure_s07_The_Wind_s_Betrayal_02_00001_.png",
+        "the-emerald-s-fading-cure_s07_The_Wind_s_Betrayal_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s07.wav",
+      "audio_duration": 43.2,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s07.json"
+    },
+    {
+      "scene": "08",
+      "title": "The Final Approach",
+      "prompt": "Kaelen, bruised and exhausted, supports herself against Veridian\u2019s neck. They stand on a small, sheltered ledge just below the final peak. Veridian is barely standing, his breathing ragged, his scales almost completely ashen grey. But ahead, cut into the very face of the mountain, is an archway of ancient, pale stone, glowing with a soft, internal, pearlescent light. A faint, warm breeze issues from it, carrying the scent of clean stone and rain. The shrine is partially hidden by a curtain of ice, but its light is unmistakable. The camera frames them from the side, showing their battered state against the promise of the glowing entrance. The color palette is dominated by the harsh, cold grey of the mountain, sharply contrasted by the inviting, warm light of the shrine.",
+      "narrative": "Battered and near the end of their strength, they reach the final approach. The entrance to the shrine is revealed\u2014a promise of warmth and light amidst the storm\u2019s fury. But Veridian may not have the strength for the last few steps.",
+      "narration": "They are broken things upon the doorstep of salvation. Veridian\u2019s breath is a shallow rasp, each one a small victory. But there, etched into the living rock, is the gateway. The Shrine of Aethelgard. Its light is not of the sun or moon, but something older, something gentle. It spills out like liquid hope, offering warmth after the wind\u2019s cruel bite. They have crossed the threshold of the world. Now, they must cross the last few feet. ",
+      "narration_text": "They are broken things upon the doorstep of salvation. Veridian\u2019s breath is a shallow rasp, each one a small victory. But there, etched into the living rock, is the gateway. The Shrine of Aethelgard. Its light is not of the sun or moon, but something older, something gentle. It spills out like liquid hope, offering warmth after the wind\u2019s cruel bite. They have crossed the threshold of the world. Now, they must cross the last few feet. ",
+      "seed": 626866239,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s08_The_Final_Approach_01_00001_.png",
+        "the-emerald-s-fading-cure_s08_The_Final_Approach_02_00001_.png",
+        "the-emerald-s-fading-cure_s08_The_Final_Approach_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s08.wav",
+      "audio_duration": 39.84,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s08.json"
+    },
+    {
+      "scene": "09",
+      "title": "Heart of the Mountain",
+      "prompt": "The interior of the shrine is vast, ancient, and serene. It is a natural cavern, its walls lined with crystals that pulse with a soft, rhythmic, green-gold light, like a slow heartbeat. A pool of perfectly clear, luminous water sits in the center. Kaelen stands at the edge, her exhausted reflection mirrored in the surface. She guides Veridian\u2019s massive head down, and he dips his snout into the glowing water. As he drinks, the light flows up from the pool, through his scales, and the ashen grey is pushed back by a wave of deep, vibrant, living emerald. The light from the crystals intensifies, bathing them both in a warm, healing radiance. The camera is low, looking up at their silhouettes against the brilliant light source.",
+      "narrative": "Inside the shrine, the power is palpable. Veridian drinks from the pool of living water, and the ancient magic reacts to his dragon nature. The color, the life, flows back into him in a dazzling display, burning away the fever and the sickness.",
+      "narration": "The air hums with a power that has slept for ages. The water is not merely water; it is the mountain\u2019s pulse, the raw, healing essence of the earth. Veridian lowers his weary head, and the moment his snout touches the surface, the mountain awakens for him. Light surges, not as an attack, but as a homecoming. The grey, the sickness, the fever\u2014it is scoured away by a tide of pure, verdant life. The scales drink in the light, remembering their true name: emerald. ",
+      "narration_text": "The air hums with a power that has slept for ages. The water is not merely water; it is the mountain\u2019s pulse, the raw, healing essence of the earth. Veridian lowers his weary head, and the moment his snout touches the surface, the mountain awakens for him. Light surges, not as an attack, but as a homecoming. The grey, the sickness, the fever\u2014it is scoured away by a tide of pure, verdant life. The scales drink in the light, remembering their true name: emerald. ",
+      "seed": 2101035946,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s09_Heart_of_the_Mountain_01_00001_.png",
+        "the-emerald-s-fading-cure_s09_Heart_of_the_Mountain_02_00001_.png",
+        "the-emerald-s-fading-cure_s09_Heart_of_the_Mountain_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s09.wav",
+      "audio_duration": 46.08,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s09.json"
+    },
+    {
+      "scene": "10",
+      "title": "Wings Against the Dawn",
+      "prompt": "A glorious, sweeping panoramic shot from a high angle. Kaelen, renewed and strong, sits astride Veridian as he bursts from the shrine\u2019s entrance into the open sky. His scales are a magnificent, dazzling emerald, gleaming like polished gemstones in the first rays of dawn. His wings are spread wide and powerful, cutting through the last of the storm clouds. Below them, the Stormcrest Mountains are bathed in golden light, and even the distant, blighted Whisperwood seems less ominous from this height. They are not flying away, but soaring upward, into the clear, pink-and-orange sky. The composition is majestic, with the dragon and rider as a powerful silhouette against the rising sun.",
+      "narrative": "Fully healed and stronger than ever, Veridian and Kaelen take to the skies once more. They leave the trials of the mountain behind, soaring into a new dawn. Their bond, tested by darkness, is now unbreakable.",
+      "narration": "And then, they fly. Not a labored, desperate flap, but a powerful, joyous stroke of wings that shatters the last of the storm\u2019s gloom. Veridian is himself again, a creature of emerald and sky, his roar a peal of thunder that echoes not with sickness, but with life. Kaelen, his rider, his partner, leans into the wind, her heart soaring as high as the mountain they conquered. Behind them lies a shrine of forgotten power. Before them lies the whole world, reclaimed. They are dragon and rider. They are healed. They are home.",
+      "narration_text": "And then, they fly. Not a labored, desperate flap, but a powerful, joyous stroke of wings that shatters the last of the storm\u2019s gloom. Veridian is himself again, a creature of emerald and sky, his roar a peal of thunder that echoes not with sickness, but with life. Kaelen, his rider, his partner, leans into the wind, her heart soaring as high as the mountain they conquered. Behind them lies a shrine of forgotten power. Before them lies the whole world, reclaimed. They are dragon and rider. They are healed. They are home.",
+      "seed": 3696724875,
+      "image_filenames": [
+        "the-emerald-s-fading-cure_s10_Wings_Against_the_Dawn_01_00001_.png",
+        "the-emerald-s-fading-cure_s10_Wings_Against_the_Dawn_02_00001_.png",
+        "the-emerald-s-fading-cure_s10_Wings_Against_the_Dawn_03_00001_.png"
+      ],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s10.wav",
+      "audio_duration": 47.68,
+      "subtitle_file": "subs_the-emerald-s-fading-cure_s10.json"
+    },
+    {
+      "title": "A Beacon Restored",
+      "prompt": "A wide, cinematic shot from above the clouds. Kaelen and Veridian soar through a crisp, dawn sky. Veridian is utterly restored, his scales a brilliant, living emerald that catches the first sunrays like scattered jewels. Kaelen\u2019s hair streams behind her, a wide, relieved smile on her face. The shrine's peak is visible far below them, a faint green glow in the mountain\u2019s crown. The mood is one of pure, expansive freedom and hope after a long trial.",
+      "narration": "They climbed above the storm, above the blight and the fear. Veridian\u2019s wings, once frail, now beat with a strength that hummed through Kaelen\u2019s very bones. The world spread below them, healed and whole. For a moment, there was only the wind and the sun, and the profound, silent understanding that they had won.",
+      "narration_text": "They climbed above the storm, above the blight and the fear. Veridian\u2019s wings, once frail, now beat with a strength that hummed through Kaelen\u2019s very bones. The world spread below them, healed and whole. For a moment, there was only the wind and the sun, and the profound, silent understanding that they had won.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s11.wav",
+      "audio_duration": 20.8,
+      "scene": "11"
+    },
+    {
+      "title": "Unwelcome Glint",
+      "prompt": "A low-angle shot looking up at Kaelen on Veridian\u2019s back. Her expression shifts from joy to sharp focus. Far below, on a jagged ridge, three horsemen are silhouetted against the dark woods. One is pointing upward, another raises a crossbow. A glint of metal\u2014a polished horn or a strange, hooked weapon\u2014catches the light. Veridian\u2019s head is turned towards them, his nostrils flaring, his emerald scales beginning to shimmer with a faint, defensive glow.",
+      "narration": "But victory is a beacon. The flash of emerald against the grey dawn was a signal too bright to miss. From the blackened woods they came, the hunters who never gave up the trail. They did not seek a sick beast, but a legend made flesh. Their greed was sharper than any crossbow bolt, and it was aimed at the heart of the sky.",
+      "narration_text": "But victory is a beacon. The flash of emerald against the grey dawn was a signal too bright to miss. From the blackened woods they came, the hunters who never gave up the trail. They did not seek a sick beast, but a legend made flesh. Their greed was sharper than any crossbow bolt, and it was aimed at the heart of the sky.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s12.wav",
+      "audio_duration": 20.0,
+      "scene": "12"
+    },
+    {
+      "title": "The Diving Dragon",
+      "prompt": "A dynamic, diagonal composition. Veridian is in a steep, controlled dive, wings tucked. Kaelen is bent low against his neck, one hand gripping the saddle, the other extended. From her palm, a bolt of the shrine\u2019s green-gold light shoots downwards, not at the hunters, but at the rock face near their feet, causing an explosive shower of stone. The hunters\u2019 horses are rearing in panic. The camera angle conveys immense speed and power.",
+      "narration": "Veridian did not flee. He folded his wings and plunged, a living missile of emerald fury. A roar, no longer of sickness but of pure, draconic challenge, split the air. Kaelen, acting on instinct, channeled the mountain\u2019s lingering power, not to destroy, but to show them the folly of their pursuit. The rock shattered, a warning in light and stone.",
+      "narration_text": "Veridian did not flee. He folded his wings and plunged, a living missile of emerald fury. A roar, no longer of sickness but of pure, draconic challenge, split the air. Kaelen, acting on instinct, channeled the mountain\u2019s lingering power, not to destroy, but to show them the folly of their pursuit. The rock shattered, a warning in light and stone.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s13.wav",
+      "audio_duration": 23.36,
+      "scene": "13"
+    },
+    {
+      "title": "A Flaw in the Cure",
+      "prompt": "A close-up, intimate shot of Veridian\u2019s neck as they fly. A single, small scale, no larger than a coin, remains a dull, brittle bone-white. Kaelen\u2019s fingers are touching it gently, her brow furrowed in concern. The surrounding scales are vibrant emerald, making the spot starkly visible. The background is a soft blur of sky and clouds. The mood is one of sudden, quiet dread.",
+      "narration": "In the exhilaration of the climb, she hadn\u2019t seen it. But now, in the calm after the confrontation, her fingers found it: one scale, cold and lifeless against the warmth of his neck. The cure was not absolute. A seed of the pallor remained, a silent reminder of the sickness\u2019s tenacity, a flaw in their perfect victory.",
+      "narration_text": "In the exhilaration of the climb, she hadn\u2019t seen it. But now, in the calm after the confrontation, her fingers found it: one scale, cold and lifeless against the warmth of his neck. The cure was not absolute. A seed of the pallor remained, a silent reminder of the sickness\u2019s tenacity, a flaw in their perfect victory.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s14.wav",
+      "audio_duration": 21.12,
+      "scene": "14"
+    },
+    {
+      "title": "Whispers in the Wind",
+      "prompt": "Veridian glides through a narrow mountain pass, the wind swirling around him. Kaelen is listening intently, head tilted. The wind doesn\u2019t just whistle; it seems to form fragmented, whispering syllables and half-images in the mist\u2014visions of a cracked altar, a locked stone gate, a single, petrified tree. The art style is slightly surreal, the whispers becoming faint, ghostly shapes in the air around them.",
+      "narration": "The mountain\u2019s wind did not wish them well. As they flew through its ancient passes, it carried voices. Not words, but impressions\u2014a deep, resentful sentience that watched them from the stone itself. The shrine\u2019s light was a medicine, but the mountain remembered a sickness far older than Veridian\u2019s, and it was jealous of its remaining power.",
+      "narration_text": "The mountain\u2019s wind did not wish them well. As they flew through its ancient passes, it carried voices. Not words, but impressions\u2014a deep, resentful sentience that watched them from the stone itself. The shrine\u2019s light was a medicine, but the mountain remembered a sickness far older than Veridian\u2019s, and it was jealous of its remaining power.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s15.wav",
+      "audio_duration": 21.12,
+      "scene": "15"
+    },
+    {
+      "title": "The Gathering Horde",
+      "prompt": "A high, wide shot looking down from a cloud. Below, on the blighted plains and in the dark woods, countless small points of light are moving\u2014torchlight and the glint of metal. A great, ominous gathering of men, beasts, and siege machines is assembling, all drawn by rumors of a healed dragon and a sacred light. Their banners are tattered, their forms indistinct but numerous, forming a dark tide heading for the mountains. The scale is vast and threatening.",
+      "narration": "The news spread faster than a dragon\u2019s flight. A cured beast. A living treasure. From every corner of the blighted lands, they came: the desperate, the greedy, and the devout. They gathered not as a single army, but as a horde of conflicting ambitions, all united by one goal\u2014to claim the mountain\u2019s miracle for themselves. The sanctuary was no longer a secret.",
+      "narration_text": "The news spread faster than a dragon\u2019s flight. A cured beast. A living treasure. From every corner of the blighted lands, they came: the desperate, the greedy, and the devout. They gathered not as a single army, but as a horde of conflicting ambitions, all united by one goal\u2014to claim the mountain\u2019s miracle for themselves. The sanctuary was no longer a secret.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s16.wav",
+      "audio_duration": 22.24,
+      "scene": "16"
+    },
+    {
+      "title": "The Heartbeat Stutters",
+      "prompt": "Inside the shrine\u2019s crystal cavern. The pool is calm, but the rhythmic, green-gold light of the crystals is now pulsing unevenly, flickering like a faltering heart. The atmosphere is tense and anxious. Veridian, who is drinking from the pool, pulls his head up suddenly, scales rippling. The white scale on his neck seems to pulse in sync with the stuttering light. Kaelen stands with her hand on the rock wall, looking worried.",
+      "narration": "They returned for answers, but found only alarm. The shrine\u2019s light, their salvation, was fading. The pool\u2019s surface no longer hummed with steady power; it trembled. The mountain was growing weak, and with each flicker, the white scale on Veridian\u2019s neck pulsed, a cancer waiting to spread. The cure was being poisoned at its source.",
+      "narration_text": "They returned for answers, but found only alarm. The shrine\u2019s light, their salvation, was fading. The pool\u2019s surface no longer hummed with steady power; it trembled. The mountain was growing weak, and with each flicker, the white scale on Veridian\u2019s neck pulsed, a cancer waiting to spread. The cure was being poisoned at its source.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s17.wav",
+      "audio_duration": 21.92,
+      "scene": "17"
+    },
+    {
+      "title": "The Corrupted Root",
+      "prompt": "A dramatic, low-angle shot from deep within a glowing crystal fissure in the cavern wall. Kaelen and Veridian peer into it. Deep inside, clinging to the rock like a parasitic vine, is a thing of shadow and blight\u2014a black, pulsating root, laced with veins of sickly, bone-white material. It is visibly sucking the light from the surrounding crystals. The mood is one of horrified discovery.",
+      "narration": "To find the sickness, she had to look deeper. In the heart of the mountain, she found it: a root, not of earth, but of the Blight itself. It had traveled through the stone, silent and patient, drawn by the shrine\u2019s power. It was drinking the cure, converting the light into a slow, creeping poison. The enemy was not just at the gates; it was inside the walls.",
+      "narration_text": "To find the sickness, she had to look deeper. In the heart of the mountain, she found it: a root, not of earth, but of the Blight itself. It had traveled through the stone, silent and patient, drawn by the shrine\u2019s power. It was drinking the cure, converting the light into a slow, creeping poison. The enemy was not just at the gates; it was inside the walls.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s18.wav",
+      "audio_duration": 24.48,
+      "scene": "18"
+    },
+    {
+      "title": "A Sacrifice of Scale",
+      "prompt": "An intensely emotional close-up. Kaelen has her hand pressed flat against the white scale on Veridian\u2019s neck. Her eyes are closed in concentration. A soft, pure emerald light flows from her palm into the scale, but also from the scale into her hand, leaving a faint, grey, brittle trace on her own skin. Veridian is perfectly still, his great eye watching her with trust and concern. The light from the flickering crystals seems to focus on them.",
+      "narration": "The cure was a contract. To sever the Blight\u2019s connection, she had to offer an anchor. With a whispered word, Kaelen drew the lingering pallor from Veridian\u2019s scale into herself, a willing sacrifice. The scale snapped to brilliant emerald life, but a line of grey now traced her veins. She had saved him again, but now she carried a fragment of the mountain\u2019s\u2014and his\u2014sickness.",
+      "narration_text": "The cure was a contract. To sever the Blight\u2019s connection, she had to offer an anchor. With a whispered word, Kaelen drew the lingering pallor from Veridian\u2019s scale into herself, a willing sacrifice. The scale snapped to brilliant emerald life, but a line of grey now traced her veins. She had saved him again, but now she carried a fragment of the mountain\u2019s\u2014and his\u2014sickness.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s19.wav",
+      "audio_duration": 23.68,
+      "scene": "19"
+    },
+    {
+      "title": "The Stand at the Spire",
+      "prompt": "An epic, vertical shot from below. Veridian stands resolute on the highest, narrowest spire of the mountain, a living emerald statue against a stormy sky. Kaelen, looking weary but determined, stands in front of him, her hands raised. The corrupted root is visible writhing below in a fissure at the spire\u2019s base. Surrounding them, scaling the lower rocks, are the leading vanguard of the horde\u2014grappling hooks flying, crossbows firing. This is the final, desperate defense.",
+      "narration": "They could not run. They could not hide. The shrine\u2019s light was their burden to protect. So they chose the highest, most exposed point, to make their stand. Veridian was the shield, his roar a wall of sound. Kaelen, channeling pain and light, was the sword. The horde climbed, the Blight-root pulsed, and the fate of the mountain\u2019s heart rested on a dragon\u2019s breath and a rider\u2019s sacrifice.",
+      "narration_text": "They could not run. They could not hide. The shrine\u2019s light was their burden to protect. So they chose the highest, most exposed point, to make their stand. Veridian was the shield, his roar a wall of sound. Kaelen, channeling pain and light, was the sword. The horde climbed, the Blight-root pulsed, and the fate of the mountain\u2019s heart rested on a dragon\u2019s breath and a rider\u2019s sacrifice.",
+      "image_filenames": [],
+      "audio_filename": "tts_the-emerald-s-fading-cure_s20.wav",
+      "audio_duration": 24.8,
+      "scene": "20"
+    }
+  ],
+  "critic_rating": 3.9,
+  "critic_stars": 4,
+  "critic_badge": "Good",
+  "has_review": true
+}

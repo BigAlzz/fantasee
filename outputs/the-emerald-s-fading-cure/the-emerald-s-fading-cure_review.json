@@ -1,0 +1,760 @@
+{
+  "story_id": "the-emerald-s-fading-cure",
+  "title": "The Emerald's Fading Cure",
+  "scene_count": 20,
+  "scenes": [
+    {
+      "scene_num": "01",
+      "title": "The Fading Light",
+      "score": 9.7,
+      "narration": {
+        "word_count": 81,
+        "sentences": 7,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 690KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 41.0,
+        "score": 10,
+        "notes": [
+          "Duration: 41.0s, Size: 1920KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 8,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "02",
+      "title": "Whispers of the Shrine",
+      "score": 9.7,
+      "narration": {
+        "word_count": 79,
+        "sentences": 7,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 692KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 38.1,
+        "score": 10,
+        "notes": [
+          "Duration: 38.1s, Size: 1785KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 5,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "03",
+      "title": "Into the Blighted Wood",
+      "score": 9.7,
+      "narration": {
+        "word_count": 78,
+        "sentences": 6,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 642KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 39.8,
+        "score": 10,
+        "notes": [
+          "Duration: 39.8s, Size: 1867KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 6,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "04",
+      "title": "Hunters in the Gloom",
+      "score": 9.7,
+      "narration": {
+        "word_count": 81,
+        "sentences": 8,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 713KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 42.7,
+        "score": 10,
+        "notes": [
+          "Duration: 42.7s, Size: 2002KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 7,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "05",
+      "title": "The Cost of the Path",
+      "score": 9.7,
+      "narration": {
+        "word_count": 77,
+        "sentences": 9,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 690KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 40.0,
+        "score": 10,
+        "notes": [
+          "Duration: 40.0s, Size: 1875KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 7,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "06",
+      "title": "The Stormcrest Ascent",
+      "score": 9.7,
+      "narration": {
+        "word_count": 76,
+        "sentences": 6,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 610KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 34.2,
+        "score": 10,
+        "notes": [
+          "Duration: 34.2s, Size: 1605KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 6,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "07",
+      "title": "The Wind\u2019s Betrayal",
+      "score": 9.7,
+      "narration": {
+        "word_count": 75,
+        "sentences": 9,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 690KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 43.2,
+        "score": 10,
+        "notes": [
+          "Duration: 43.2s, Size: 2025KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 10,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "08",
+      "title": "The Final Approach",
+      "score": 9.7,
+      "narration": {
+        "word_count": 77,
+        "sentences": 8,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 634KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 39.8,
+        "score": 10,
+        "notes": [
+          "Duration: 39.8s, Size: 1867KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 7,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "09",
+      "title": "Heart of the Mountain",
+      "score": 9.6,
+      "narration": {
+        "word_count": 84,
+        "sentences": 6,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 681KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 46.1,
+        "score": 10,
+        "notes": [
+          "Duration: 46.1s, Size: 2160KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 5,
+        "score": 7.5,
+        "issues": [
+          "Cue 1: too long (10.4s) \u2014 split into multiple cues"
+        ]
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "10",
+      "title": "Wings Against the Dawn",
+      "score": 9.7,
+      "narration": {
+        "word_count": 93,
+        "sentences": 9,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 3,
+        "score": 10,
+        "notes": [
+          "3 images, avg 607KB"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 47.7,
+        "score": 10,
+        "notes": [
+          "Duration: 47.7s, Size: 2235KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 7,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": true
+    },
+    {
+      "scene_num": "?",
+      "title": "A Beacon Restored",
+      "score": 6.0,
+      "narration": {
+        "word_count": 54,
+        "sentences": 4,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 20.8,
+        "score": 10,
+        "notes": [
+          "Duration: 20.8s, Size: 975KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "?",
+      "title": "Unwelcome Glint",
+      "score": 5.8,
+      "narration": {
+        "word_count": 64,
+        "sentences": 5,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 20.0,
+        "score": 9.0,
+        "notes": [
+          "Duration: 20.0s, Size: 937KB"
+        ],
+        "issues": [
+          "Audio (20.0s) may be too short for narration (24s minimum at 160wpm)"
+        ]
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "?",
+      "title": "The Diving Dragon",
+      "score": 6.0,
+      "narration": {
+        "word_count": 60,
+        "sentences": 5,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 23.4,
+        "score": 10,
+        "notes": [
+          "Duration: 23.4s, Size: 1095KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "?",
+      "title": "A Flaw in the Cure",
+      "score": 5.8,
+      "narration": {
+        "word_count": 57,
+        "sentences": 4,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 21.1,
+        "score": 9.0,
+        "notes": [
+          "Duration: 21.1s, Size: 990KB"
+        ],
+        "issues": [
+          "Audio (21.1s) may be too short for narration (21s minimum at 160wpm)"
+        ]
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "?",
+      "title": "Whispers in the Wind",
+      "score": 6.0,
+      "narration": {
+        "word_count": 56,
+        "sentences": 4,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 21.1,
+        "score": 10,
+        "notes": [
+          "Duration: 21.1s, Size: 990KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "?",
+      "title": "The Gathering Horde",
+      "score": 5.8,
+      "narration": {
+        "word_count": 62,
+        "sentences": 6,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 22.2,
+        "score": 9.0,
+        "notes": [
+          "Duration: 22.2s, Size: 1042KB"
+        ],
+        "issues": [
+          "Audio (22.2s) may be too short for narration (23s minimum at 160wpm)"
+        ]
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "?",
+      "title": "The Heartbeat Stutters",
+      "score": 6.0,
+      "narration": {
+        "word_count": 55,
+        "sentences": 5,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 21.9,
+        "score": 10,
+        "notes": [
+          "Duration: 21.9s, Size: 1027KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "?",
+      "title": "The Corrupted Root",
+      "score": 5.8,
+      "narration": {
+        "word_count": 68,
+        "sentences": 5,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 24.5,
+        "score": 9.0,
+        "notes": [
+          "Duration: 24.5s, Size: 1147KB"
+        ],
+        "issues": [
+          "Audio (24.5s) may be too short for narration (26s minimum at 160wpm)"
+        ]
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "?",
+      "title": "A Sacrifice of Scale",
+      "score": 5.8,
+      "narration": {
+        "word_count": 64,
+        "sentences": 5,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 23.7,
+        "score": 9.0,
+        "notes": [
+          "Duration: 23.7s, Size: 1110KB"
+        ],
+        "issues": [
+          "Audio (23.7s) may be too short for narration (24s minimum at 160wpm)"
+        ]
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "?",
+      "title": "The Stand at the Spire",
+      "score": 5.8,
+      "narration": {
+        "word_count": 68,
+        "sentences": 7,
+        "score": 10,
+        "issues": []
+      },
+      "images": {
+        "count": 0,
+        "score": 0,
+        "notes": [],
+        "issues": [
+          "No images"
+        ]
+      },
+      "audio": {
+        "duration": 24.8,
+        "score": 9.0,
+        "notes": [
+          "Duration: 24.8s, Size: 1162KB"
+        ],
+        "issues": [
+          "Audio (24.8s) may be too short for narration (26s minimum at 160wpm)"
+        ]
+      },
+      "subtitles": {
+        "cue_count": 0,
+        "score": 0,
+        "issues": [
+          "VTT file not found"
+        ]
+      },
+      "has_video": false
+    }
+  ],
+  "overall_issues": [],
+  "continuity_issues": [],
+  "recommendations": [
+    "Regenerate subtitles for 10 scene(s)",
+    "Some images are missing or very small \u2014 check ComfyUI generation"
+  ],
+  "scores": {
+    "overall": 7.8,
+    "story": 10.0,
+    "visual": 5.0,
+    "audio": 9.7,
+    "subtitles": 4.0,
+    "structure": 10
+  },
+  "review": {
+    "rating": 3.9,
+    "stars": 4,
+    "summary": "A solid 3.9/5 star effort. Main areas to address: no images (10 scenes).",
+    "categories": [
+      {
+        "name": "Narrative",
+        "score": 10.0,
+        "max_score": 10.0
+      },
+      {
+        "name": "Visuals",
+        "score": 5.0,
+        "max_score": 10.0
+      },
+      {
+        "name": "Audio",
+        "score": 9.7,
+        "max_score": 10.0
+      },
+      {
+        "name": "Subtitles",
+        "score": 4.0,
+        "max_score": 10.0
+      },
+      {
+        "name": "Structure",
+        "score": 10,
+        "max_score": 10.0
+      }
+    ],
+    "what_works": [
+      "Consistent narration quality across all scenes",
+      "Audio production is solid throughout"
+    ],
+    "needs_work": [
+      "No images (10 scenes)",
+      "VTT file not found (10 scenes)",
+      "Audio (6 scenes)",
+      "Cue 1"
+    ],
+    "badge": "Good",
+    "scene_count": 20,
+    "overall_score": 7.8
+  }
+}
