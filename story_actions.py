@@ -345,6 +345,51 @@ def regenerate_story(
         images_per_scene=images_per_scene,
     )
 
+    # run_pipeline() derives its own slug from a fresh LLM title call,
+    # so the generated content lands in stories/<new-slug>/ — not the
+    # original story_dir we just wiped. Move it back so URLs, saved
+    # progress, and Plex packages keep the original slug.
+    if result and result.get("id") and result["id"] != story_id:
+        new_dir = story_dir.parent / result["id"]
+        if new_dir.exists() and new_dir != story_dir:
+            # Clear the placeholder manifest we wrote in the original dir
+            for child in list(story_dir.iterdir()):
+                if child.is_dir() and not child.name.startswith("."):
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    try:
+                        child.unlink()
+                    except OSError:
+                        pass
+            # Move all content from the new dir into the original dir
+            for child in list(new_dir.iterdir()):
+                target = story_dir / child.name
+                if target.exists():
+                    if target.is_dir():
+                        shutil.rmtree(target, ignore_errors=True)
+                    else:
+                        target.unlink(missing_ok=True)
+                shutil.move(str(child), str(target))
+            # Rename the manifest file to match the original slug
+            new_manifest = story_dir / f"{result['id']}.json"
+            old_manifest = story_dir / f"{story_id}.json"
+            if new_manifest.exists() and not old_manifest.exists():
+                new_manifest.rename(old_manifest)
+            # Update the id field inside the manifest
+            if old_manifest.exists():
+                try:
+                    m = json.loads(old_manifest.read_text(encoding="utf-8"))
+                    m["id"] = story_id
+                    _save_manifest(story_dir, m)
+                except Exception:
+                    pass
+            # Remove the now-empty new directory
+            try:
+                new_dir.rmdir()
+            except OSError:
+                pass
+            result["id"] = story_id
+
     return {
         "status": "ok" if result else "error",
         "story_id": story_id,
@@ -642,6 +687,7 @@ def apply_extend(
     """
     from generate_story import call_llm, STORY_OUTLINE_SYSTEM
     from tts_utils import generate_tts, get_audio_duration
+    from comfyui_utils import checkpoint_for_style
 
     story_dir = _resolve_story_dir(story_id, story_dir)
     manifest = _load_manifest(story_dir)
