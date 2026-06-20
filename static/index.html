@@ -1104,6 +1104,205 @@ kbd {
   0%   { transform: translateX(-2%); }
   100% { transform: translateX(2%); }
 }
+/* Diagonal pan — adds variety for landscape frames */
+@keyframes kenPanDiagonal {
+  0%   { transform: translate(-2%, -1%) scale(1.04); }
+  100% { transform: translate(2%,  1%)  scale(1.10); }
+}
+.player-image.ken-pan-diagonal { animation: kenPanDiagonal 24s ease-in-out forwards; }
+
+/* Breathe — a slow, very subtle scale pulse that feels alive. Good for
+   quiet or contemplative scenes. */
+@keyframes kenBreathe {
+  0%, 100% { transform: scale(1.04); }
+  50%      { transform: scale(1.10); }
+}
+.player-image.ken-breathe { animation: kenBreathe 14s ease-in-out infinite; }
+
+/* Glitch — quick scale-and-shake flickers for action or shock moments. */
+@keyframes kenGlitch {
+  0%   { transform: scale(1.08) translate(0, 0); }
+  10%  { transform: scale(1.10) translate(-1.5%, 0.5%); }
+  20%  { transform: scale(1.06) translate(1.5%, -0.5%); }
+  30%  { transform: scale(1.10) translate(-0.5%, 1%); }
+  40%  { transform: scale(1.08) translate(0, 0); }
+  100% { transform: scale(1.14) translate(0, 0); }
+}
+.player-image.ken-glitch { animation: kenGlitch 1.2s steps(8) forwards; }
+
+/* ═══ Cinematic scene transitions ═════════════════════════════════════
+   These are applied to the player image when scenes change. The image
+   fades to black (or zooms out) on the way OUT, then fades IN (or
+   zooms in) on the new scene. Controlled by JS via .scene-out-* and
+   .scene-in-* classes that get added/removed around the src swap. */
+
+/* Cross-fade: old fades out, new fades in underneath */
+@keyframes sceneFadeOut {
+  0%   { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.04); }
+}
+@keyframes sceneFadeIn {
+  0%   { opacity: 0; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.player-image.scene-out-fade { animation: sceneFadeOut 0.45s ease-in forwards; }
+.player-image.scene-in-fade  { animation: sceneFadeIn  0.55s ease-out forwards; }
+
+/* Fade through black: the player container itself goes black briefly */
+@keyframes blackoutPulse {
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
+}
+.player-blackout {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 5;
+  pointer-events: none;
+  animation: blackoutPulse 0.7s ease-in-out forwards;
+}
+
+/* Zoom blur transition: pull the outgoing image back while blurring,
+   push the new image in from blur to sharp */
+@keyframes sceneZoomBlurOut {
+  0%   { opacity: 1; transform: scale(1); filter: blur(0); }
+  100% { opacity: 0; transform: scale(1.18); filter: blur(14px); }
+}
+@keyframes sceneZoomBlurIn {
+  0%   { opacity: 0; transform: scale(1.18); filter: blur(14px); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+.player-image.scene-out-zoom { animation: sceneZoomBlurOut 0.5s ease-in forwards; }
+.player-image.scene-in-zoom  { animation: sceneZoomBlurIn  0.65s ease-out forwards; }
+
+/* Slide left / slide right — outgoing slides off, new slides in from opposite */
+@keyframes sceneSlideLeftOut {
+  0%   { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(-12%); opacity: 0; }
+}
+@keyframes sceneSlideLeftIn {
+  0%   { transform: translateX(12%); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes sceneSlideRightOut {
+  0%   { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(12%); opacity: 0; }
+}
+@keyframes sceneSlideRightIn {
+  0%   { transform: translateX(-12%); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+.player-image.scene-out-slide-left  { animation: sceneSlideLeftOut  0.4s ease-in forwards; }
+.player-image.scene-in-slide-left   { animation: sceneSlideLeftIn   0.5s ease-out forwards; }
+.player-image.scene-out-slide-right { animation: sceneSlideRightOut 0.4s ease-in forwards; }
+.player-image.scene-in-slide-right  { animation: sceneSlideRightIn  0.5s ease-out forwards; }
+
+/* Iris wipe — circular reveal expanding from center */
+@keyframes sceneIrisIn {
+  0%   { clip-path: circle(0% at 50% 50%); opacity: 1; }
+  100% { clip-path: circle(75% at 50% 50%); opacity: 1; }
+}
+@keyframes sceneIrisOut {
+  0%   { clip-path: circle(75% at 50% 50%); opacity: 1; }
+  100% { clip-path: circle(0% at 50% 50%); opacity: 1; }
+}
+.player-image.scene-in-iris  { animation: sceneIrisIn  0.55s ease-out forwards; }
+.player-image.scene-out-iris { animation: sceneIrisOut 0.45s ease-in forwards; }
+
+/* ═══ Cinematic overlays ════════════════════════════════════════════
+   Vignette, color grade, and scene title card. The vignette gives the
+   frame a subtle dark edge like a movie theater. The scene-title card
+   fades in briefly when a new scene starts. */
+
+/* Vignette — soft dark edges, very subtle so the image stays readable */
+.player-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(0, 0, 0, 0.35) 90%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.player-vignette.visible { opacity: 1; }
+
+/* Subtle color grade — cool shadows, warm highlights, gentle contrast */
+.player-grade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    180deg,
+    rgba(20, 30, 60, 0.10) 0%,
+    rgba(0, 0, 0, 0) 30%,
+    rgba(0, 0, 0, 0) 70%,
+    rgba(120, 70, 30, 0.10) 100%
+  );
+  mix-blend-mode: overlay;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.player-grade.visible { opacity: 0.6; }
+
+/* Scene title card — fades in at scene start, fades out after ~2.5s */
+.player-scene-title {
+  position: absolute;
+  bottom: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85), 0 0 32px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  max-width: 80%;
+}
+.player-scene-title.visible { opacity: 1; }
+.player-scene-title .scene-num {
+  font-size: 14px;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+.player-scene-title .scene-label {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+/* Focus pull — image starts blurred and sharpens into focus */
+@keyframes sceneFocusPull {
+  0%   { filter: blur(12px) brightness(0.7); opacity: 0; }
+  60%  { filter: blur(2px)  brightness(0.95); opacity: 0.9; }
+  100% { filter: blur(0)    brightness(1);    opacity: 1; }
+}
+.player-image.scene-in-focus-pull { animation: sceneFocusPull 0.8s ease-out forwards; }
+
+/* Letterbox bars — thin cinematic bars that appear at the top and bottom */
+.player-letterbox {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6%;
+  background: #000;
+  z-index: 5;
+  pointer-events: none;
+  transition: height 0.5s ease;
+}
+.player-letterbox.top    { top: 0; }
+.player-letterbox.bottom { bottom: 0; }
+.player-letterbox.visible { height: 7%; }
 .player-controls {
   position: absolute;
   bottom: 0;
@@ -2206,7 +2405,25 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   .player-image.ken-zoom-out,
   .player-image.ken-pan-up,
   .player-image.ken-pan-down,
-  .player-image.ken-sway { animation: none !important; }
+  .player-image.ken-pan-left,
+  .player-image.ken-pan-right,
+  .player-image.ken-pan-diagonal,
+  .player-image.ken-sway,
+  .player-image.ken-breathe,
+  .player-image.ken-glitch,
+  .player-image.scene-out-fade,
+  .player-image.scene-in-fade,
+  .player-image.scene-out-zoom,
+  .player-image.scene-in-zoom,
+  .player-image.scene-out-slide-left,
+  .player-image.scene-in-slide-left,
+  .player-image.scene-out-slide-right,
+  .player-image.scene-in-slide-right,
+  .player-image.scene-in-iris,
+  .player-image.scene-out-iris,
+  .player-image.scene-in-focus-pull { animation: none !important; }
+  .player-vignette, .player-grade, .player-letterbox,
+  .player-scene-title { transition: none !important; }
   .loading-skeleton { animation: none !important; }
 }
 
@@ -2495,6 +2712,14 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
       <div class="play-overlay-label">Tap to start audio</div>
     </div>
     <img id="player-image" src="" alt="Scene" class="player-image" width="1920" height="1080" />
+    <div class="player-vignette" id="player-vignette" aria-hidden="true"></div>
+    <div class="player-grade" id="player-grade" aria-hidden="true"></div>
+    <div class="player-letterbox top" id="player-letterbox-top" aria-hidden="true"></div>
+    <div class="player-letterbox bottom" id="player-letterbox-bottom" aria-hidden="true"></div>
+    <div class="player-scene-title" id="player-scene-title" aria-hidden="true">
+      <div class="scene-num" id="scene-title-num"></div>
+      <div class="scene-label" id="scene-title-label"></div>
+    </div>
     <div class="player-subtitles" id="player-subtitles" aria-live="polite" aria-atomic="true"></div>
     <audio id="player-audio" preload="auto" style="display:none" crossorigin="anonymous"></audio>
     <!-- Background music track — separate audio element so its volume is
@@ -4303,6 +4528,8 @@ async function openPlayer(storyId, sceneIndex) {
   const ccBtn = document.getElementById('btn-cc');
   ccBtn.classList.toggle('active', state.subtitlesOn);
   updateCcButton(ccBtn);
+  // Turn on the cinematic overlays (vignette, color grade, letterbox).
+  setupPlayerOverlays();
   updatePlayer();
   // Move focus to play button so keyboard users can hit space immediately
   document.getElementById('btn-play').focus();
@@ -4317,6 +4544,8 @@ function closePlayer() {
   // tab.
   const bgEl = document.getElementById('player-background');
   if (bgEl) { bgEl.pause(); bgEl.currentTime = 0; }
+  // Tear down cinematic overlays so they don't bleed into the next open.
+  teardownPlayerOverlays();
   state.playerStory = null;
 }
 
@@ -4340,14 +4569,65 @@ function updatePlayer() {
   const prevSrc = img.src;
   const newSrc = imgUrl;
   if (prevSrc !== newSrc) {
-    // Apply Ken Burns cinematic animation on scene change
-    img.src = newSrc;
-    img.alt = scene.title ? `Scene ${idx + 1}: ${scene.title}` : `Scene ${idx + 1}`;
-    applyKenBurns(img);
+    // Cinematic transition between scenes. We pick a transition style
+    // pseudo-randomly so the player feels varied across a long story.
+    // Each transition is paired so the OUT animation and the IN animation
+    // feel like one continuous move.
+    const transitions = [
+      ['scene-out-fade',  'scene-in-fade',       450, 550,  null],         // cross-fade
+      ['scene-out-zoom',  'scene-in-zoom',       500, 650,  null],         // zoom blur
+      ['scene-out-slide-left',  'scene-in-slide-right', 400, 500, 'left'],  // slide left
+      ['scene-out-slide-right', 'scene-in-slide-left',  400, 500, 'right'], // slide right
+      [null,              'scene-in-focus-pull',  0,   800,  null],         // focus pull (no out)
+      [null,              'scene-in-iris',        0,   550,  null],         // iris reveal (no out)
+    ];
+    const t = transitions[Math.floor(Math.random() * transitions.length)];
+
+    // Pre-load the new image so the swap happens cleanly. While we wait,
+    // play the OUT animation on the current image, then fade the new one in.
+    const onOutEnd = () => {
+      img.removeEventListener('animationend', onOutEnd);
+      img.src = newSrc;
+      img.alt = scene.title ? `Scene ${idx + 1}: ${scene.title}` : `Scene ${idx + 1}`;
+      // Clear out-class, apply in-class, kick off Ken Burns after the
+      // in-class animation finishes (use a small delay to layer them).
+      img.classList.remove(t[0]);
+      img.style.animation = 'none';
+      void img.offsetWidth;
+      if (t[1]) img.classList.add(t[1]);
+      applyKenBurns(img);
+    };
+
+    if (t[0]) {
+      // Strip any leftover transition classes from a previous change.
+      for (const cls of ['scene-out-fade','scene-out-zoom','scene-out-slide-left','scene-out-slide-right','scene-in-fade','scene-in-zoom','scene-in-slide-left','scene-in-slide-right','scene-in-focus-pull','scene-in-iris']) {
+        img.classList.remove(cls);
+      }
+      img.classList.add(t[0]);
+      img.addEventListener('animationend', onOutEnd, { once: true });
+      // Safety: if animationend never fires (e.g. animation: none media
+      // query), force the swap after the out-duration + a small buffer.
+      setTimeout(() => {
+        if (img.classList.contains(t[0])) onOutEnd();
+      }, t[2] + 100);
+    } else {
+      // No OUT animation — just set the src and play the IN animation.
+      img.src = newSrc;
+      img.alt = scene.title ? `Scene ${idx + 1}: ${scene.title}` : `Scene ${idx + 1}`;
+      for (const cls of ['scene-in-fade','scene-in-zoom','scene-in-slide-left','scene-in-slide-right','scene-in-focus-pull','scene-in-iris']) {
+        img.classList.remove(cls);
+      }
+      img.style.animation = 'none';
+      void img.offsetWidth;
+      if (t[1]) img.classList.add(t[1]);
+      applyKenBurns(img);
+    }
   } else {
     img.src = newSrc;
     img.alt = scene.title ? `Scene ${idx + 1}: ${scene.title}` : `Scene ${idx + 1}`;
   }
+  // Update scene title card (cinematic overlay)
+  showSceneTitle(idx, scenes.length, scene.title || `Scene ${idx + 1}`);
   // Image error handler — show a placeholder when the source is broken
   // (e.g. story has no images, file is missing, or 404).
   img.onerror = () => {
@@ -5055,22 +5335,84 @@ function closeShortcuts() {
 // don't bounce (e.g. pan-up → pan-down).
 const _KEN_LAST_EFFECT = { value: null };
 function applyKenBurns(img) {
-  const effects = ['ken-zoom-in', 'ken-zoom-out', 'ken-pan-up', 'ken-pan-down', 'ken-sway'];
-  for (const cls of effects) img.classList.remove(cls);
+  // Clear all ken-* classes (old + new) so we never stack animations.
+  const ALL_EFFECTS = [
+    'ken-zoom-in', 'ken-zoom-out',
+    'ken-pan-up', 'ken-pan-down', 'ken-pan-left', 'ken-pan-right',
+    'ken-pan-diagonal', 'ken-sway', 'ken-breathe',
+  ];
+  for (const cls of ALL_EFFECTS) img.classList.remove(cls);
   img.style.animation = 'none';
   // Force reflow to restart the CSS animation
   void img.offsetWidth;
   // Bias by aspect ratio once the image has naturalWidth
   const ar = (img.naturalWidth && img.naturalHeight) ? img.naturalWidth / img.naturalHeight : 16 / 9;
   let pool;
-  if (ar > 1.5)        pool = ['ken-zoom-in', 'ken-pan-left', 'ken-pan-right', 'ken-sway'];
-  else if (ar < 0.8)   pool = ['ken-zoom-in', 'ken-zoom-out', 'ken-pan-up', 'ken-pan-down'];
-  else                 pool = effects;
+  if (ar > 1.5)        pool = ['ken-zoom-in', 'ken-pan-left', 'ken-pan-right', 'ken-pan-diagonal', 'ken-sway', 'ken-breathe'];
+  else if (ar < 0.8)   pool = ['ken-zoom-in', 'ken-zoom-out', 'ken-pan-up', 'ken-pan-down', 'ken-breathe'];
+  else                 pool = ALL_EFFECTS;
   // Don't repeat the same effect as the previous scene
   const filtered = pool.filter(e => e !== _KEN_LAST_EFFECT.value);
   const choice = filtered[Math.floor(Math.random() * filtered.length)];
   _KEN_LAST_EFFECT.value = choice;
   img.classList.add(choice);
+}
+
+// ── Cinematic overlays ─────────────────────────────────────────
+// The vignette, color grade, letterbox bars, and scene title card are
+// enabled when the player is open. Each can be toggled independently by
+// the user from a future settings menu; for now they default to on.
+
+let _sceneTitleHideTimer = null;
+
+function setupPlayerOverlays() {
+  // Toggle the persistent cinematic overlays on once the player is open.
+  // Each overlay has its own opacity transition so they ease in instead
+  // of popping on.
+  const v = document.getElementById('player-vignette');
+  const g = document.getElementById('player-grade');
+  const lbTop = document.getElementById('player-letterbox-top');
+  const lbBot = document.getElementById('player-letterbox-bottom');
+  if (v) v.classList.add('visible');
+  if (g) g.classList.add('visible');
+  if (lbTop) lbTop.classList.add('visible');
+  if (lbBot) lbBot.classList.add('visible');
+}
+
+function teardownPlayerOverlays() {
+  const v = document.getElementById('player-vignette');
+  const g = document.getElementById('player-grade');
+  const lbTop = document.getElementById('player-letterbox-top');
+  const lbBot = document.getElementById('player-letterbox-bottom');
+  if (v) v.classList.remove('visible');
+  if (g) g.classList.remove('visible');
+  if (lbTop) lbTop.classList.remove('visible');
+  if (lbBot) lbBot.classList.remove('visible');
+  // Also hide the scene title card immediately so a stale title doesn't
+  // flash on next open.
+  hideSceneTitle();
+}
+
+function showSceneTitle(idx, total, label) {
+  const numEl = document.getElementById('scene-title-num');
+  const labelEl = document.getElementById('scene-title-label');
+  const card = document.getElementById('player-scene-title');
+  if (!card) return;
+  if (numEl) numEl.textContent = `Scene ${idx + 1} of ${total}`;
+  if (labelEl) labelEl.textContent = label;
+  card.classList.add('visible');
+  if (_sceneTitleHideTimer) clearTimeout(_sceneTitleHideTimer);
+  // Hold the title for ~2.5s then fade out.
+  _sceneTitleHideTimer = setTimeout(hideSceneTitle, 2500);
+}
+
+function hideSceneTitle() {
+  const card = document.getElementById('player-scene-title');
+  if (card) card.classList.remove('visible');
+  if (_sceneTitleHideTimer) {
+    clearTimeout(_sceneTitleHideTimer);
+    _sceneTitleHideTimer = null;
+  }
 }
 
 // ── Fullscreen Toggle ──────────────────────────────────────────
