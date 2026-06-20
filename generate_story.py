@@ -116,6 +116,50 @@ def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str
 
 # ── Story outline generation ───────────────────────────────────────────
 
+# Patterns that should never appear in narration text. If the LLM leaks
+# these into a scene's narration field, strip them so the TTS voiceover
+# stays clean. Case-insensitive matching.
+_NARRATION_BLOCKLIST = [
+    re.compile(r"\bvisual\s+prompt\s*:", re.IGNORECASE),
+    re.compile(r"\bnarration\s*:", re.IGNORECASE),
+    re.compile(r"\bnarrative\s*:", re.IGNORECASE),
+    re.compile(r"\btitle\s*:", re.IGNORECASE),
+    re.compile(r"\bnavigation\s*:", re.IGNORECASE),
+    re.compile(r"\bdescription\s*:", re.IGNORECASE),
+    re.compile(r"\bscene\s+\d+\b", re.IGNORECASE),
+    re.compile(r"^---\s*scene", re.IGNORECASE),
+]
+
+
+def _clean_narration_field(text: str) -> str:
+    """Strip leaked field labels and metadata from narration text.
+
+    The story outline parser is line-oriented: it starts a new field
+    when it sees a known prefix like ``Visual Prompt:`` or
+    ``Narration:``. If the LLM packs multiple fields into one line
+    (or uses a slight prefix variation), the parser falls back to
+    "append as continuation", which can leak the next field's content
+    into the narration. This cleanup runs after parsing to catch
+    anything that slipped through, so the TTS engine never reads
+    "Navigation:" or a visual-prompt paragraph aloud.
+    """
+    if not text:
+        return ""
+    cleaned = text
+    # Cut at the first blocklisted field marker — everything from that
+    # point on is a different field that shouldn't be in narration.
+    earliest = len(cleaned)
+    for pattern in _NARRATION_BLOCKLIST:
+        m = pattern.search(cleaned)
+        if m and m.start() < earliest:
+            earliest = m.start()
+    if earliest < len(cleaned):
+        cleaned = cleaned[:earliest]
+    # Collapse repeated whitespace
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
 STORY_OUTLINE_SYSTEM = """You are a creative writing assistant specializing in visual storytelling.
 Your task is to generate a detailed scene-by-scene breakdown for an illustrated story.
 
@@ -258,8 +302,27 @@ Make each visual prompt detailed enough for AI image generation."""
                 current["narrative"] = line.split(":", 1)[1].strip()
             elif low.startswith("narration:"):
                 current["narration"] = line.split(":", 1)[1].strip()
+            elif re.match(r"^(visual\s+prompt|narrative|narration|title)\s*:", low):
+                # New field starting with a known prefix but slight variation
+                # (e.g. "Visual Prompt:" with extra space). Treat as new field
+                # by checking which field it is.
+                if low.startswith("visual"):
+                    current["prompt"] = line.split(":", 1)[1].strip()
+                elif low.startswith("narrative"):
+                    current["narrative"] = line.split(":", 1)[1].strip()
+                elif low.startswith("narration"):
+                    current["narration"] = line.split(":", 1)[1].strip()
+                elif low.startswith("title"):
+                    current["title"] = line.split(":", 1)[1].strip()
+            elif low.startswith("---") or low.startswith("===") or low.startswith("scene"):
+                # Skip section dividers and stray "Scene N" markers
+                continue
             else:
-                # Append continuation
+                # Append continuation. Check that the line doesn't look like
+                # the start of a new field or navigation/metadata that leaked
+                # into the LLM output.
+                if not line:
+                    continue
                 if current["narration"]:
                     current["narration"] += " " + line
                 elif current["narrative"]:
@@ -269,6 +332,12 @@ Make each visual prompt detailed enough for AI image generation."""
 
     if current:
         scenes.append(current)
+
+    # Clean up narration text — strip leaked field labels and metadata
+    # that sometimes bleed through from the LLM output (e.g. "Navigation:",
+    # "Visual Prompt:", or stray "Scene N" markers that the parser missed).
+    for s in scenes:
+        s["narration"] = _clean_narration_field(s.get("narration", ""))
 
     # Ensure every scene has a prompt and narration
     for s in scenes:
