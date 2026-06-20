@@ -24,9 +24,10 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Optional
+from story_storage import STORIES_ROOT, existing_story_dir, ensure_story_layout
 
 # ── Defaults ────────────────────────────────────────────────────────────
-OUTPUTS = Path(r"C:\dev\fantasee\outputs")
+OUTPUTS = STORIES_ROOT
 DEFAULT_WIDTH = 1920
 DEFAULT_HEIGHT = 1080
 CROSSFADE_DURATION = 0.8       # seconds of crossfade between images
@@ -429,7 +430,7 @@ def _time():
 
 def main():
     parser = argparse.ArgumentParser(description="Fantasee Video Renderer")
-    parser.add_argument("slug", help="Story slug (folder name in outputs/)")
+    parser.add_argument("slug", help="Story slug (folder name in stories/)")
     parser.add_argument("--outputs-dir", type=Path, default=OUTPUTS,
                         help="Base outputs directory")
     parser.add_argument("--resolution", default=f"{DEFAULT_WIDTH}x{DEFAULT_HEIGHT}",
@@ -449,9 +450,12 @@ def main():
     width, height = int(w), int(h)
     
     story_dir = args.outputs_dir / args.slug
+    if args.outputs_dir == OUTPUTS:
+        story_dir = existing_story_dir(args.slug)
     if not story_dir.is_dir():
         print(f"ERROR: Story directory not found: {story_dir}")
         sys.exit(1)
+    layout = ensure_story_layout(story_dir)
     
     # Read story metadata
     meta_path = story_dir / f"{args.slug}.json"
@@ -508,6 +512,10 @@ def main():
         concatenate_scenes(scene_videos, args.slug, story_dir)
         if scene_vtts:
             concatenate_vtts(scene_vtts, args.slug, story_dir)
+        for suffix in (".mp4", ".vtt"):
+            full_path = story_dir / f"{args.slug}_full{suffix}"
+            if full_path.exists():
+                shutil.copy2(full_path, layout["final"] / full_path.name)
     
     elapsed = _time() - t_start
     print(f"\n{'═'*60}")

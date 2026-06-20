@@ -488,6 +488,25 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
     emit("running", f"Story: \"{story_title}\" (id: {story_id})", 0.03)
     emit("running", "Generating title slide first...", 0.035)
     title_slide = write_title_slide(story_dir, story_id, story_title, concept, tone, style)
+    early_manifest = {
+        "id": story_id,
+        "title": story_title,
+        "subtitle": concept[:60],
+        "description": concept[:200],
+        "tags": [style, tone, "generated"],
+        "tone": tone,
+        "voice_preset": voice_preset,
+        "generated": True,
+        "status": "generating",
+        "hero_image": title_slide,
+        "title_slide": title_slide,
+        "storage_root": "stories",
+        "scenes": [],
+    }
+    early_manifest_path = story_dir / f"{story_id}.json"
+    early_tmp = early_manifest_path.with_suffix(".json.tmp")
+    early_tmp.write_text(json.dumps(early_manifest, indent=2), encoding="utf-8")
+    os.replace(early_tmp, early_manifest_path)
 
     # ── Step 2: Generate description ───────────────────────────────────
     emit("running", "Step 2/6: Writing description...", 0.05)
@@ -510,6 +529,11 @@ Be evocative but concise."""
 
     if len(scenes) > num_scenes:
         scenes = scenes[:num_scenes]
+
+    (layout["drafts"] / "scenes.json").write_text(
+        json.dumps(scenes, indent=2),
+        encoding="utf-8",
+    )
 
     # ── Step 4: Generate images via ComfyUI ────────────────────────────
     emit("running", f"Step 4/6: Generating {len(scenes)} scene images...", 0.15)
@@ -695,6 +719,10 @@ Be evocative but concise."""
         "tone": tone,           # explicit top-level field for TTS lookups
         "voice_preset": voice_preset,
         "generated": True,
+        "status": "complete",
+        "hero_image": title_slide,
+        "title_slide": title_slide,
+        "storage_root": "stories",
         "scenes": output_scenes,
     }
     manifest_path = story_dir / f"{story_id}.json"

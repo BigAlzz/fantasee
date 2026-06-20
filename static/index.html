@@ -2652,7 +2652,9 @@ const ICONS = {
 function pickHeroImage(story) {
   if (!story) return '';
   if (story.hero_image) {
-    return story.hero_image.startsWith('/') ? story.hero_image : `/images/${story.hero_image}`;
+    if (story.hero_image.startsWith('/')) return story.hero_image;
+    if (story.hero_image.includes('/')) return `/${story.hero_image}`;
+    return `/images/${story.hero_image}`;
   }
   if (story.scenes && story.scenes[0]) {
     const s0 = story.scenes[0];
@@ -2755,7 +2757,7 @@ function renderCards(stories) {
           let imgUrl = '';
           if (s.hero_image) {
             // hero_image could be a full path (generated stories) or just a filename (pre-built)
-            imgUrl = s.hero_image.includes('/') ? `/${s.hero_image}` : `/images/${s.hero_image}`;
+            imgUrl = pickHeroImage(s);
           }
           const savedIdx = getProgress(s.id);
           const resumeBadge = savedIdx !== null ? `<div class="resume-badge" aria-label="Resume at scene ${savedIdx + 1}">Resume Scene ${savedIdx + 1}</div>` : '';
@@ -2817,7 +2819,7 @@ function renderCards(stories) {
           <div class="row-scroll" id="row-scroll-${rowId}">
           ${tagStories.map(s => {
             const imgUrl = s.hero_image
-              ? (s.hero_image.includes('/') ? `/${s.hero_image}` : `/images/${s.hero_image}`)
+              ? pickHeroImage(s)
               : '';
             return `
               <div class="story-card" data-action="open-detail" data-id="${s.id}" role="link" tabindex="0">
@@ -2892,9 +2894,7 @@ async function openDetail(storyId) {
   const story = await API.fetchStory(storyId);
   state.currentDetail = story;
 
-    const heroUrl = story.hero_image
-      ? (story.hero_image.startsWith('/') ? story.hero_image : `/images/${story.hero_image}`)
-      : '';
+    const heroUrl = pickHeroImage(story);
     document.getElementById('detail-backdrop').style.backgroundImage = `url('${heroUrl}')`;
 
     const scenesHtml = (story.scenes || []).map((scene, i) => {
@@ -4572,6 +4572,9 @@ function connectWebSocket() {
         updateProgressDisplay();
         if (typeof showGenProgress === 'function') {
           showGenProgress(data.task_id, data.message, data.progress);
+        }
+        if (data.message && data.message.includes('Title slide ready')) {
+          setTimeout(() => init(), 250);
         }
       }
     } catch (e) {

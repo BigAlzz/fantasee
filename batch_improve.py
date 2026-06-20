@@ -12,6 +12,7 @@ import time
 import requests
 from pathlib import Path
 from datetime import datetime
+from story_storage import STORIES_ROOT
 
 # Force UTF-8 on stdout/stderr so non-ASCII (em-dashes, arrows) don't get mangled
 # when the script is run from PowerShell on Windows (default cp1252).
@@ -22,8 +23,8 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 BASE_URL = "http://127.0.0.1:8765"
-OUTPUTS_DIR = Path(r"C:\dev\fantasee\outputs")
-LOG_FILE = OUTPUTS_DIR.parent / "batch_improve.log"
+OUTPUTS_DIR = STORIES_ROOT
+LOG_FILE = Path(__file__).parent / "batch_improve.log"
 
 def log(msg):
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

@@ -19,8 +19,9 @@ import re
 import sys
 from pathlib import Path
 from dataclasses import dataclass, field
+from story_storage import STORIES_ROOT, existing_story_dir
 
-OUTPUTS_DIR = Path(__file__).parent / "outputs"
+OUTPUTS_DIR = STORIES_ROOT
 
 
 # ── VTT Parser ───────────────────────────────────────────────────────────
@@ -453,7 +454,7 @@ def analyze_story_arc(story: dict) -> dict:
     
     # Check rendered video exists
     story_id = story.get("id", "")
-    story_dir = OUTPUTS_DIR / story_id
+    story_dir = existing_story_dir(story_id)
     has_video = any(story_dir.glob(f"{story_id}_s*.mp4")) if story_dir.exists() else False
     has_full = (story_dir / f"{story_id}_full.mp4").exists() if story_dir.exists() else False
     
@@ -717,7 +718,7 @@ Output ONLY a JSON object:
 
 def review_story(story_id: str) -> dict | None:
     """Perform a full production review."""
-    story_dir = OUTPUTS_DIR / story_id
+    story_dir = existing_story_dir(story_id)
     if not story_dir.exists():
         print(f"Error: Story not found: {story_id}", file=sys.stderr)
         return None
@@ -1000,7 +1001,7 @@ def validate_manifest(story_id: str) -> dict:
     Never raises — all exceptions are caught and reported.
     """
     result = {"story_id": story_id, "ok": True, "errors": [], "warnings": [], "stats": {}}
-    story_dir = OUTPUTS_DIR / story_id
+    story_dir = existing_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
 
     if not story_dir.exists():
@@ -1218,13 +1219,14 @@ def _save_review(story_id: str, result: dict, json_only: bool = False):
         print(format_report(result))
 
     # Save review JSON alongside the story
-    review_path = OUTPUTS_DIR / story_id / f"{story_id}_review.json"
+    story_dir = existing_story_dir(story_id)
+    review_path = story_dir / f"{story_id}_review.json"
     review_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     if not json_only:
         print(f"  Review saved: {review_path}")
 
     # Update manifest with review fields
-    manifest_path = OUTPUTS_DIR / story_id / f"{story_id}.json"
+    manifest_path = story_dir / f"{story_id}.json"
     if manifest_path.exists():
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

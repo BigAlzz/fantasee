@@ -34,8 +34,9 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
+from story_storage import STORIES_ROOT
 
-OUTPUTS_DIR = Path(__file__).parent / "outputs"
+OUTPUTS_DIR = STORIES_ROOT
 TRASH_DIR = OUTPUTS_DIR / ".trash"
 
 # Patterns that count as "debris" — anything left behind by partial

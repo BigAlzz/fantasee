@@ -47,6 +47,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from story_storage import LEGACY_OUTPUTS_ROOT, STORIES_ROOT, existing_story_dir, ensure_story_layout
 
 # ── Paths ──────────────────────────────────────────────────────────────
 OUTPUTS = Path(r"E:\\hermes\\workspace\\outputs")
@@ -118,7 +119,7 @@ STORY_META = {
 }
 
 
-# Built-in stories are disabled; generated stories are loaded from outputs/.
+# Built-in stories are disabled; generated stories are loaded from stories/.
 STORY_META = {}
 
 
@@ -844,7 +845,30 @@ def get_task(task_id: str):
 
 # ── ComfyUI & TTS Integration ──────────────────────────────────────────
 
-GEN_OUTPUTS = Path(__file__).parent / "outputs"  # PoC / generated story outputs
+GEN_OUTPUTS = STORIES_ROOT
+LEGACY_GEN_OUTPUTS = LEGACY_OUTPUTS_ROOT
+
+
+def generated_path(*parts: str) -> Path:
+    """Resolve a generated asset from stories/, falling back to legacy outputs/."""
+    try:
+        primary = path_under(GEN_OUTPUTS, *parts)
+    except HTTPException:
+        raise
+    if primary.exists():
+        return primary
+    legacy = path_under(LEGACY_GEN_OUTPUTS, *parts)
+    if legacy.exists():
+        return legacy
+    return primary
+
+
+def generated_story_dir(story_id: str, create: bool = False) -> Path:
+    """Return a story directory, preferring stories/ over legacy outputs/."""
+    story_dir = existing_story_dir(story_id)
+    if create:
+        ensure_story_layout(story_dir)
+    return path_under(story_dir.parent, story_dir.name)
 
 
 @app.get("/api/comfyui/status")
@@ -947,7 +971,7 @@ async def generate_tts_audio(req: TTSRequest):
 @app.get("/generated-images/{filename:path}")
 def serve_generated_image(filename: str):
     """Serve an image from the fantasee outputs directory."""
-    filepath = path_under(GEN_OUTPUTS, filename)
+    filepath = generated_path(filename)
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(str(filepath))
@@ -956,20 +980,21 @@ def serve_generated_image(filename: str):
 @app.get("/generated/{story_id}/{filename:path}")
 def serve_generated_asset(story_id: str, filename: str):
     """Serve any asset (image/audio/subs) from a generated story's directory."""
-    filepath = path_under(GEN_OUTPUTS, story_id, filename)
+    filepath = generated_path(story_id, filename)
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Asset not found")
     # Determine media type
     suffix = filepath.suffix.lower()
     media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-                   ".wav": "audio/wav", ".mp3": "audio/mpeg", ".json": "application/json"}
+                   ".svg": "image/svg+xml", ".wav": "audio/wav",
+                   ".mp3": "audio/mpeg", ".json": "application/json"}
     return FileResponse(str(filepath), media_type=media_types.get(suffix, "application/octet-stream"))
 
 
 @app.get("/generated-audio/{filename:path}")
 def serve_generated_audio(filename: str):
     """Serve audio from the fantasee outputs directory."""
-    filepath = path_under(GEN_OUTPUTS, filename)
+    filepath = generated_path(filename)
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Audio not found")
     return FileResponse(str(filepath), media_type="audio/wav")
@@ -978,7 +1003,7 @@ def serve_generated_audio(filename: str):
 @app.get("/generated-subtitles/{filename:path}")
 def serve_generated_subtitles(filename: str):
     """Serve subtitle JSON from the fantasee outputs directory."""
-    filepath = path_under(GEN_OUTPUTS, filename)
+    filepath = generated_path(filename)
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Subtitles not found")
     return FileResponse(str(filepath), media_type="application/json")
@@ -987,7 +1012,7 @@ def serve_generated_subtitles(filename: str):
 @app.get("/generated-videos/{filename:path}")
 def serve_generated_video(filename: str):
     """Serve rendered MP4 video from the fantasee outputs directory."""
-    filepath = path_under(GEN_OUTPUTS, filename)
+    filepath = generated_path(filename)
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Video not found")
     media = {".mp4": "video/mp4", ".webm": "video/webm", ".mkv": "video/x-matroska"}
@@ -997,7 +1022,7 @@ def serve_generated_video(filename: str):
 @app.get("/generated-vtt/{filename:path}")
 def serve_generated_vtt(filename: str):
     """Serve VTT subtitle sidecar from the fantasee outputs directory."""
-    filepath = path_under(GEN_OUTPUTS, filename)
+    filepath = generated_path(filename)
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="VTT not found")
     return FileResponse(str(filepath), media_type="text/vtt")
@@ -1005,46 +1030,92 @@ def serve_generated_vtt(filename: str):
 
 # ── Discover generated stories (from outputs/_stories/*.json) ───────────
 
-def discover_generated_stories() -> list[dict]:
-    """Load story manifests from outputs/ directories."""
-    stories = []
-    # Check all subdirectories of GEN_OUTPUTS for story manifests
-    if not GEN_OUTPUTS.exists():
-        return stories
-    for child in GEN_OUTPUTS.iterdir():
-        if child.is_dir():
-            # Look for a manifest JSON with matching name
+def iter_generated_story_dirs() -> list[Path]:
+    """Return story directories, preferring stories/ over legacy outputs/."""
+    found: dict[str, Path] = {}
+    for root in (GEN_OUTPUTS, LEGACY_GEN_OUTPUTS):
+        if not root.exists():
+            continue
+        for child in root.iterdir():
+            if not child.is_dir() or child.name.startswith(".") or child.name.startswith("_"):
+                continue
             manifest = child / f"{child.name}.json"
-            if manifest.exists():
+            if manifest.exists() and child.name not in found:
+                found[child.name] = child
+    return sorted(found.values(), key=lambda p: p.name)
+
+
+def generated_asset_url(story_id: str, filename: str) -> str:
+    """Return a URL for an asset inside a generated story folder."""
+    filename = str(filename).replace("\\", "/").lstrip("/")
+    return f"/generated/{story_id}/{filename}"
+
+
+def ensure_title_slide_for_manifest(story_dir: Path, manifest: dict) -> None:
+    """Create a title slide for an existing story if it does not have one."""
+    story_id = manifest.get("id") or story_dir.name
+    title_slide = manifest.get("title_slide") or manifest.get("hero_image")
+    if title_slide and (story_dir / str(title_slide).lstrip("/")).exists():
+        return
+    try:
+        from generate_story import write_title_slide
+        title = manifest.get("title") or story_id.replace("-", " ").title()
+        concept = manifest.get("description") or manifest.get("subtitle") or title
+        tags = manifest.get("tags") or []
+        style = tags[0] if tags else "fantasy painterly"
+        tone = manifest.get("tone") or (tags[1] if len(tags) > 1 else "dramatic")
+        rel = write_title_slide(story_dir, story_id, title, concept, tone, style)
+        manifest["title_slide"] = rel
+        manifest["hero_image"] = rel
+        manifest["storage_root"] = "stories"
+        atomic_write_json(story_dir / f"{story_id}.json", manifest)
+    except Exception as e:
+        print(f"[title-slide] failed for {story_id}: {e}", file=sys.stderr)
+
+
+def discover_generated_stories() -> list[dict]:
+    """Load story manifests from stories/ and legacy outputs/ directories."""
+    stories = []
+    for child in iter_generated_story_dirs():
+        manifest = child / f"{child.name}.json"
+        if manifest.exists():
                 try:
                     data = json.loads(manifest.read_text(encoding="utf-8"))
+                    data["storage_root"] = "stories" if child.parent == GEN_OUTPUTS else "outputs"
                     # Enrich with asset URLs and scene_count
                     scenes = data.get("scenes", [])
                     data["scene_count"] = len(scenes)
+                    hero = data.get("hero_image") or data.get("title_slide")
+                    if hero:
+                        data["hero_image_url"] = generated_asset_url(child.name, hero)
                     for scene in scenes:
                         # Convert filenames to URLs
                         imgs = scene.get("image_filenames", [])
-                        scene["image_urls"] = [f"/generated-images/{child.name}/{f}" for f in imgs if f]
+                        scene["image_urls"] = [generated_asset_url(child.name, f) for f in imgs if f]
                         audio = scene.get("audio_filename", "")
-                        scene["audio_url"] = f"/generated-audio/{child.name}/{audio}" if audio else None
+                        scene["audio_url"] = generated_asset_url(child.name, audio) if audio else None
                         subs = scene.get("subtitle_file", "")
-                        scene["subtitle_url"] = f"/generated-subtitles/{child.name}/{subs}" if subs else None
+                        scene["subtitle_url"] = generated_asset_url(child.name, subs) if subs else None
                         # Rendered video + VTT sidecar (from render_video.py)
                         scene_key = scene.get("scene", "")
                         if scene_key:
                             mp4 = f"{child.name}_s{scene_key}.mp4"
                             vtt = f"{child.name}_s{scene_key}.vtt"
                             if (child / mp4).exists():
-                                scene["video_url"] = f"/generated-videos/{child.name}/{mp4}"
+                                scene["video_url"] = generated_asset_url(child.name, mp4)
                             if (child / vtt).exists():
-                                scene["vtt_url"] = f"/generated-vtt/{child.name}/{vtt}"
+                                scene["vtt_url"] = generated_asset_url(child.name, vtt)
                     # Full story video + VTT
                     full_mp4 = f"{child.name}_full.mp4"
                     full_vtt = f"{child.name}_full.vtt"
                     if (child / full_mp4).exists():
-                        data["full_video_url"] = f"/generated-videos/{child.name}/{full_mp4}"
+                        data["full_video_url"] = generated_asset_url(child.name, full_mp4)
+                    elif (child / "final" / full_mp4).exists():
+                        data["full_video_url"] = generated_asset_url(child.name, f"final/{full_mp4}")
                     if (child / full_vtt).exists():
-                        data["full_vtt_url"] = f"/generated-vtt/{child.name}/{full_vtt}"
+                        data["full_vtt_url"] = generated_asset_url(child.name, full_vtt)
+                    elif (child / "final" / full_vtt).exists():
+                        data["full_vtt_url"] = generated_asset_url(child.name, f"final/{full_vtt}")
                     stories.append(data)
                 except (json.JSONDecodeError, OSError):
                     pass
@@ -1058,12 +1129,12 @@ def list_generated_stories():
     summaries = []
     for s in stories:
         # For generated stories, derive hero_image from first scene's first image
-        hero = s.get("hero_image")
+        hero = s.get("hero_image_url") or s.get("hero_image")
         if not hero and s.get("scenes"):
             first_scene = s["scenes"][0]
             imgs = first_scene.get("image_filenames", [])
             if imgs:
-                hero = f"generated/{s.get('id', '')}/{imgs[0]}"
+                hero = generated_asset_url(s.get("id", ""), imgs[0])
 
         summaries.append({
             "id": s.get("id", ""),
@@ -1089,11 +1160,15 @@ def get_generated_story(story_id: str):
     for s in stories:
         if s.get("id") == story_id:
             # Enrich hero_image if missing (same logic as list endpoint)
-            if not s.get("hero_image") and s.get("scenes"):
+            if s.get("hero_image_url"):
+                s["hero_image"] = s["hero_image_url"]
+            elif s.get("hero_image"):
+                s["hero_image"] = generated_asset_url(s.get("id", ""), s["hero_image"])
+            elif s.get("scenes"):
                 first_scene = s["scenes"][0]
                 imgs = first_scene.get("image_filenames", [])
                 if imgs:
-                    s["hero_image"] = f"/generated-images/{s.get('id', '')}/{imgs[0]}"
+                    s["hero_image"] = generated_asset_url(s.get("id", ""), imgs[0])
             return s
     raise HTTPException(status_code=404, detail="Generated story not found")
 
@@ -1101,7 +1176,7 @@ def get_generated_story(story_id: str):
 @app.get("/api/generated-stories/{story_id}/review")
 def get_story_review(story_id: str):
     """Get the critic review for a generated story."""
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     review_path = story_dir / f"{story_id}_review.json"
     if review_path.exists():
         try:
@@ -1114,7 +1189,7 @@ def get_story_review(story_id: str):
 @app.post("/api/generated-stories/{story_id}/run-critic")
 async def run_critic(story_id: str):
     """Run the critic on a generated story and return the review."""
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     if not story_dir.exists():
         raise HTTPException(status_code=404, detail="Story not found")
 
@@ -1178,7 +1253,7 @@ async def run_critic(story_id: str):
 @app.post("/api/stories/{story_id}/scenes/{scene_idx}/regenerate")
 async def regenerate_scene(story_id: str, scene_idx: int):
     """Regenerate images and TTS for a single scene."""
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
@@ -1245,7 +1320,7 @@ async def regenerate_scene(story_id: str, scene_idx: int):
 @app.post("/api/stories/{story_id}/scenes/{scene_idx}/add-image")
 async def add_scene_image(story_id: str, scene_idx: int):
     """Add an additional image to a scene for more visual variety."""
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
@@ -1289,7 +1364,7 @@ async def add_scene_image(story_id: str, scene_idx: int):
 @app.post("/api/stories/{story_id}/scenes/{scene_idx}/refine-prompt")
 async def refine_prompt(story_id: str, scene_idx: int, body: dict = Body(default=None)):
     """Use LLM to improve a scene's visual prompt."""
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
@@ -1347,10 +1422,17 @@ async def refine_prompt(story_id: str, scene_idx: int, body: dict = Body(default
 @app.post("/api/stories/{story_id}/render")
 async def render_story(story_id: str, body: dict = Body(default=None)):
     """Re-render video. Pass scene_idx for single scene, or omit for full story."""
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
+    try:
+        ensure_title_slide_for_manifest(
+            story_dir,
+            json.loads(manifest_path.read_text(encoding="utf-8")),
+        )
+    except (json.JSONDecodeError, OSError):
+        pass
 
     scene_idx = (body or {}).get("scene_idx")
     cmd = [sys.executable, str(Path(__file__).parent / "render_video.py"), story_id]
@@ -1429,7 +1511,7 @@ def delete_story_endpoint(story_id: str, body: dict = Body(default=None)):
                    "It lives outside outputs/."
         )
 
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     if not story_dir.exists():
         # Already gone — still reload the cache and return success
         global _stories_cache
@@ -1506,7 +1588,7 @@ async def extend_story(story_id: str, body: dict = Body(default=None)):
     is logged and skipped, and the manifest is written after every successful
     scene so a partial extension is always recoverable.
     """
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
@@ -1826,7 +1908,7 @@ async def improve_loop(story_id: str, body: dict = Body(default=None)):
     5. Re-render
     6. Repeat
     """
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
@@ -2109,7 +2191,7 @@ async def improve_loop(story_id: str, body: dict = Body(default=None)):
 @app.post("/api/stories/{story_id}/add-images")
 async def add_images_bulk(story_id: str, body: dict = Body(default=None)):
     """Add more images to scenes that have fewer than the target count."""
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
@@ -2158,7 +2240,7 @@ async def add_images_bulk(story_id: str, body: dict = Body(default=None)):
 @app.post("/api/stories/{story_id}/improve")
 async def auto_improve(story_id: str, body: dict = Body(default=None)):
     """Auto-improve: critic → identify weak scenes → refine → regenerate → re-render."""
-    story_dir = path_under(GEN_OUTPUTS, story_id)
+    story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")

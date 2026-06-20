@@ -17,8 +17,9 @@ import os
 import sys
 import time
 from pathlib import Path
+from story_storage import STORIES_ROOT, existing_story_dir
 
-OUTPUTS_DIR = Path(__file__).parent / "outputs"
+OUTPUTS_DIR = STORIES_ROOT
 
 
 def _atomic_write_json(path: Path, data) -> None:
@@ -43,7 +44,7 @@ def regen_tts_for_scenes(
     sys.path.insert(0, str(Path(__file__).parent))
     from tts_utils import generate_tts, get_audio_duration
 
-    story_dir = OUTPUTS_DIR / story_id
+    story_dir = existing_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     report = {
         "story_id": story_id,
@@ -142,7 +143,7 @@ def regen_tts_for_scenes(
 
 def main():
     parser = argparse.ArgumentParser(description="Regenerate TTS audio for a story's scenes")
-    parser.add_argument("--story", required=True, help="Story ID (folder name in outputs/)")
+    parser.add_argument("--story", required=True, help="Story ID (folder name in stories/)")
     parser.add_argument("--from", dest="from_scene", type=int, required=True,
                         help="First scene number (1-indexed, inclusive)")
     parser.add_argument("--to", dest="to_scene", type=int, required=True,

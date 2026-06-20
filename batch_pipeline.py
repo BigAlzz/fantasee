@@ -19,8 +19,9 @@ import time
 from pathlib import Path
 
 import requests
+from story_storage import STORIES_ROOT, existing_story_dir
 
-OUTPUTS_DIR = Path(__file__).parent / "outputs"
+OUTPUTS_DIR = STORIES_ROOT
 SCRIPT_DIR = Path(__file__).parent
 
 
@@ -320,7 +321,7 @@ def render_video(story_id):
 
 def process_story(story_id, target_scenes=20, target_stars=4.5, voice="Dean", skip_images=False):
     """Full pipeline for a single story: extend -> TTS -> images -> critic -> improve."""
-    story_dir = OUTPUTS_DIR / story_id
+    story_dir = existing_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
 
     if not manifest_path.exists():
