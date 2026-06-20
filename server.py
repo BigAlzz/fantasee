@@ -204,7 +204,7 @@ def list_stories():
             "description": (s.get("description") or "")[:200] + "...",
             "tags": s.get("tags", []),
             "year": s.get("year", ""),
-            "hero_image": s.get("hero_image") or s.get("hero_image_url"),
+            "hero_image": s.get("hero_image_url") or s.get("hero_image"),
             "scene_count": s.get("scene_count", len(s.get("scenes", []))),
         })
     return {"stories": summaries}
