@@ -3143,21 +3143,27 @@ const ICONS = {
  * hero_image, then scene image_urls, then scene image_filenames. */
 function pickHeroImage(story) {
   if (!story) return '';
+  // The server now returns hero_image as a full URL (e.g. /generated/<id>/assets/...).
+  // Use it directly if it starts with a slash.
   if (story.hero_image) {
-    if (story.hero_image.startsWith('/')) return story.hero_image;
-    if (story.hero_image.includes('/')) return `/${story.hero_image}`;
-    return `/images/${story.hero_image}`;
+    const hi = story.hero_image;
+    if (hi.startsWith('http://') || hi.startsWith('https://')) return hi;
+    if (hi.startsWith('/')) return hi;
+    if (hi.includes('/')) return `/${hi}`;
+    return `/images/${hi}`;
   }
   // Prefer the new image-backed title PNG if the manifest carries it.
   if (story.title_image) {
-    if (story.title_image.startsWith('/')) return story.title_image;
-    if (story.title_image.includes('/')) return `/${story.title_image}`;
+    const ti = story.title_image;
+    if (ti.startsWith('http://') || ti.startsWith('https://')) return ti;
+    if (ti.startsWith('/')) return ti;
+    return `/${ti}`;
   }
   if (story.scenes && story.scenes[0]) {
     const s0 = story.scenes[0];
     if (s0.image_urls && s0.image_urls[0]) return s0.image_urls[0];
     if (s0.image_filenames && s0.image_filenames[0]) {
-      return `/generated-images/${story.id}/${s0.image_filenames[0]}`;
+      return `/generated/${story.id}/${s0.image_filenames[0]}`;
     }
   }
   return '';
