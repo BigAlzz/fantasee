@@ -81,6 +81,16 @@ CHECKPOINTS = {
     "anything": "anything-v5.safetensors",
 }
 
+
+def checkpoint_for_style(style: Optional[str] = None) -> str:
+    """Return the checkpoint filename best suited to a story style."""
+    s = (style or "").lower()
+    if any(token in s for token in ("anime", "manga", "manhwa", "webtoon")):
+        return CHECKPOINTS["anime"]
+    if any(token in s for token in ("fantasy", "painterly", "epic", "storybook")):
+        return CHECKPOINTS["fantasy"]
+    return CHECKPOINTS["fantasy"]
+
 # Quality defaults — 896x512 (16:9). Smaller is faster: image gen is
 # the bottleneck of story generation, and 512p gives plenty of detail for
 # the Ken Burns zoom/pan in render_video.py while halving per-image time
@@ -631,6 +641,7 @@ def inject_prompt(
 import threading
 _rr_lock = threading.Lock()
 _rr_counter = 0
+_base_lock = threading.Lock()
 
 
 def _healthy_bases(timeout: float = 1.5) -> list[str]:
@@ -944,25 +955,24 @@ def _generate_image_to_base(base_url: str, prompt: str, output_prefix: str,
     fan out work across multiple ComfyUI instances running on different ports.
     """
     global COMFYUI_BASE
-    original_base = COMFYUI_BASE
-    try:
-        # Temporarily point the module-level URL at the target instance so
-        # the existing polling / copy logic in generate_image() works unchanged.
+    with _base_lock:
+        original_base = COMFYUI_BASE
         COMFYUI_BASE = base_url
-        return generate_image(
-            prompt=prompt,
-            output_prefix=output_prefix,
-            output_dir=output_dir,
-            negative_prompt=negative_prompt,
-            seed=seed,
-            checkpoint=checkpoint,
-            width=width,
-            height=height,
-            timeout=timeout,
-            workflow_path=workflow_path,
-        )
-    finally:
-        COMFYUI_BASE = original_base
+        try:
+            return generate_image(
+                prompt=prompt,
+                output_prefix=output_prefix,
+                output_dir=output_dir,
+                negative_prompt=negative_prompt,
+                seed=seed,
+                checkpoint=checkpoint,
+                width=width,
+                height=height,
+                timeout=timeout,
+                workflow_path=workflow_path,
+            )
+        finally:
+            COMFYUI_BASE = original_base
 
 
 def generate_images_parallel(

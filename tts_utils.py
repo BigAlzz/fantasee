@@ -548,7 +548,7 @@ if __name__ == "__main__":
         parser.error("text argument required (or use --list-voices)")
 
     output = args.output or "tts_output.wav"
-    style = args.style or STYLE_MAP.get(DEFAULT_STYLE, "")
+    style = args.style or STYLE_MAP.get("normal", "")
     ok = generate_tts(args.text, output, voice=args.voice, style=style)
     if ok:
         print(f"✓ Saved to {output}")

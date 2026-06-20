@@ -232,8 +232,8 @@ def get_scene(story_id: str, scene_idx: int):
 
 @app.get("/images/{filename:path}")
 def serve_image(filename: str):
-    """Serve a generated image."""
-    filepath = path_under(OUTPUTS, filename)
+    """Serve a generated image from stories/ or legacy outputs/."""
+    filepath = generated_path(filename)
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(str(filepath))
@@ -241,8 +241,8 @@ def serve_image(filename: str):
 
 @app.get("/audio/{filename:path}")
 def serve_audio(filename: str):
-    """Serve a TTS narration audio file."""
-    filepath = path_under(OUTPUTS, filename)
+    """Serve a TTS narration audio file from stories/ or legacy outputs/."""
+    filepath = generated_path(filename)
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Audio not found")
     return FileResponse(str(filepath), media_type="audio/mpeg")

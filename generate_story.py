@@ -162,6 +162,8 @@ QUALITY STANDARDS for visual prompts:
 - ALWAYS mention the main character(s) by name and describe their appearance
 - Include lighting direction and quality
 - Include camera perspective
+- Prefer cinematic action compositions over static face portraits whenever the story beat allows it: characters moving, reaching, running, fighting, climbing, discovering, reacting, carrying tools, crossing terrain, or interacting with the environment. Use dynamic poses, visible hands/body language, foreground/background depth, and a clear story action in the frame.
+- Avoid making every scene a head-and-shoulders portrait. Use a mix of wide shots, over-the-shoulder shots, three-quarter medium action shots, low-angle hero shots, chase/combat/discovery frames, and environmental storytelling. Faces can be visible, but the image should show what the characters are doing.
 - Describe color palette explicitly
 - Use vivid, atmospheric language matching the requested tone
 - NEVER use tag-list format
@@ -523,7 +525,7 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
 
     # Lazy imports — only load when needed
     from tts_utils import generate_tts, get_audio_duration
-    from comfyui_utils import generate_image, is_running as comfyui_running
+    from comfyui_utils import checkpoint_for_style, generate_image, is_running as comfyui_running
 
     # ── Step 1: Generate story title & ID ──────────────────────────────
     emit("running", "Step 1/6: Generating title...", 0.02)
@@ -622,6 +624,7 @@ Be evocative but concise."""
     comfyui_bases = os.environ.get("COMFYUI_URLS", "").strip()
     n_workers = len([b for b in comfyui_bases.split(",") if b.strip()]) if comfyui_bases else 1
     parallel_images = use_comfyui and n_workers > 1
+    image_checkpoint = checkpoint_for_style(style)
     if parallel_images:
         emit("running", f"  Using {n_workers} ComfyUI instances in parallel")
 
@@ -658,6 +661,7 @@ Be evocative but concise."""
                     "prompt": s["prompt"],
                     "output_prefix": prefix,
                     "seed": seed + img_idx,
+                    "checkpoint": image_checkpoint,
                 })
                 job_owners.append((s_idx, img_idx))
 
@@ -693,6 +697,7 @@ Be evocative but concise."""
                         output_prefix=prefix,
                         output_dir=str(story_dir),
                         seed=seed + img_idx,
+                        checkpoint=image_checkpoint,
                         timeout=600,
                     )
                     if filename:

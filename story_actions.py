@@ -505,7 +505,7 @@ def apply_repair(story_id: str, plan: RepairPlan, *, progress: Optional[Callable
 
 def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manifest) -> None:
     """Regenerate the image(s) for one scene, in-place."""
-    from comfyui_utils import generate_image, is_running
+    from comfyui_utils import checkpoint_for_style, generate_image, is_running
     if not is_running().get("running", False):
         # Surface a clear error to the caller instead of silently
         # doing nothing. The endpoint translates this to a 503.
@@ -520,6 +520,9 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
         raise RuntimeError("Scene has no prompt — cannot regenerate image")
 
     seed_base = hash(f"{story_id}{padded}repair") % (2**32 - 1)
+    tags = manifest.get("tags") or []
+    style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
+    checkpoint = checkpoint_for_style(style)
     new_imgs = []
     for i in range(max(1, len(scene_obj.get("image_filenames") or [None]))):
         prefix = f"{story_id}_s{padded}_{safe_title}_{(i + 1):02d}"
@@ -528,6 +531,7 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
             output_prefix=prefix,
             output_dir=str(story_dir),
             seed=seed_base + i,
+            checkpoint=checkpoint,
             timeout=300,
         )
         if filename:
@@ -538,6 +542,7 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
 def _regen_scene_audio(story_dir, story_id, padded, scene_obj, manifest) -> None:
     """Regenerate the TTS audio for one scene."""
     from tts_utils import generate_tts, get_audio_duration
+    from comfyui_utils import checkpoint_for_style
     narration = (scene_obj.get("narration") or scene_obj.get("narration_text") or "").strip()
     if not narration:
         raise RuntimeError("Scene has no narration — cannot regenerate audio")
@@ -649,6 +654,7 @@ def apply_extend(
     tone = manifest.get("tone") or (tags[1] if len(tags) > 1 else "dramatic")
     voice = manifest.get("voice_preset") or "Dean"
     images_per_scene = int(manifest.get("images_per_scene") or 1)
+    image_checkpoint = checkpoint_for_style(style)
 
     plan = plan_extend(story_id, scenes)
 
@@ -678,6 +684,7 @@ Write exactly {plan.will_add} more scenes that continue from where the story lef
 Maintain the same characters, tone, and visual style.
 Each scene MUST have a Narration field (voiceover text for TTS — 80-150 words, dramatic, present tense).
 Make each visual prompt detailed enough for AI image generation (80-150 words).
+Prefer cinematic action compositions over static portraits whenever possible: show characters moving, fighting, climbing, discovering, reacting, using tools, crossing terrain, or interacting with the environment. Use dynamic poses, visible hands/body language, depth, camera angle, and a clear story action in the frame. Do not make every image a face close-up.
 
 Style: {style}
 Tone: {tone}"""
@@ -749,6 +756,7 @@ Tone: {tone}"""
                         output_prefix=prefix,
                         output_dir=str(story_dir),
                         seed=seed + img_idx,
+                        checkpoint=image_checkpoint,
                         timeout=300,
                     )
                     if filename:

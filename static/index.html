@@ -910,9 +910,6 @@ img { display: block; max-width: 100%; }
   justify-content: center;
   animation: fadeIn 0.2s ease;
 }
-.shortcuts-overlay {
-  display: none !important;
-}
 .shortcuts-content {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
@@ -5031,7 +5028,7 @@ document.addEventListener('keydown', (e) => {
 
 function openShortcuts() {
   const overlay = document.getElementById('shortcuts-overlay');
-  overlay.hidden = true;
+  overlay.hidden = false;
 }
 function closeShortcuts() {
   const overlay = document.getElementById('shortcuts-overlay');
