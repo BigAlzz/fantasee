@@ -905,10 +905,13 @@ img { display: block; max-width: 100%; }
   z-index: calc(var(--z-modal) + 50);
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(8px);
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   animation: fadeIn 0.2s ease;
+}
+.shortcuts-overlay.active {
+  display: flex;
 }
 .shortcuts-content {
   background: var(--bg-secondary);
@@ -5029,10 +5032,12 @@ document.addEventListener('keydown', (e) => {
 function openShortcuts() {
   const overlay = document.getElementById('shortcuts-overlay');
   overlay.hidden = false;
+  overlay.classList.add('active');
 }
 function closeShortcuts() {
   const overlay = document.getElementById('shortcuts-overlay');
   overlay.hidden = true;
+  overlay.classList.remove('active');
   closeDialog(overlay);
 }
 
