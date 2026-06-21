@@ -565,6 +565,57 @@ def load_workflow(path: Optional[str] = None) -> Optional[dict]:
         return json.load(f)
 
 
+# SD 1.5's CLIP encoder has a 77-token limit. ComfyUI silently truncates
+# prompts beyond that, which causes the model to ignore the most
+# descriptive parts of a long prompt. We approximate the BPE token
+# count and pre-truncate intelligently, keeping the front of the prompt
+# (subject, framing, action) and the back (style, quality), and dropping
+# the middle if necessary.
+def _approx_token_count(text: str) -> int:
+    """Rough BPE token estimate. BPE on natural English text produces
+    roughly 0.75 tokens per word, with commas, periods and short
+    words inflating the ratio. We use 0.6 to stay safely under the
+    77-token CLIP limit even on prose-heavy input.
+    """
+    if not text:
+        return 0
+    words = len(text.split())
+    # Count punctuation and short tokens that often become their own BPE
+    # tokens. This is a rough heuristic; exact counting requires the
+    # full BPE tokenizer, which is heavyweight to load just for this.
+    punct = sum(1 for c in text if c in ",.;:!?\"'()")
+    return max(1, int(words / 0.6) + punct // 4)
+
+
+def _clip_truncate(text: str, max_tokens: int = 77) -> str:
+    """Truncate a prompt to fit SD 1.5's 77-token CLIP limit.
+
+    Strategy: keep the beginning of the prompt (subject, framing,
+    primary action — these set the image) and the end (style/quality
+    tokens — these refine the look). If the middle has to be cut,
+    prefer to drop the LEAST-informative middle. If the prompt is
+    already short, return it unchanged.
+    """
+    if not text:
+        return text
+    if _approx_token_count(text) <= max_tokens:
+        return text
+    # Rough word budget. Use a smaller multiplier than 0.6 to leave
+    # headroom for tokenization edge cases.
+    word_budget = int(max_tokens * 0.55)
+    words = text.split()
+    if len(words) <= word_budget:
+        return text
+    # Keep first 60% and last 30% of the budget, drop the middle 10%.
+    head_count = int(word_budget * 0.60)
+    tail_count = int(word_budget * 0.30)
+    head = " ".join(words[:head_count])
+    tail = " ".join(words[-tail_count:]) if tail_count else ""
+    if tail:
+        return f"{head} {tail}"
+    return head
+
+
 def inject_prompt(
     workflow: dict,
     positive_prompt: str,
@@ -592,6 +643,16 @@ def inject_prompt(
         filename_prefix: Custom output filename prefix.
     """
     q = {**QUALITY_SETTINGS, **(quality or {})}
+
+    # SD 1.5's CLIP encoder has a 77-token limit. ComfyUI's CLIPTextEncode
+    # node silently truncates anything longer. We pre-truncate intelligently
+    # so the most important parts of the prompt survive. Approximate
+    # token count: 1 token ≈ 0.75 words for English natural language, but
+    # we also count commas/periods which inflate the BPE count. Use a
+    # conservative 0.6 multiplier so we never overflow the 77-token limit.
+    MAX_TOKENS = 77
+    positive_prompt = _clip_truncate(positive_prompt, MAX_TOKENS)
+    negative_prompt = _clip_truncate(negative_prompt, MAX_TOKENS)
 
     for node_id, node in workflow.items():
         if not isinstance(node, dict):

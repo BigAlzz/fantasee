@@ -220,6 +220,94 @@ QUALITY STANDARDS for visual prompts:
   medium and close-up shots. Include a phrase such as "a well-defined
   human nose" and "natural human facial features" in the prompt.
 
+SHOT VARIETY (CRITICAL — read carefully):
+Each scene's Visual Prompt MUST explicitly name ONE shot type from the
+list below as the very first phrase after the framing word. Do NOT
+default to "close-up portrait" or "head-and-shoulders" for every scene.
+Mix the shot types across the story so the player feels like a real
+film with a working cinematographer, not a slideshow of mugshots.
+
+SHOT TYPES (pick ONE per scene, name it explicitly in the prompt):
+
+  1. EXTREME WIDE SHOT — establishing shot, landscape or environment
+     dominates, characters tiny or absent. Use for chapter openings,
+     world reveals, "we see the battlefield" moments, or any scene
+     where the setting IS the story.
+     Keywords: "extreme wide shot", "establishing shot", "vast
+     landscape", "tiny figures in", "bird's-eye view", "panoramic".
+
+  2. WIDE / LONG SHOT — full body visible head to toe, plenty of
+     room around the character, environment prominent. Use when the
+     character is moving through a space, or when their body language
+     matters as much as their face.
+     Keywords: "wide shot", "long shot", "full body", "head to toe",
+     "kneeling in", "standing in", "entire figure visible".
+
+  3. MEDIUM SHOT — waist-up framing. The workhorse of any film;
+     shows hands, gesture, and expression together. Use for
+     conversation, action, discovery, and most "talking head"
+     moments where the character is also DOING something.
+     Keywords: "medium shot", "waist up", "from the waist up",
+     "torso visible", "hands visible".
+
+  4. MEDIUM CLOSE-UP — chest-up. More emotional than medium but
+     still shows the shoulders and arms. Use for reactions, reveals,
+     emotional pivots.
+     Keywords: "medium close-up", "chest up", "from the chest up".
+
+  5. CLOSE-UP — face fills most of the frame. Reserve for the most
+     important emotional beats. NEVER use close-up for more than 2
+     consecutive scenes — it loses impact.
+     Keywords: "close-up", "face filling the frame", "tight on
+     the face", "eyes dominate".
+
+  6. EXTREME CLOSE-UP — just eyes, or just hands gripping something.
+     Use for shock, focus, or micro-detail moments.
+     Keywords: "extreme close-up", "macro shot", "tight on the eyes",
+     "tight on the hands".
+
+  7. OVER-THE-SHOULDER — foreground shoulder frames the shot of the
+     subject. Use for conversations, reveals, watching someone from
+     behind. Always name whose shoulder is in the foreground.
+     Keywords: "over-the-shoulder shot", "OTS", "seen from over
+     the shoulder of", "foreground shoulder frames".
+
+  8. LOW ANGLE — camera below subject looking up. Makes the subject
+     powerful, heroic, threatening. Use for villain reveals, heroic
+     moments, monumental scale.
+     Keywords: "low angle", "from below", "looking up at", "worm's
+     eye view", "ground-level camera".
+
+  9. HIGH ANGLE — camera above looking down. Makes the subject
+     vulnerable, small, observed. Use for defeat, surveillance,
+     loneliness, or to show the character as one dot in a big world.
+     Keywords: "high angle", "from above", "looking down at", "bird's
+     eye view", "overhead shot".
+
+  10. DUTCH ANGLE / TILT — camera rolled. Use sparingly for tension,
+      madness, unease, dream sequences.
+      Keywords: "dutch angle", "tilted frame", "tilted camera", "rolled
+      horizon".
+
+SHOT ROTATION RULE: For a 10-scene story, aim for a distribution like:
+  1-2 extreme wide / wide
+  1-2 medium
+  1-2 medium close-up
+  1 close-up
+  1 over-the-shoulder or low/high angle
+  1-2 medium or wide for action moments
+No more than TWO close-ups in a row. No more than THREE medium shots
+in a row. If you find yourself writing "close-up portrait" twice,
+switch the next scene to a wide or over-the-shoulder.
+
+COMPOSITION (in addition to the shot type): name a foreground element
+(a tree trunk, a doorway, a weapon held close to the lens), a
+midground subject (the character), and a background element (distant
+mountains, a crowd, falling ash). This layered depth reads cinematic.
+Example: "wide shot, low angle, a rusted greatsword in the foreground
+out of focus, a lone warrior mid-stride in the center, distant
+burning city in the background haze".
+
 TONE GUIDE — match the narration and visual style to the requested tone:
 - dramatic:    weight on key moments, controlled intensity, never stage-acting
 - dark:        dread and shadow, slow deliberate pacing, longer pauses
@@ -346,7 +434,18 @@ Tone: {tone}{char_section}
 
 Generate exactly {num_scenes} scenes. Each scene MUST have a Narration field
 (voiceover text for TTS — 80-150 words, dramatic, present tense).
-Make each visual prompt detailed enough for AI image generation."""
+Make each visual prompt detailed enough for AI image generation.
+
+CRITICAL: For each scene, the Visual Prompt MUST start by naming ONE
+shot type from this list: extreme wide shot, wide shot, long shot,
+medium shot, medium close-up, close-up, extreme close-up,
+over-the-shoulder shot, low angle, high angle, or dutch angle.
+Do NOT default to "close-up portrait" or "head-and-shoulders".
+Rotate the shot types across the {num_scenes} scenes so the
+player feels cinematic, not a slideshow of mugshots. Aim for a
+mix dominated by wide and medium shots, with close-ups reserved
+for the most important emotional beats. See the SHOT VARIETY
+block in the system prompt for details and keywords."""
 
     response = call_llm(STORY_OUTLINE_SYSTEM, user_prompt)
     if not response:

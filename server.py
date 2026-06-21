@@ -1032,6 +1032,17 @@ def discover_generated_stories() -> list[dict]:
                         scene["audio_url"] = generated_asset_url(child.name, audio) if audio else None
                         subs = scene.get("subtitle_file", "")
                         scene["subtitle_url"] = generated_asset_url(child.name, subs) if subs else None
+                        # Load Whisper subtitle segments so the frontend
+                        # can sync captions to the actual audio timing
+                        # instead of approximating by character length.
+                        if subs:
+                            subs_path = child / subs
+                            if subs_path.exists():
+                                try:
+                                    with open(subs_path, "r", encoding="utf-8") as f:
+                                        scene["subtitle_segments"] = json.load(f)
+                                except (OSError, json.JSONDecodeError):
+                                    pass
                         # Rendered video + VTT sidecar (from render_video.py)
                         scene_key = scene.get("scene", "")
                         if scene_key:
