@@ -20,7 +20,7 @@ start.bat gpu1
 start.bat server
 ```
 
-If no ComfyUI worker is detected when the server starts, Fantasee auto-spawns a DirectML GPU worker on port `8189`.
+If no ComfyUI worker is detected when the server starts, Fantasee auto-spawns one DirectML GPU worker on port `8189`. Startup and first-run generation only require one healthy GPU worker; additional workers are optional throughput.
 
 ## Features
 
@@ -45,7 +45,7 @@ If no ComfyUI worker is detected when the server starts, Fantasee auto-spawns a 
 | `start.bat all` | Start gpu1, gpu2, and server |
 | `kill_workers.bat` | Kill Fantasee and ComfyUI worker processes on standard ports |
 
-For desktop responsiveness, prefer `gpu1 + server`. CPU workers are fallback workers and run below normal priority when launched by Fantasee scripts.
+For desktop responsiveness, prefer `gpu1 + server`. Start `gpu2`, `all`, or `max` only when you want extra throughput; Fantasee will use healthy extra workers when they are ready, but it will not wait on them before the first image. CPU workers are fallback workers and run below normal priority when launched by Fantasee scripts.
 
 ## ComfyUI Setup
 

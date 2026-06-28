@@ -292,17 +292,20 @@ img { display: block; max-width: 100%; }
 .hero {
   position: relative;
   width: 100%;
-  height: 80vh;
-  min-height: 500px;
-  max-height: 800px;
-  margin-bottom: -80px;
+  height: 78vh;
+  min-height: 540px;
+  max-height: 820px;
+  margin-bottom: -96px;
+  overflow: hidden;
 }
 .hero-backdrop {
   position: absolute;
-  inset: 0;
+  inset: -12px;
   background-size: cover;
-  background-position: center 20%;
+  background-position: center 34%;
   z-index: 0;
+  filter: saturate(1.08) contrast(1.05);
+  transform: scale(1.01);
 }
 .hero-backdrop::after {
   content: '';
@@ -311,9 +314,9 @@ img { display: block; max-width: 100%; }
   background: linear-gradient(
     0deg,
     #141414 0%,
-    rgba(20,20,20,0.7) 40%,
-    rgba(20,20,20,0.3) 70%,
-    rgba(20,20,20,0.1) 100%
+    rgba(20,20,20,0.88) 28%,
+    rgba(20,20,20,0.42) 62%,
+    rgba(20,20,20,0.12) 100%
   );
 }
 .hero-backdrop::before {
@@ -323,9 +326,9 @@ img { display: block; max-width: 100%; }
   background: linear-gradient(
     90deg,
     #141414 0%,
-    transparent 20%,
-    transparent 80%,
-    #141414 100%
+    rgba(20,20,20,0.82) 19%,
+    rgba(20,20,20,0.22) 47%,
+    rgba(20,20,20,0.42) 100%
   );
 }
 .hero-content {
@@ -335,8 +338,8 @@ img { display: block; max-width: 100%; }
   flex-direction: column;
   justify-content: flex-end;
   height: 100%;
-  padding: 0 var(--content-pad) 120px;
-  max-width: 720px;
+  padding: 0 var(--content-pad) 132px;
+  max-width: min(740px, 52vw);
 }
 .hero-badge {
   display: inline-flex;
@@ -353,12 +356,13 @@ img { display: block; max-width: 100%; }
   color: var(--success);
 }
 .hero-title {
-  font-size: clamp(36px, 5vw, 64px);
+  font-size: clamp(36px, 4.5vw, 60px);
   font-weight: 900;
   line-height: 1.05;
-  letter-spacing: -1.5px;
+  letter-spacing: 0;
   margin-bottom: 16px;
   text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  max-width: 100%;
 }
 .hero-meta {
   display: flex;
@@ -429,6 +433,20 @@ img { display: block; max-width: 100%; }
   filter: brightness(1.15);
   transform: scale(1.03);
 }
+.btn-primary:disabled,
+.btn-accent:disabled,
+.btn-secondary:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+  transform: none;
+}
+.btn-primary:disabled:hover,
+.btn-accent:disabled:hover,
+.btn-secondary:disabled:hover {
+  filter: grayscale(0.35);
+  transform: none;
+}
 .btn-secondary {
   padding: 12px 28px;
   background: rgba(255,255,255,0.1);
@@ -464,7 +482,9 @@ img { display: block; max-width: 100%; }
   position: relative;
   z-index: 2;
   margin-top: 0;
-  padding-bottom: 60px;
+  padding-bottom: 72px;
+  background:
+    linear-gradient(180deg, transparent 0, #141414 72px, #141414 100%);
 }
 .row {
   padding: 0 var(--content-pad);
@@ -476,6 +496,20 @@ img { display: block; max-width: 100%; }
   gap: 12px;
   margin-bottom: 16px;
 }
+.row-header-spacer { flex: 1; }
+.row-action {
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.12);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+}
+.row-action:hover {
+  background: rgba(255,255,255,0.2);
+  color: var(--text-primary);
+}
 .row-title {
   font-size: 20px;
   font-weight: 700;
@@ -485,6 +519,18 @@ img { display: block; max-width: 100%; }
   font-size: 13px;
   color: var(--text-muted);
   font-weight: 400;
+}
+.maintenance-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(255,165,0,0.92);
+  color: #151515;
+  font-size: 11px;
+  font-weight: 700;
 }
 .row-scroll {
   display: flex;
@@ -540,28 +586,61 @@ img { display: block; max-width: 100%; }
    STORY CARDS
    ══════════════════════════════════════════════════════════════════════ */
 .story-card {
-  flex: 0 0 280px;
+  flex: 0 0 300px;
   scroll-snap-align: start;
   border-radius: var(--radius-md);
   overflow: hidden;
   cursor: pointer;
-  transition: transform var(--transition), box-shadow var(--transition);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
   position: relative;
-  background: var(--bg-card);
+  background: #111;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 28px rgba(0,0,0,0.28);
 }
 .story-card:hover {
-  transform: scale(1.04);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 24px 55px rgba(0,0,0,0.55);
+  border-color: rgba(255,255,255,0.22);
 }
 .story-card-img {
   width: 100%;
-  aspect-ratio: 16/9;
+  height: 100%;
+  min-height: 212px;
+  aspect-ratio: 16/10;
   object-fit: cover;
   display: block;
   background: var(--bg-elevated);
+  transform: scale(1.01);
+  transition: transform 360ms ease, filter 360ms ease;
+  filter: saturate(1.04) contrast(1.04);
 }
 .story-card-img-wrap {
   position: relative;
+  height: 100%;
+  min-height: 212px;
+  overflow: hidden;
+}
+.story-card:hover .story-card-img {
+  transform: scale(1.075);
+  filter: saturate(1.14) contrast(1.08);
+}
+.story-card-img-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.12) 35%, rgba(0,0,0,0.86) 100%),
+    radial-gradient(circle at 18% 12%, rgba(255,255,255,0.12), transparent 34%);
+  pointer-events: none;
+}
+.story-card-empty-art {
+  width: 100%;
+  height: 100%;
+  min-height: 212px;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(229,9,20,0.28), transparent 36%),
+    radial-gradient(circle at 76% 30%, rgba(86,120,255,0.24), transparent 35%),
+    linear-gradient(135deg, #202033 0%, #111119 58%, #260f16 100%);
 }
 .resume-badge {
   position: absolute;
@@ -581,20 +660,36 @@ img { display: block; max-width: 100%; }
   opacity: 1;
 }
 .story-card-body {
-  padding: 12px 14px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 54px 15px 14px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.68) 58%, transparent 100%);
 }
 .story-card-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 5px;
+  white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.6);
 }
 .story-card-subtitle {
   font-size: 12px;
-  color: var(--text-muted);
-  margin-bottom: 6px;
+  line-height: 1.25;
+  color: rgba(255,255,255,0.74);
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .story-card-tags {
   display: flex;
@@ -604,19 +699,23 @@ img { display: block; max-width: 100%; }
 .story-card-tags span {
   font-size: 10px;
   padding: 2px 6px;
-  background: var(--bg-hover);
+  background: rgba(255,255,255,0.12);
   border-radius: var(--radius-sm);
-  color: var(--text-muted);
+  color: rgba(255,255,255,0.72);
+  backdrop-filter: blur(6px);
 }
 .story-card .card-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(0deg, rgba(0,0,0,0.6) 0%, transparent 50%);
+  z-index: 3;
+  background: linear-gradient(0deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.03) 55%);
   opacity: 0;
   transition: opacity var(--transition);
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
+  justify-content: flex-end;
   padding: 16px;
+  pointer-events: none;
 }
 .story-card:hover .card-overlay {
   opacity: 1;
@@ -624,17 +723,23 @@ img { display: block; max-width: 100%; }
 .card-overlay .play-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  gap: 0;
+  font-size: 0;
   font-weight: 600;
   color: #fff;
+  background: rgba(229, 9, 20, 0.95);
+  border-radius: 999px;
+  box-shadow: 0 10px 28px rgba(229,9,20,0.35);
 }
 .card-overlay .play-badge svg {
-  width: 24px;
-  height: 24px;
-  background: var(--accent);
+  width: 22px;
+  height: 22px;
+  background: transparent;
   border-radius: 50%;
-  padding: 4px;
+  padding: 3px;
 }
 
 /* Featured card (horizontal, wider) */
@@ -1423,8 +1528,8 @@ input.volume-slider.volume-slider-bg::-moz-range-thumb {
   position: absolute;
   /* Default vertical position is encoded as a translateY offset.
      With controls visible: shifted up so they sit above the scrubber.
-     With controls hidden: the .controls-hidden modifier flips to 0. */
-  bottom: clamp(80px, 15vh, 200px);
+     With controls hidden: the .controls-hidden modifier nudges them lower. */
+  bottom: clamp(34px, 8vh, 140px);
   left: 50%;
   --subtitle-y: 0px;
   transform: translate(-50%, var(--subtitle-y));
@@ -1453,30 +1558,20 @@ input.volume-slider.volume-slider-bg::-moz-range-thumb {
 
 /* Subtitles go lower when controls are hidden — clean cinematic look */
 .player-page.controls-hidden .player-subtitles {
-  --subtitle-y: calc(20px - clamp(80px, 15vh, 200px));
+  --subtitle-y: 18px;
+}
+
+/* In fullscreen, keep the captions a touch lower so they don't float
+   toward the middle of the frame. */
+.player-page:fullscreen .player-subtitles {
+  bottom: clamp(28px, 6vh, 120px);
+}
+.player-page:fullscreen.controls-hidden .player-subtitles {
+  --subtitle-y: 24px;
 }
 
 .player-subtitles.visible {
   opacity: 1;
-}
-.audio-indicator {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 10;
-  background: rgba(0,0,0,0.6);
-  border-radius: 20px;
-  padding: 6px 12px;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #fff;
-  pointer-events: none;
-  transition: opacity 0.3s;
-}
-.audio-indicator.muted {
-  opacity: 0.4;
 }
 .play-overlay {
   position: absolute;
@@ -1620,6 +1715,19 @@ input.volume-slider.volume-slider-bg::-moz-range-thumb {
   display: flex;
   justify-content: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Pulsing glow on the Continue button to draw attention */
+@keyframes creditsPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(229, 9, 20, 0.4); }
+  50%      { box-shadow: 0 0 20px 4px rgba(229, 9, 20, 0.25); }
+}
+#btn-credits-extend {
+  animation: creditsPulse 2.5s ease-in-out infinite;
+}
+#btn-credits-extend:hover {
+  animation: none;
 }
 
 @keyframes fadeIn {
@@ -2468,11 +2576,15 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   .navbar-links a.active::after { display: none; }
   .navbar-links a.active { color: var(--accent); }
   .hamburger { display: inline-flex; }
-  .hero-content { padding: 0 var(--content-pad-mobile) 80px; }
+  .hero-content { padding: 0 var(--content-pad-mobile) 96px; max-width: 92vw; }
   .hero-title { font-size: 28px; }
   .hero-meta { flex-wrap: wrap; }
   .row { padding: 0 var(--content-pad-mobile); }
   .story-card { flex: 0 0 200px; }
+  .story-card-img,
+  .story-card-img-wrap,
+  .story-card-empty-art { min-height: 178px; }
+  .story-card-body { padding: 48px 12px 12px; }
   .detail-content { padding: 0 var(--content-pad-mobile) 40px; }
   .detail-title { font-size: 28px; }
   .detail-close { right: var(--content-pad-mobile); top: 80px; }
@@ -2500,9 +2612,12 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
 /* Tablet: tighter padding, more comfortable grids */
 @media (min-width: 769px) and (max-width: 1100px) {
   .navbar, .row { padding-left: 32px; padding-right: 32px; }
-  .hero-content { padding-left: 32px; padding-right: 32px; }
+  .hero-content { padding-left: 32px; padding-right: 32px; max-width: 60vw; }
   .detail-content { padding-left: 32px; padding-right: 32px; max-width: 100%; }
   .story-card { flex: 0 0 240px; }
+  .story-card-img,
+  .story-card-img-wrap,
+  .story-card-empty-art { min-height: 190px; }
 }
 
 /* Landscape phones: hero shouldn't cover the navbar */
@@ -2695,19 +2810,8 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
       Back
     </button>
     <button type="button" class="player-create-btn" data-action="player-create" aria-label="Create a new story">+ Create</button>
-    <div class="player-progress">
-      <span id="player-progress-label" aria-live="polite">1 / 10</span>
-      <div class="player-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
-           aria-valuenow="10" aria-label="Story progress" id="player-progress-bar">
-        <div class="player-progress-fill" id="player-progress-fill" style="--pct: 0.1"></div>
-      </div>
-    </div>
   </div>
   <div class="player-image-container">
-    <!-- Audio status overlay -->
-    <div class="audio-indicator" id="audio-indicator" title="Audio status" aria-hidden="true">
-      <span id="audio-icon">🔊</span>
-    </div>
     <!-- Click-to-play overlay (shown when autoplay is blocked) -->
     <div class="play-overlay" id="play-overlay" data-action="play-click" style="display:none" role="button" tabindex="0" aria-label="Tap to start audio">
       <div class="play-overlay-icon" aria-hidden="true">▶</div>
@@ -2744,13 +2848,6 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
           <path d="M8 5v14l11-7z"/>
         </svg>
       </button>
-      <!-- Volume controls -->
-      <button type="button" class="player-btn" id="btn-volume" data-action="toggle-mute" aria-label="Mute" title="Mute / Unmute (M)">
-        <svg id="volume-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
-          <path d="M14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-        </svg>
-      </button>
       <input type="range" class="volume-slider" id="volume-slider" min="0" max="1" step="0.05" value="1"
              data-action="set-volume" aria-label="Volume" title="Volume">
       <input type="range" id="player-scrub" min="0" max="100" value="0"
@@ -2761,7 +2858,6 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
       <button type="button" class="player-btn" data-action="player-next" aria-label="Next scene">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
       </button>
-      <span class="player-btn-text" id="player-scene-counter" aria-live="polite">1 / 30</span>
       <button type="button" class="player-btn cc-btn" id="btn-cc" data-action="toggle-subs" aria-label="Enable subtitles" aria-pressed="true" title="Toggle subtitles (C)">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
           <rect x="2" y="5" width="20" height="14" rx="2"/>
@@ -2814,7 +2910,11 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
     <p class="credits-the-end">The End</p>
     <p class="credits-stats" id="credits-stats"></p>
     <div class="credits-actions">
-      <button type="button" class="btn-primary" data-action="credits-back">
+      <button type="button" class="btn-primary" id="btn-credits-extend" data-action="credits-extend">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Continue (+5 Scenes)
+      </button>
+      <button type="button" class="btn-secondary" data-action="credits-back">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         Back to Browse
       </button>
@@ -3292,7 +3392,12 @@ const API = {
     ]);
     const built = await builtRes.json();
     const gen = await genRes.json();
-    return [...(built.stories || []), ...(gen.stories || [])];
+    const byId = new Map();
+    for (const story of [...(built.stories || []), ...(gen.stories || [])]) {
+      if (!story || !story.id) continue;
+      byId.set(story.id, { ...(byId.get(story.id) || {}), ...story });
+    }
+    return sortStoriesNewest([...byId.values()]);
   },
   async fetchStory(id) {
     // Try pre-built first, then generated
@@ -3316,6 +3421,18 @@ const API = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
     });
+    return res.json();
+  },
+  async queueLibraryMaintenance(opts = {}) {
+    const res = await fetch('/api/library-maintenance/queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(opts),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
+    }
     return res.json();
   },
   async exportPlex(storyId, opts = {}) {
@@ -3362,18 +3479,58 @@ const ICONS = {
   info: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
 };
 
+function storySortValue(story) {
+  const numeric = Number(story?.sort_ts || story?.updated_at || story?.created_at || 0);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  const parsed = Date.parse(story?.updated_at || story?.created_at || story?.generated_at || '');
+  return Number.isFinite(parsed) ? parsed / 1000 : 0;
+}
+
+function sortStoriesNewest(stories) {
+  return [...(stories || [])].sort((a, b) => storySortValue(b) - storySortValue(a));
+}
+
+function incompleteStories(stories) {
+  return sortStoriesNewest((stories || []).filter(s => !(s.completion || {}).complete));
+}
+
+function maintenanceSummary(story) {
+  const missing = (story.completion || {}).missing || [];
+  if (!missing.length) return 'Needs completion';
+  const labels = {
+    story: 'story',
+    status: 'status',
+    story_text: 'text',
+    image: 'images',
+    audio: 'audio',
+    subtitles: 'subtitles',
+    scene_video: 'MP4',
+    full_video: 'full MP4',
+    plex: 'Plex',
+  };
+  return `Missing ${missing.slice(0, 3).map(k => labels[k] || k).join(', ')}`;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // HERO BANNER
 // ═══════════════════════════════════════════════════════════════════════
 
 /** Pick the first usable image URL from a story, or '' if none. Tries
- * hero_image, then scene image_urls, then scene image_filenames. */
+ * cover_image first so generated stories show their actual art instead of
+ * the placeholder title card, then falls back to hero/title assets. */
 function pickHeroImage(story) {
   if (!story) return '';
+  if (story.cover_image_url || story.cover_image) {
+    const ci = story.cover_image_url || story.cover_image;
+    if (ci.startsWith('http://') || ci.startsWith('https://')) return ci;
+    if (ci.startsWith('/')) return ci;
+    if (ci.includes('/')) return `/${ci}`;
+    return `/images/${ci}`;
+  }
   // The server now returns hero_image as a full URL (e.g. /generated/<id>/assets/...).
   // Use it directly if it starts with a slash.
-  if (story.hero_image) {
-    const hi = story.hero_image;
+  if (story.hero_image_url || story.hero_image) {
+    const hi = story.hero_image_url || story.hero_image;
     if (hi.startsWith('http://') || hi.startsWith('https://')) return hi;
     if (hi.startsWith('/')) return hi;
     if (hi.includes('/')) return `/${hi}`;
@@ -3393,7 +3550,28 @@ function pickHeroImage(story) {
       return `/generated/${story.id}/${s0.image_filenames[0]}`;
     }
   }
+  if (story.hero_image) {
+    const hi = story.hero_image;
+    if (hi.startsWith('http://') || hi.startsWith('https://')) return hi;
+    if (hi.startsWith('/')) return hi;
+    if (hi.includes('/')) return `/${hi}`;
+    return `/images/${hi}`;
+  }
   return '';
+}
+
+function pickStoryArt(story, offset = 0) {
+  if (!story) return '';
+  const art = story.scene_art_urls || story.sceneArtUrls || [];
+  if (art.length) return art[Math.min(offset, art.length - 1)];
+  return pickHeroImage(story);
+}
+
+function criticMatchPercent(story) {
+  const raw = Number(story?.critic_rating || 0);
+  if (raw > 0) return Math.round(raw <= 5 ? raw * 20 : raw);
+  const stars = Number(story?.critic_stars || 0);
+  return stars > 0 ? Math.round(stars * 20) : 0;
 }
 
 /** Choose the first story (from a list) that has any usable image URL. */
@@ -3408,6 +3586,48 @@ function pickFeaturedStory(stories) {
   return stories[0];
 }
 
+function storyCardMarkup(story, options = {}) {
+  const imgUrl = pickStoryArt(story, options.artOffset || 0);
+  const needsMaintenance = !(story.completion || {}).complete;
+  const savedIdx = getProgress(story.id);
+  const resumeBadge = savedIdx !== null
+    ? `<div class="resume-badge" aria-label="Resume at scene ${savedIdx + 1}">Resume Scene ${savedIdx + 1}</div>`
+    : '';
+  const tags = (story.tags || []).slice(0, 3).map(t => `<span>${escapeHtml(t)}</span>`).join('');
+  const subtitleBits = [
+    story.subtitle || story.description || '',
+    story.scene_count ? `${story.scene_count} scenes` : '',
+  ].filter(Boolean);
+  const artMarkup = imgUrl
+    ? `<img class="story-card-img" src="${escapeAttr(imgUrl)}" alt="${escapeAttr(story.title)}" loading="lazy" decoding="async" width="300" height="188"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+       <div class="story-card-empty-art" style="display:none"></div>`
+    : `<div class="story-card-empty-art"></div>`;
+
+  return `
+    <div class="story-card" data-action="open-detail" data-id="${escapeAttr(story.id)}" role="link" tabindex="0" title="${escapeAttr(story.title)}">
+      <div class="story-card-img-wrap">
+        ${artMarkup}
+        <div class="card-overlay">
+          <span class="play-badge">${ICONS.play} Play</span>
+        </div>
+        ${resumeBadge}
+        ${needsMaintenance ? `<div class="maintenance-badge">${escapeHtml(maintenanceSummary(story))}</div>` : ''}
+        <div class="story-card-body">
+          <div class="story-card-title">${escapeHtml(story.title)}</div>
+          <div class="story-card-subtitle">${escapeHtml(subtitleBits.join(' · '))}</div>
+          ${tags ? `<div class="story-card-tags">${tags}</div>` : ''}
+          ${story.critic_stars ? `
+          <div class="story-card-rating" aria-label="${story.critic_stars} of 5 stars">
+            <span class="stars" aria-hidden="true">${'★'.repeat(story.critic_stars)}${'☆'.repeat(5 - story.critic_stars)}</span>
+            ${story.critic_badge ? `<span class="badge ${story.critic_badge.toLowerCase().replace(/\s+/g, '-')}">${escapeHtml(story.critic_badge)}</span>` : ''}
+          </div>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderHero(story) {
   const container = document.getElementById('hero-container');
   if (!story) {
@@ -3415,6 +3635,10 @@ function renderHero(story) {
     return;
   }
   const heroUrl = pickHeroImage(story);
+  const heroKicker = (story.tags || []).slice(0, 2).join(' / ') || 'Generated story';
+  const heroDescription = story.description || (
+    story.subtitle && story.subtitle !== story.title ? story.subtitle : ''
+  );
   // When no image is available, use a Netflix-style gradient placeholder
   // (no background-image so the CSS-defined gradient shows through).
   const backdropStyle = heroUrl
@@ -3428,16 +3652,16 @@ function renderHero(story) {
       <div class="hero-backdrop" style="${backdropStyle}"></div>
       <div class="hero-content">
         <div class="hero-badge">
-          <span>${story.title}</span>
+          <span>${escapeHtml(heroKicker)}</span>
         </div>
-        <h1 class="hero-title">${story.subtitle || story.title}</h1>
+        <h1 class="hero-title">${escapeHtml(story.title)}</h1>
         <div class="hero-meta">
-          ${story.critic_stars ? `<span class="match">${(story.critic_rating || story.critic_stars * 20)}% Match</span>` : ''}
-          <span>${story.year || new Date().getFullYear()}</span>
-          ${(story.tags || []).slice(0, 3).map(t => `<span class="tag">${t}</span>`).join('')}
-          <span>${story.scene_count} Scenes</span>
+          ${criticMatchPercent(story) ? `<span class="match">${criticMatchPercent(story)}% Match</span>` : ''}
+          <span>${escapeHtml(story.year || new Date().getFullYear())}</span>
+          ${(story.tags || []).slice(0, 3).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}
+          <span>${escapeHtml(story.scene_count)} Scenes</span>
         </div>
-        <p class="hero-desc">${story.description || ''}</p>
+        <p class="hero-desc">${escapeHtml(heroDescription)}</p>
         <div class="hero-actions">
           <button class="btn-primary" data-action="open-scene" data-id="${story.id}" data-scene-idx="0">
             ${ICONS.play}
@@ -3458,6 +3682,7 @@ function renderHero(story) {
 // ═══════════════════════════════════════════════════════════════════════
 function renderCards(stories) {
   const container = document.getElementById('content-rows');
+  stories = sortStoriesNewest(stories);
   if (!stories.length) {
     container.innerHTML = `
       <div class="empty-state">
@@ -3470,6 +3695,31 @@ function renderCards(stories) {
   }
 
   let html = '';
+  const needsCompletion = incompleteStories(stories);
+
+  if (needsCompletion.length) {
+    html += `
+      <div class="row">
+        <div class="row-header">
+          <h2 class="row-title">Needs Completion</h2>
+          <span class="row-count">${needsCompletion.length} stories</span>
+          <span class="row-header-spacer"></span>
+          <button type="button" class="row-action" data-action="queue-library-maintenance">
+            Queue all
+          </button>
+        </div>
+        <div class="row-scroll-wrap">
+          <button class="row-scroll-arrow left" data-row="row-incomplete"
+                  data-action="scroll-row" data-dir="-1" aria-label="Scroll Needs Completion left">&#8249;</button>
+          <div class="row-scroll" id="row-scroll-row-incomplete">
+          ${needsCompletion.map((s, i) => storyCardMarkup(s, { artOffset: i % 3 })).join('')}
+          </div>
+          <button class="row-scroll-arrow right" data-row="row-incomplete"
+                  data-action="scroll-row" data-dir="1" aria-label="Scroll Needs Completion right">&#8250;</button>
+        </div>
+      </div>
+    `;
+  }
 
   // "Continue Watching" row — all stories
   html += `
@@ -3482,40 +3732,7 @@ function renderCards(stories) {
         <button class="row-scroll-arrow left" data-row="row-main"
                 data-action="scroll-row" data-dir="-1" aria-label="Scroll My Stories left">&#8249;</button>
         <div class="row-scroll" id="row-scroll-row-main">
-        ${stories.map(s => {
-          // Handle generated stories: hero_image may not exist, use first scene image
-          let imgUrl = '';
-          if (s.hero_image) {
-            // hero_image could be a full path (generated stories) or just a filename (pre-built)
-            imgUrl = pickHeroImage(s);
-          }
-          const savedIdx = getProgress(s.id);
-          const resumeBadge = savedIdx !== null ? `<div class="resume-badge" aria-label="Resume at scene ${savedIdx + 1}">Resume Scene ${savedIdx + 1}</div>` : '';
-          return `
-            <div class="story-card" data-action="open-detail" data-id="${s.id}" role="link" tabindex="0" title="${s.title}">
-              <div class="story-card-img-wrap">
-                <img class="story-card-img" src="${imgUrl}" alt="${s.title}" loading="lazy" decoding="async" width="280" height="158"
-                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                <div class="card-overlay" style="display:none;align-items:center;justify-content:center;background:var(--bg-elevated)">
-                  <span class="play-badge">${ICONS.play} ${s.title}</span>
-                </div>
-                ${resumeBadge}
-              </div>
-              <div class="story-card-body">
-                <div class="story-card-title">${s.title}</div>
-                <div class="story-card-subtitle">${s.subtitle || ''} &middot; ${s.scene_count} scenes</div>
-                <div class="story-card-tags">
-                  ${(s.tags || []).slice(0, 3).map(t => `<span>${t}</span>`).join('')}
-                </div>
-                ${s.critic_stars ? `
-                <div class="story-card-rating" aria-label="${s.critic_stars} of 5 stars">
-                  <span class="stars" aria-hidden="true">${'★'.repeat(s.critic_stars)}${'☆'.repeat(5 - s.critic_stars)}</span>
-                  ${s.critic_badge ? `<span class="badge ${s.critic_badge.toLowerCase().replace(/\s+/g, '-')}">${s.critic_badge}</span>` : ''}
-                </div>` : ''}
-              </div>
-            </div>
-          `;
-        }).join('')}
+        ${stories.map((s, i) => storyCardMarkup(s, { artOffset: i % 3 })).join('')}
         </div>
         <button class="row-scroll-arrow right" data-row="row-main"
                 data-action="scroll-row" data-dir="1" aria-label="Scroll My Stories right">&#8250;</button>
@@ -3547,28 +3764,7 @@ function renderCards(stories) {
           <button class="row-scroll-arrow left" data-row="${rowId}"
                   data-action="scroll-row" data-dir="-1" aria-label="Scroll ${tag} left">&#8249;</button>
           <div class="row-scroll" id="row-scroll-${rowId}">
-          ${tagStories.map(s => {
-            const imgUrl = s.hero_image
-              ? pickHeroImage(s)
-              : '';
-            return `
-              <div class="story-card" data-action="open-detail" data-id="${s.id}" role="link" tabindex="0">
-                <img class="story-card-img" src="${imgUrl}" alt="${s.title}" loading="lazy" decoding="async" width="280" height="158"
-                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-                <div class="card-overlay" style="display:none;align-items:center;justify-content:center;background:var(--bg-elevated)">
-                  <span class="play-badge">${ICONS.play} ${s.title}</span>
-                </div>
-                <div class="story-card-body">
-                  <div class="story-card-title">${s.title}</div>
-                  <div class="story-card-subtitle">${s.subtitle || ''}</div>
-                  ${s.critic_stars ? `
-                  <div class="story-card-rating" aria-label="${s.critic_stars} of 5 stars">
-                    <span class="stars" aria-hidden="true">${'★'.repeat(s.critic_stars)}${'☆'.repeat(5 - s.critic_stars)}</span>
-                  </div>` : ''}
-                </div>
-              </div>
-          `;
-        }).join('')}
+          ${tagStories.map((s, i) => storyCardMarkup(s, { artOffset: (i + 1) % 4 })).join('')}
           </div>
           <button class="row-scroll-arrow right" data-row="${rowId}"
                   data-action="scroll-row" data-dir="1" aria-label="Scroll ${tag} right">&#8250;</button>
@@ -3800,7 +3996,7 @@ async function openDetail(storyId) {
         </button>
       </div>
       <div class="detail-meta">
-        ${story.critic_stars ? `<span class="match">${(story.critic_rating || story.critic_stars * 20)}% Match</span>` : ''}
+        ${criticMatchPercent(story) ? `<span class="match">${criticMatchPercent(story)}% Match</span>` : ''}
         <span>${story.year || new Date().getFullYear()}</span>
         <span>${story.scene_count} Scenes</span>
         <span id="detail-duration"></span>
@@ -3954,8 +4150,18 @@ async function improveStory(storyId) {
     });
     if (res.ok) {
       const data = await res.json();
-      toast.success(`Improved ${data.improved_scenes.length} scenes. Render: ${data.render_ok ? '✓' : '✗'}`);
-      openDetail(storyId);
+      if (data.status === 'running' && data.task_id) {
+        prefillProgressPanel(data.task_id, `Improving: ${storyId}`, {
+          kind: 'improve',
+          story_id: storyId,
+          status: 'running',
+          message: data.message || 'Improvement started…',
+        });
+        toast.success('Improvement started in the background.');
+      } else {
+        toast.success(`Improved ${data.improved_scenes.length} scenes. Render: ${data.render_ok ? '✓' : '✗'}`);
+        openDetail(storyId);
+      }
     } else {
       const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
       toast.error(`Improve failed: ${err.detail}`);
@@ -4047,11 +4253,21 @@ async function improveLoop(storyId) {
     });
     if (res.ok) {
       const data = await res.json();
-      const msg = data.status === 'target_reached'
-        ? `Target reached in ${data.rounds_completed} rounds! Stars: ${data.final_stars}`
-        : `Completed ${data.rounds_completed} rounds. Stars: ${data.final_stars}, Rating: ${data.final_rating}`;
-      toast.warn(msg);
-      openDetail(storyId);
+      if (data.status === 'running' && data.task_id) {
+        prefillProgressPanel(data.task_id, `Improving: ${storyId}`, {
+          kind: 'improve_loop',
+          story_id: storyId,
+          status: 'running',
+          message: data.message || 'Improvement loop started…',
+        });
+        toast.success('Improvement loop started in the background.');
+      } else {
+        const msg = data.status === 'target_reached'
+          ? `Target reached in ${data.rounds_completed} rounds! Stars: ${data.final_stars}`
+          : `Completed ${data.rounds_completed} rounds. Stars: ${data.final_stars}, Rating: ${data.final_rating}`;
+        toast.warn(msg);
+        openDetail(storyId);
+      }
     } else {
       const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
       toast.error(`Improve loop failed: ${err.detail}`);
@@ -4220,8 +4436,21 @@ async function executeDeleteStory() {
       body: JSON.stringify({ confirm: true, backup }),
     });
     const data = await res.json();
-    if (!res.ok || data.status !== 'ok') {
+    if (!res.ok || !['ok', 'running'].includes(data.status)) {
       throw new Error(data.detail || data.error || 'Delete failed');
+    }
+    if (data.status === 'running' && data.task_id) {
+      showToast(`Deleting "${storyId}" in the background.`, 'success');
+      prefillProgressPanel(data.task_id, `Deleting ${storyId}`, {
+        kind: 'delete_story',
+        story_id: storyId,
+        message: data.message || 'Deleting story…',
+      });
+      setBusy(confirmBtn, false);
+      if (btn) setBusy(btn, false);
+      closeDeleteModal();
+      closeDetail();
+      return;
     }
     const sizeMb = (data.bytes_freed / 1024 / 1024).toFixed(1);
     const backupNote = data.backup_path ? ` (backup at ${data.backup_path})` : '';
@@ -4389,10 +4618,13 @@ async function confirmRepairStory(storyId, btn) {
     const plan = await res.json();
     _repairPlan = plan;
     const total = plan.scenes_to_repair || 0;
+    const blocked = plan.scenes_blocked || 0;
     summary.innerHTML = total === 0
-      ? `✓ All ${plan.scenes_checked} scene(s) look complete — nothing to repair.`
+      ? (blocked
+        ? `Found <b>${blocked}</b> scene(s) with corrupt story text. Use <b>Re-generate</b> to rebuild this story.`
+        : `✓ All ${plan.scenes_checked} scene(s) look complete — nothing to repair.`)
       : `Will regenerate assets for <b>${total}</b> scene(s) out of ${plan.scenes_checked}. ` +
-        `<span style="color:var(--text-muted)">${plan.scenes_already_complete} already complete.</span>`;
+        `<span style="color:var(--text-muted)">${plan.scenes_already_complete} already complete${blocked ? `, ${blocked} need re-generation` : ''}.</span>`;
     scenesEl.innerHTML = plan.scenes
       .filter(s => (s.actions || []).length > 0)
       .map(s => {
@@ -4401,7 +4633,11 @@ async function confirmRepairStory(storyId, btn) {
             ? '🖼️ image (looks like a near-duplicate of the previous scene)'
             : '🖼️ image (missing)';
           if (a === 'regen_tts') return '🔊 audio (missing or corrupt)';
+          if (a === 'regen_narration') return '🎙️ narration (missing)';
           if (a === 'regen_subs') return '💬 subtitles (missing)';
+          if (a === 'needs_regenerate') return '⚠️ story text is corrupt — use Re-generate';
+          if (a === 'needs_narration') return '⚠️ narration is missing — use Re-generate';
+          if (a === 'needs_prompt') return '⚠️ image prompt is missing — use Re-generate';
           return a;
         }).join(' · ');
         return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
@@ -4415,9 +4651,10 @@ async function confirmRepairStory(storyId, btn) {
     setBusy(confirmBtn, false);
     if (_repairPlan) {
       const total = _repairPlan.scenes_to_repair || 0;
+      const blocked = _repairPlan.scenes_blocked || 0;
       confirmBtn.disabled = total === 0;
       confirmBtn.textContent = total === 0
-        ? '🔧 Nothing to repair'
+        ? (blocked ? '🔧 Re-generate required' : '🔧 Nothing to repair')
         : `🔧 Repair ${total} scene${total === 1 ? '' : 's'}`;
     } else {
       confirmBtn.disabled = true;
@@ -4516,6 +4753,7 @@ async function openPlayer(storyId, sceneIndex) {
   }
   state.playerStory = story;
   state.playerIndex = Math.max(0, Math.min(sceneIndex, story.scenes.length - 1));
+  _KEN_LAST_EFFECT.value = null;  // Reset Ken Burns effect tracking for new story
   const playerPage = document.getElementById('player-page');
   playerPage.classList.add('active');
   // Initialize audio state
@@ -4541,6 +4779,11 @@ function closePlayer() {
   document.getElementById('player-page').classList.remove('active');
   document.getElementById('player-audio').pause();
   document.getElementById('player-audio').src = '';
+  // Stop image cycling
+  stopImageCycle();
+  // Reset image opacity (may have been set by cycling)
+  const img = document.getElementById('player-image');
+  if (img) { img.style.opacity = ''; img.style.transition = ''; }
   // Stop the background music too — it was synced to the narration
   // timeline so a stale loop would otherwise keep playing in the background
   // tab.
@@ -4554,10 +4797,17 @@ function closePlayer() {
 function updatePlayer() {
   const story = state.playerStory;
   if (!story) return;
+  // Stop any running image cycle from the previous scene
+  stopImageCycle();
   const scenes = story.scenes || [];
   const idx = state.playerIndex;
   const scene = scenes[idx];
   if (!scene) return;
+  // Reset image opacity (cleared by crossfade cycling)
+  const img0 = document.getElementById('player-image');
+  if (img0) { img0.style.opacity = ''; img0.style.transition = ''; }
+
+  const audioEl = document.getElementById('player-audio');
 
   // Handle both pre-built (image_filenames + /images/) and generated (image_urls) stories
   let imgUrl = '';
@@ -4589,7 +4839,7 @@ function updatePlayer() {
     // play the OUT animation on the current image, then fade the new one in.
     const onOutEnd = () => {
       img.removeEventListener('animationend', onOutEnd);
-      img.src = newSrc;
+      img.src = newSrc + (newSrc.includes('?') ? '&' : '?') + 't=' + Date.now();
       img.alt = scene.title ? `Scene ${idx + 1}: ${scene.title}` : `Scene ${idx + 1}`;
       // Clear out-class, apply in-class, kick off Ken Burns after the
       // in-class animation finishes (use a small delay to layer them).
@@ -4614,7 +4864,7 @@ function updatePlayer() {
       }, t[2] + 100);
     } else {
       // No OUT animation — just set the src and play the IN animation.
-      img.src = newSrc;
+      img.src = newSrc + (newSrc.includes('?') ? '&' : '?') + 't=' + Date.now();
       img.alt = scene.title ? `Scene ${idx + 1}: ${scene.title}` : `Scene ${idx + 1}`;
       for (const cls of ['scene-in-fade','scene-in-zoom','scene-in-slide-left','scene-in-slide-right','scene-in-focus-pull','scene-in-iris']) {
         img.classList.remove(cls);
@@ -4625,7 +4875,7 @@ function updatePlayer() {
       applyKenBurns(img);
     }
   } else {
-    img.src = newSrc;
+    img.src = newSrc + (newSrc.includes('?') ? '&' : '?') + 't=' + Date.now();
     img.alt = scene.title ? `Scene ${idx + 1}: ${scene.title}` : `Scene ${idx + 1}`;
   }
   // Update scene title card (cinematic overlay)
@@ -4681,7 +4931,6 @@ function updatePlayer() {
     // Compute timing once audio metadata is available. This is a
     // approximation — Whisper timestamps (the path above) are far
     // more accurate.
-    const audioEl = document.getElementById('player-audio');
     const onMeta = () => {
       timeweightSubtitleSegments(audioEl.duration);
       audioEl.removeEventListener('loadedmetadata', onMeta);
@@ -4697,26 +4946,17 @@ function updatePlayer() {
   // Apply subtitle visibility
   subEl.classList.toggle('visible', state.subtitlesOn);
 
-  document.getElementById('player-progress-label').textContent = `${idx + 1} / ${scenes.length}`;
   // Use --pct CSS variable so the transform: scaleX() bar animates on the
   // compositor instead of triggering layout via `width` changes.
-  const pct = scenes.length > 0 ? (idx + 1) / scenes.length : 0;
-  document.getElementById('player-progress-fill').style.setProperty('--pct', pct);
-  document.getElementById('player-scene-counter').textContent = `${idx + 1} / ${scenes.length}`;
-
   const scrub = document.getElementById('player-scrub');
   scrub.max = scenes.length - 1;
   scrub.value = idx;
 
   // Load and play audio for this scene
-  const audioIndicator = document.getElementById('audio-indicator');
-  const audioIcon = document.getElementById('audio-icon');
   const playOverlay = document.getElementById('play-overlay');
   if (scene.audio_file || scene.audio_url) {
     // Handle both pre-built (audio_file) and generated (audio_url) stories
     const audioSrc = scene.audio_url || `/audio/${scene.audio_file}`;
-    audioIndicator.style.display = 'flex';
-    audioIcon.textContent = '🔊';
     if (audioEl.src !== audioSrc) {
       state._sceneChanging = true; // Suppress pause → showControls during transition
       audioEl.pause();
@@ -4727,9 +4967,6 @@ function updatePlayer() {
       // this the play overlay gets stuck and the user can't proceed.
       audioEl.onerror = () => {
         audioEl.onerror = null;
-        audioIndicator.classList.add('muted');
-        audioIcon.textContent = '⚠';
-        audioIndicator.title = 'Audio unavailable for this scene';
         state._sceneChanging = false;
         playOverlay.style.display = 'none';
       };
@@ -4738,8 +4975,6 @@ function updatePlayer() {
         // Scene transition complete — allow pause event to show controls again
         setTimeout(() => { state._sceneChanging = false; }, 1000);
         playOverlay.style.display = 'none';
-        audioIndicator.classList.remove('muted');
-        audioIcon.textContent = '🔊';
         // Start (or keep playing) the background music in sync with the
         // narration. The background audio is looped, so we don't need to
         // reset currentTime on scene change — it should ride the timeline.
@@ -4749,8 +4984,6 @@ function updatePlayer() {
         setTimeout(() => { state._sceneChanging = false; }, 1000);
         // Autoplay blocked — let user tap
         playOverlay.style.display = 'flex';
-        audioIndicator.classList.add('muted');
-        audioIcon.textContent = '🔇';
         updatePlayIcon();
       });
     }
@@ -4758,12 +4991,13 @@ function updatePlayer() {
     audioEl.pause();
     audioEl.src = '';
     playOverlay.style.display = 'none';
-    audioIndicator.style.display = 'none';
-    audioIcon.textContent = '🔇';
     updatePlayIcon();
   }
   // Save viewing progress
   saveProgress(story.id, idx);
+  // Start image cycling for scenes with multiple images
+  const sceneDuration = scene.audio_duration || (audioEl.duration || 0);
+  startImageCycle(scene, sceneDuration);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -4863,13 +5097,9 @@ document.getElementById('player-audio').addEventListener('timeupdate', _coalesce
 function handlePlayClick() {
   const audioEl = document.getElementById('player-audio');
   const playOverlay = document.getElementById('play-overlay');
-  const audioIndicator = document.getElementById('audio-indicator');
-  const audioIcon = document.getElementById('audio-icon');
   if (audioEl.paused && audioEl.src) {
     audioEl.play().then(() => {
       playOverlay.style.display = 'none';
-      audioIndicator.classList.remove('muted');
-      audioIcon.textContent = '🔊';
       updatePlayIcon();
     }).catch(() => {
       // Still blocked — keep overlay visible
@@ -4920,6 +5150,8 @@ function showCredits() {
   document.getElementById('credits-subtitle').textContent = story.subtitle || '';
   document.getElementById('credits-stats').textContent = `${scenes.length} scenes`;
   document.getElementById('credits-overlay').classList.add('active');
+  // Stop image cycling
+  stopImageCycle();
   // Clear progress — story is complete
   clearProgress(story.id);
   // Pause any audio
@@ -4933,6 +5165,47 @@ function showCredits() {
 
 function closeCredits() {
   document.getElementById('credits-overlay').classList.remove('active');
+}
+
+// ── Extend from Credits (Continue +5 Scenes) ─────────────────────────
+async function creditsExtend() {
+  const story = state.playerStory;
+  if (!story || !story.id) return;
+  const btn = document.getElementById('btn-credits-extend');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Generating 5 new scenes…';
+  }
+  try {
+    const res = await fetch(`/api/stories/${story.id}/extend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenes: 5, images_per_scene: 2 }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      toast.success(`Added ${data.new_scenes_added} scenes! Total: ${data.total_scenes}.`);
+      // Reload the story into the player and jump to the first new scene
+      const updatedStory = await API.fetchStory(story.id);
+      if (updatedStory && updatedStory.scenes) {
+        state.playerStory = updatedStory;
+        const firstNewIdx = updatedStory.scenes.length - data.new_scenes_added;
+        state.playerIndex = Math.max(0, firstNewIdx);
+        closeCredits();
+        updatePlayer();
+      }
+    } else {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      toast.error(`Extend failed: ${err.detail}`);
+    }
+  } catch (e) {
+    toast.error(`Extend error: ${e.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Continue (+5 Scenes)`;
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -5143,7 +5416,6 @@ function handleVolumeWheel(e) {
   setVolume(newVol);
 }
 document.getElementById('volume-slider').addEventListener('wheel', handleVolumeWheel, { passive: false });
-document.getElementById('btn-volume').addEventListener('wheel', handleVolumeWheel, { passive: false });
 
 function toggleMute() {
   const audioEl = document.getElementById('player-audio');
@@ -5154,6 +5426,7 @@ function toggleMute() {
 
 function updateVolumeIcon() {
   const icon = document.getElementById('volume-icon');
+  if (!icon) return;
   if (state.muted || state.volume === 0) {
     // Muted icon — speaker with X
     icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/><line x1="22" y1="9" x2="17" y2="14" stroke="currentColor" stroke-width="1.5"/><line x1="17" y1="9" x2="22" y2="14" stroke="currentColor" stroke-width="1.5"/>';
@@ -5177,6 +5450,7 @@ const PLEX_STAGE_LABELS = {
   chapters:  'Building chapter markers',
   audio_mix: 'Mixing narration + background audio',
   finalize:  'Finalizing MP4',
+  plex_copy: 'Copying to Plex library',
   complete:  'Plex export complete',
   error:     'Plex export failed',
 };
@@ -5227,7 +5501,17 @@ async function exportPlexAction(storyId, btn) {
       `;
       showPlexProgressToast(finalHtml);
       if (done) {
-        toast.success('Plex export ready — click "Open Plex package" to download.');
+        // If the server copied the package to the user's Plex library,
+        // surface the destination so they know where to look.
+        const destDir = data.result && data.result.destination_dir;
+        const destErr = data.result && data.result.destination_error;
+        if (destDir) {
+          toast.success(`Plex export ready — copied to ${destDir}`);
+        } else if (destErr) {
+          toast.warn(`Plex export ready, but library copy failed: ${destErr}`);
+        } else {
+          toast.success('Plex export ready — click "Open Plex package" to download.');
+        }
         if (btn) setBusy(btn, false);
         // Refresh story cache so the new package shows up
         setTimeout(() => init(), 500);
@@ -5371,6 +5655,67 @@ function applyKenBurns(img) {
   const choice = filtered[Math.floor(Math.random() * filtered.length)];
   _KEN_LAST_EFFECT.value = choice;
   img.classList.add(choice);
+}
+
+// ── Image Cycle (multiple images per scene with Ken Burns) ──────
+// When a scene has multiple images, cycle through them with Ken Burns
+// effects and cinematic crossfades, dividing the scene's audio duration
+// evenly across the available images.
+const _imageCycle = { timer: null, index: 0, urls: [], interval: 0 };
+
+function stopImageCycle() {
+  if (_imageCycle.timer) { clearInterval(_imageCycle.timer); _imageCycle.timer = null; }
+  _imageCycle.index = 0;
+  _imageCycle.urls = [];
+  _imageCycle.interval = 0;
+}
+
+function startImageCycle(scene, audioDuration) {
+  stopImageCycle();
+  // Gather all image URLs for this scene
+  const urls = [];
+  if (scene.image_urls && scene.image_urls.length) {
+    urls.push(...scene.image_urls);
+  } else if (scene.image_filenames && scene.image_filenames.length) {
+    for (const fn of scene.image_filenames) urls.push(`/images/${fn}`);
+  }
+  if (urls.length <= 1) return; // nothing to cycle
+
+  _imageCycle.urls = urls;
+  _imageCycle.index = 0;
+  // Distribute across audio duration. Show each image at least 3s,
+  // max 8s. Shorter scenes get fewer cycles.
+  const minPerImage = 3;
+  const maxPerImage = 8;
+  let interval = Math.max(minPerImage, Math.min(maxPerImage, audioDuration / urls.length));
+  // If total cycle time exceeds audio, just use fewer images
+  const maxImages = Math.max(1, Math.floor(audioDuration / minPerImage));
+  const effectiveUrls = urls.slice(0, maxImages);
+  _imageCycle.urls = effectiveUrls;
+  interval = audioDuration / effectiveUrls.length;
+  _imageCycle.interval = interval * 1000; // ms
+
+  // Start after the initial image has been shown for one interval
+  _imageCycle.timer = setInterval(() => {
+    _imageCycle.index++;
+    if (_imageCycle.index >= _imageCycle.urls.length) {
+      stopImageCycle(); // done cycling
+      return;
+    }
+    const img = document.getElementById('player-image');
+    if (!img) return;
+    const newUrl = _imageCycle.urls[_imageCycle.index];
+    if (!newUrl) return;
+
+    // Crossfade transition for intra-scene cycling (softer than scene transitions)
+    img.style.transition = 'opacity 0.8s ease';
+    img.style.opacity = '0';
+    setTimeout(() => {
+      img.src = newUrl + (newUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
+      img.style.opacity = '1';
+      applyKenBurns(img);
+    }, 800);
+  }, _imageCycle.interval);
 }
 
 // ── Cinematic overlays ─────────────────────────────────────────
@@ -5999,6 +6344,10 @@ function escapeHtml(s) {
   }[c]));
 }
 
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/`/g, '&#96;');
+}
+
 function updateProgressDisplay() {
   const list = document.getElementById('progress-list');
   if (!state.tasks.length) {
@@ -6010,17 +6359,23 @@ function updateProgressDisplay() {
     return;
   }
   // Group sub-tasks under their parent queue
-  const queueTasks = state.tasks.filter(t => (t.kind === 'queue' || t.id?.startsWith('q-')));
+  const isQueueTask = (t) => (
+    t.kind === 'queue'
+    || t.kind === 'library_maintenance'
+    || t.id?.startsWith('q-')
+    || t.id?.startsWith('library-')
+  );
+  const queueTasks = state.tasks.filter(isQueueTask);
   const subTasks = state.tasks.filter(t => t.parent);
   const topLevel = state.tasks.filter(t =>
-    !t.parent && !(t.kind === 'queue' || t.id?.startsWith('q-'))
+    !t.parent && !isQueueTask(t)
   );
   const childrenOf = (parentId) => subTasks.filter(t => t.parent === parentId);
 
   const renderItem = (t, isChild = false) => {
     const statusClass = t.status === 'running' ? 'running' : t.status === 'done' ? 'done' : t.status === 'error' ? 'error' : 'queued';
     const pct = Math.round((t.progress || 0) * 100);
-    const isQueue = t.kind === 'queue' || t.id?.startsWith('q-');
+    const isQueue = isQueueTask(t);
     const bar = isQueue
       ? `<div class="progress-bar-outer" style="margin-top:4px"><div class="progress-bar-inner" style="width:${pct}%"></div></div>`
       : '';
@@ -6031,7 +6386,7 @@ function updateProgressDisplay() {
     // Prefer the resolved story title; fall back to a preview of the
     // concept; finally use a short id. Never show "undefined".
     const title = isQueue
-      ? 'Generation queue'
+      ? (t.kind === 'library_maintenance' ? 'Library maintenance' : 'Generation queue')
       : (t.title || t.concept || `Task ${(t.id || '').slice(0, 6) || '—'}`);
     return `
       <div class="progress-item ${isChild ? 'progress-item-child-row' : ''}">
@@ -6088,6 +6443,27 @@ const toast = {
   info:    (msg, opts) => showToast(msg, 'info',    opts),
 };
 
+async function queueLibraryMaintenance(el) {
+  setBusy(el, true, 'Queueing...');
+  try {
+    const result = await API.queueLibraryMaintenance({ include_failed: true });
+    if (result.status === 'done' || !result.count) {
+      toast.success(result.message || 'All stories are complete.');
+      return;
+    }
+    toast.success(`Queued ${result.count} incomplete stor${result.count === 1 ? 'y' : 'ies'} for maintenance.`);
+    prefillProgressPanel(result.task_id, 'Library maintenance', {
+      kind: 'library_maintenance',
+      item_count: result.count,
+      message: result.message || 'Library maintenance queued',
+    });
+  } catch (e) {
+    toast.error(`Maintenance queue failed: ${e.message || e}`);
+  } finally {
+    setBusy(el, false);
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // DELEGATED CLICK HANDLER — data-action="..." routing
 // One listener on document routes every interactive element by its
@@ -6104,6 +6480,7 @@ const ACTION_HANDLERS = {
     el.setAttribute('aria-expanded', String(open));
   },
   'open-create':    () => openCreateModal(),
+  'queue-library-maintenance': (el) => queueLibraryMaintenance(el),
   'close-create':   () => closeCreateModal(),
   'open-workers':   () => openWorkersModal(),
   'close-workers':  () => closeWorkersModal(),
@@ -6118,6 +6495,7 @@ const ACTION_HANDLERS = {
   'toggle-subs':    (el) => { toggleSubtitles(); updateCcButton(el); },
   'toggle-fullscreen': () => toggleFullscreen(),
   'credits-back':   () => { closeCredits(); closePlayer(); },
+  'credits-extend': () => creditsExtend(),
   'mode-single':    (el) => setCreateMode('single', el),
   'mode-queue':     (el) => setCreateMode('queue', el),
   'add-queue-item': () => addQueueItem(),
@@ -6290,6 +6668,48 @@ function connectWebSocket() {
         }
         if (data.message && data.message.includes('Title slide ready')) {
           setTimeout(() => init(), 250);
+        }
+        if (data.kind === 'delete_story' && data.status === 'done') {
+          const sid = data.story_id;
+          const report = data.result || {};
+          const sizeMb = ((report.bytes_freed || 0) / 1024 / 1024).toFixed(1);
+          toast.success(`Deleted "${sid}" — ${report.files_deleted || 0} files, ${sizeMb} MB`);
+          if (state.currentDetail && state.currentDetail.id === sid) closeDetail();
+          try {
+            const all = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+            if (sid in all) {
+              delete all[sid];
+              localStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
+            }
+          } catch (e) {}
+          setTimeout(() => init(), 250);
+        } else if (data.kind === 'delete_story' && data.status === 'error') {
+          toast.error(data.message || `Delete failed for ${data.story_id}`);
+          setTimeout(() => init(), 250);
+        } else if ((data.kind === 'improve' || data.kind === 'improve_loop') && data.status === 'done') {
+          const sid = data.story_id;
+          const result = data.result || {};
+          if (data.kind === 'improve') {
+            const count = (result.improved_scenes || []).length;
+            toast.success(`Improved ${count} scene${count === 1 ? '' : 's'}.`);
+          } else if (result.status === 'target_reached') {
+            toast.success(`Improvement target reached: ${result.final_stars || 0} stars.`);
+          } else {
+            toast.success(`Improvement loop complete: ${result.final_stars || 0} stars.`);
+          }
+          if (state.currentDetail && state.currentDetail.id === sid) {
+            setTimeout(() => openDetail(sid), 250);
+          } else {
+            setTimeout(() => init(), 250);
+          }
+        } else if ((data.kind === 'improve' || data.kind === 'improve_loop') && data.status === 'error') {
+          toast.error(data.message || `Improvement failed for ${data.story_id}`);
+        } else if (data.kind === 'library_maintenance' && data.status === 'done') {
+          toast.success(data.message || 'Library maintenance complete.');
+          setTimeout(() => init(), 500);
+        } else if (data.kind === 'library_maintenance' && data.status === 'error') {
+          toast.error(data.message || 'Library maintenance failed.');
+          setTimeout(() => init(), 500);
         }
       }
     } catch (e) {

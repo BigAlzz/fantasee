@@ -18,6 +18,7 @@ import html
 import json
 import os
 import re
+import warnings
 import sys
 import time
 import traceback
@@ -25,8 +26,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import requests
 from story_storage import STORIES_ROOT, ensure_story_layout
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import requests
 
 # ── Config ─────────────────────────────────────────────────────────────
 OUTPUTS = STORIES_ROOT
@@ -89,7 +93,7 @@ def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str
             {"role": "user", "content": prompt},
         ],
         "temperature": temperature,
-        "max_tokens": 4096,
+        "max_completion_tokens": 4096,
     }
     for attempt in range(3):
         try:
@@ -158,6 +162,153 @@ def _clean_narration_field(text: str) -> str:
     # Collapse repeated whitespace
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
+
+
+_SCENE_HEADER_RE = re.compile(
+    r"""
+    ^\s*
+    (?:[-*#>`\s]*\s*)?
+    (?:
+        ---\s*scene\s*(?P<n1>\d+)\b(?P<rest1>.*) |
+        scene\s*(?P<n2>\d+)\b(?P<rest2>.*) |
+        scn\s*(?P<n3>\d+)\b(?P<rest3>.*) |
+        (?P<n4>\d+)\s*[\).\:-]\s*(?P<rest4>.+)
+    )
+    \s*$
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+_FIELD_RE = re.compile(
+    r"^(?:[-*]\s*)?(?:\*\*)?\s*"
+    r"(title|visual\s+prompt|prompt|narrative|narration)"
+    r"\s*:\s*(.*?)\s*(?:\*\*)?\s*$",
+    re.IGNORECASE,
+)
+
+
+def _strip_md_wrap(text: str) -> str:
+    """Remove common markdown wrappers from a field value."""
+    text = (text or "").strip()
+    text = re.sub(r"^\*{1,3}\s*", "", text)
+    text = re.sub(r"\s*\*{1,3}$", "", text)
+    return text.strip()
+
+
+def _title_from_scene_header(match: re.Match) -> str:
+    """Extract an inline title from a scene heading, if the LLM supplied one."""
+    rest = ""
+    for name in ("rest1", "rest2", "rest3", "rest4"):
+        rest = (match.group(name) or "").strip()
+        if rest:
+            break
+    rest = _strip_md_wrap(rest.lstrip(":.-").strip())
+    if not rest:
+        return ""
+    title_match = _FIELD_RE.match(rest)
+    if title_match and title_match.group(1).lower() == "title":
+        return _strip_md_wrap(title_match.group(2))
+    rest = re.sub(r"^(?:scene\s*\d+\b\s*)", "", rest, flags=re.IGNORECASE).strip(" :-")
+    return _strip_md_wrap(rest)
+
+
+def _has_scene_content(scene: dict) -> bool:
+    """Return True when a parsed scene has real labeled content."""
+    content = " ".join((scene.get("prompt", ""), scene.get("narrative", ""), scene.get("narration", ""))).strip()
+    if not content:
+        return False
+    if re.fullmatch(r"[-=_#*\s]+", content):
+        return False
+    return True
+
+
+def parse_scene_response(response: str, expected_scenes: int = 0) -> list[dict]:
+    """Parse a MiMo scene-outline response into scene dictionaries."""
+    if not response:
+        return []
+
+    scenes: list[dict] = []
+    current: Optional[dict] = None
+    last_field: Optional[str] = None
+    saw_scene_header = False
+
+    def _new_scene() -> dict:
+        return {"title": "", "prompt": "", "narrative": "", "narration": ""}
+
+    for raw_line in response.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("```"):
+            continue
+
+        header_match = _SCENE_HEADER_RE.match(line)
+        if header_match:
+            saw_scene_header = True
+            if current:
+                scenes.append(current)
+            current = _new_scene()
+            current["title"] = _title_from_scene_header(header_match)
+            last_field = None
+            continue
+
+        if current is None:
+            continue
+
+        field_match = _FIELD_RE.match(line)
+        if field_match:
+            field_name = field_match.group(1).lower().replace(" ", "_")
+            field_value = _strip_md_wrap(field_match.group(2))
+            if field_name == "visual_prompt":
+                field_name = "prompt"
+            current[field_name] = field_value
+            last_field = field_name
+            continue
+
+        if re.match(r"^(?:---+|===+)\s*$", line):
+            continue
+
+        if last_field == "narration":
+            current["narration"] = (current["narration"] + " " + line).strip()
+        elif last_field == "narrative":
+            current["narrative"] = (current["narrative"] + " " + line).strip()
+        elif last_field == "prompt":
+            current["prompt"] = (current["prompt"] + " " + line).strip()
+        elif current["narration"]:
+            current["narration"] = (current["narration"] + " " + line).strip()
+        elif current["narrative"]:
+            current["narrative"] = (current["narrative"] + " " + line).strip()
+        elif current["prompt"]:
+            current["prompt"] = (current["prompt"] + " " + line).strip()
+
+    if current:
+        scenes.append(current)
+
+    scenes = [scene for scene in scenes if _has_scene_content(scene)]
+
+    if not scenes and not saw_scene_header:
+        paragraphs = [p.strip() for p in response.split("\n\n") if p.strip()]
+        limit = expected_scenes or len(paragraphs)
+        for i, p in enumerate(paragraphs[:limit]):
+            scenes.append({
+                "title": f"Scene {i + 1}",
+                "prompt": p,
+                "narrative": p[:200],
+                "narration": p,
+            })
+
+    for scene in scenes:
+        scene["title"] = _strip_md_wrap(scene.get("title", ""))
+        scene["prompt"] = _strip_md_wrap(scene.get("prompt", ""))
+        scene["narrative"] = _strip_md_wrap(scene.get("narrative", ""))
+        scene["narration"] = _clean_narration_field(scene.get("narration", ""))
+        if not scene.get("prompt") or len(scene["prompt"]) < 20:
+            scene["prompt"] = scene.get("narrative", scene.get("title", ""))
+        if not scene.get("narration"):
+            scene["narration"] = scene.get("narrative", scene.get("title", ""))
+
+    if expected_scenes and len(scenes) > expected_scenes:
+        scenes = scenes[:expected_scenes]
+
+    return scenes
 
 
 STORY_OUTLINE_SYSTEM = """You are a creative writing assistant specializing in visual storytelling.
@@ -447,83 +598,34 @@ mix dominated by wide and medium shots, with close-ups reserved
 for the most important emotional beats. See the SHOT VARIETY
 block in the system prompt for details and keywords."""
 
-    response = call_llm(STORY_OUTLINE_SYSTEM, user_prompt)
-    if not response:
-        return None
-
-    # Parse the response into structured scenes
     scenes = []
-    current = None
-    for line in response.strip().split("\n"):
-        line = line.strip()
-        if re.match(r"^---\s*SCENE\s*(\d+)", line, re.IGNORECASE):
-            if current:
-                scenes.append(current)
-            current = {"title": "", "prompt": "", "narrative": "", "narration": ""}
-        elif current:
-            low = line.lower()
-            if low.startswith("title:"):
-                current["title"] = line.split(":", 1)[1].strip()
-            elif low.startswith("visual prompt:"):
-                current["prompt"] = line.split(":", 1)[1].strip()
-            elif low.startswith("narrative:"):
-                current["narrative"] = line.split(":", 1)[1].strip()
-            elif low.startswith("narration:"):
-                current["narration"] = line.split(":", 1)[1].strip()
-            elif re.match(r"^(visual\s+prompt|narrative|narration|title)\s*:", low):
-                # New field starting with a known prefix but slight variation
-                # (e.g. "Visual Prompt:" with extra space). Treat as new field
-                # by checking which field it is.
-                if low.startswith("visual"):
-                    current["prompt"] = line.split(":", 1)[1].strip()
-                elif low.startswith("narrative"):
-                    current["narrative"] = line.split(":", 1)[1].strip()
-                elif low.startswith("narration"):
-                    current["narration"] = line.split(":", 1)[1].strip()
-                elif low.startswith("title"):
-                    current["title"] = line.split(":", 1)[1].strip()
-            elif low.startswith("---") or low.startswith("===") or low.startswith("scene"):
-                # Skip section dividers and stray "Scene N" markers
-                continue
-            else:
-                # Append continuation. Check that the line doesn't look like
-                # the start of a new field or navigation/metadata that leaked
-                # into the LLM output.
-                if not line:
-                    continue
-                if current["narration"]:
-                    current["narration"] += " " + line
-                elif current["narrative"]:
-                    current["narrative"] += " " + line
-                elif current["prompt"]:
-                    current["prompt"] += " " + line
+    response = ""
+    for attempt in range(2):
+        prompt = user_prompt
+        if attempt:
+            prompt += (
+                "\n\nYour previous response could not be parsed into the requested "
+                f"{num_scenes} complete scenes. Return exactly {num_scenes} scenes, "
+                "using the specified labels exactly: Title, Visual Prompt, Narrative, Narration."
+            )
+        response = call_llm(STORY_OUTLINE_SYSTEM, prompt)
+        if not response:
+            continue
+        scenes = parse_scene_response(response, expected_scenes=num_scenes)
+        if len(scenes) == num_scenes:
+            break
+        emit(
+            "running",
+            f"Scene parser found {len(scenes)}/{num_scenes} complete scenes; retrying outline...",
+            0.12,
+        )
 
-    if current:
-        scenes.append(current)
-
-    # Clean up narration text — strip leaked field labels and metadata
-    # that sometimes bleed through from the LLM output (e.g. "Navigation:",
-    # "Visual Prompt:", or stray "Scene N" markers that the parser missed).
-    for s in scenes:
-        s["narration"] = _clean_narration_field(s.get("narration", ""))
-
-    # Ensure every scene has a prompt and narration
-    for s in scenes:
-        if not s["prompt"] or len(s["prompt"]) < 20:
-            s["prompt"] = s.get("narrative", s["title"])
-        if not s["narration"]:
-            s["narration"] = s.get("narrative", s["title"])
-
-    if not scenes:
-        # Fallback: parse as paragraphs
-        paragraphs = [p.strip() for p in response.split("\n\n") if p.strip()]
-        for i, p in enumerate(paragraphs[:num_scenes]):
-            scenes.append({
-                "title": f"Scene {i + 1}",
-                "prompt": p,
-                "narrative": p[:200],
-                "narration": p,
-            })
+    if len(scenes) != num_scenes:
+        emit(
+            "error",
+            f"Could not parse {num_scenes} complete scenes from the LLM response.",
+        )
+        return None
 
     emit("running", f"Generated {len(scenes)} scenes with narration.", 0.15)
     return scenes
@@ -872,7 +974,7 @@ Be evocative but concise."""
         scene_num = i + 1
         padded = f"{scene_num:02d}"
         safe_title = re.sub(r'[^a-zA-Z0-9]+', '_', scene["title"]).strip("_")[:30]
-        seed = hash(story_id + str(scene_num)) % (2**32 - 1)
+        seed = int(hashlib.md5(f"{story_id}{scene_num}".encode()).hexdigest()[:8], 16) % (2**32 - 1)
 
         s = {
             "scene": padded,
@@ -921,7 +1023,7 @@ Be evocative but concise."""
             scene_num = i + 1
             padded = f"{scene_num:02d}"
             safe_title = re.sub(r'[^a-zA-Z0-9]+', '_', scene["title"]).strip("_")[:30]
-            seed = hash(story_id + str(scene_num)) % (2**32 - 1)
+            seed = int(hashlib.md5(f"{story_id}{scene_num}".encode()).hexdigest()[:8], 16) % (2**32 - 1)
             s = output_scenes[i]
 
             img_progress = 0.15 + (i * 0.35 / max(len(scenes), 1))

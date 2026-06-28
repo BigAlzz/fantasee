@@ -162,10 +162,21 @@ def build_track_index(background_dir: Path = BACKGROUND_DIR) -> list[BackgroundT
     """Build a stable index of background tracks with metadata.
 
     Cached internally per-directory so repeated lookups are cheap.
+    Cache is invalidated when the directory modification time changes.
     """
     cache_attr = f"_index_cache_{background_dir}"
+    mtime_attr = f"_index_mtime_{background_dir}"
+    
+    # Check if directory has been modified since last cache
+    try:
+        current_mtime = background_dir.stat().st_mtime
+    except OSError:
+        current_mtime = 0.0
+    
+    cached_mtime = getattr(build_track_index, mtime_attr, 0.0)
     cached = getattr(build_track_index, cache_attr, None)
-    if cached is not None:
+    
+    if cached is not None and current_mtime == cached_mtime:
         return cached
 
     tracks: list[BackgroundTrack] = []
@@ -177,6 +188,7 @@ def build_track_index(background_dir: Path = BACKGROUND_DIR) -> list[BackgroundT
             tags=_tags_for_filename(p.stem),
         ))
     setattr(build_track_index, cache_attr, tracks)
+    setattr(build_track_index, mtime_attr, current_mtime)
     return tracks
 
 

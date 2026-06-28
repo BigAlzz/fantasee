@@ -427,6 +427,7 @@ def generate_tts_batch(
     output_dir: str,
     story_id: str,
     voice: str = DEFAULT_VOICE,
+    tone: str = "",
     filename_pattern: str = "tts_{story_id}_s{scene_num:02d}.wav",
 ) -> dict:
     """Generate TTS audio for multiple scenes.
@@ -456,7 +457,7 @@ def generate_tts_batch(
             continue
 
         print(f"  [TTS] Scene {i + 1}/{total}: {scene.get('title', f'Scene {i + 1}')}...", file=sys.stderr)
-        ok = generate_tts(text, str(filepath), voice=voice)
+        ok = generate_tts(text, str(filepath), voice=voice, tone=tone)
         if ok:
             scene_audios[str(i)] = filename
             print(f"    ✓ Saved {filename}", file=sys.stderr)

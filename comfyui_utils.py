@@ -3,6 +3,7 @@ ComfyUI Utils — Health check, workflow injection, and image generation
 for Fantasee's local ComfyUI instance (AMD DirectML).
 """
 
+import hashlib
 import json
 import os
 import re
@@ -266,12 +267,10 @@ def wait_for_ready(timeout: int = 120) -> bool:
 
 # ── Worker Pool / Auto-spawn Supervisor ────────────────────────────────
 #
-# If only one ComfyUI worker is configured (or none is, and we discover
-# the GPU one on 8188), we auto-spawn a CPU-only ComfyUI on a second
-# port so the parallel image generator has 2 workers. CPU is ~5-10x
-# slower per image than GPU, but for batch story generation the
-# throughput is still 1.5-1.8x what a single GPU gives, and the
-# smaller 896x512 resolution keeps CPU latency reasonable.
+# A single healthy GPU worker is enough for startup and first-run image
+# generation. Extra workers are optional throughput capacity: configured
+# workers are used when they are healthy, and the explicit worker-spawn
+# endpoint can still request a second worker.
 #
 # Disable with FANTASEE_AUTO_SPAWN_CPU=0.
 # Override CPU port with COMFYUI_CPU_PORT=8189.
@@ -362,6 +361,7 @@ def _spawn_cpu_comfyui(port: int) -> Optional[subprocess.Popen]:
           file=sys.stderr)
     try:
         proc = subprocess.Popen(**kwargs)
+        log_fh.close()  # Close the file handle — Popen keeps its own dup
         _cpu_process = proc
         # Register this URL as a GPU worker so the picker treats it
         # as the preferred target. (Function/variable name kept
@@ -402,7 +402,7 @@ def _kill_cpu_comfyui() -> None:
         print(f"[comfyui_utils] CPU kill failed: {e}", file=sys.stderr)
 
 
-def ensure_workers(min_workers: int = 2, wait_for_spawn: bool = False,
+def ensure_workers(min_workers: int = 1, wait_for_spawn: bool = False,
                    wait_timeout: int = 90) -> list[str]:
     """Make sure at least `min_workers` ComfyUI workers are available.
 
@@ -415,17 +415,18 @@ def ensure_workers(min_workers: int = 2, wait_for_spawn: bool = False,
        the workers were still booting.
     2. Otherwise, probe the default GPU ComfyUI on 8188. If running, use it.
     3. If fewer than `min_workers` are present AND FANTASEE_AUTO_SPAWN_CPU is
-       not "0", auto-spawn a CPU-only ComfyUI on a second port and add it.
+       not "0", auto-spawn a DirectML GPU ComfyUI on the fallback port and add it.
     4. Updates the COMFYUI_URLS env var with whatever we ended up with.
 
     Set wait_for_spawn=True to block up to wait_timeout seconds for the
-    spawned worker to come up (otherwise the first call returns the
-    pre-spawn worker list and the spawn happens in the background).
+    required worker count to come up. Optional extra workers are not required
+    for readiness; callers should filter to healthy workers before dispatch.
     """
     global _cpu_spawn_attempted
 
+    explicit_urls = os.environ.get("COMFYUI_URLS", "").strip()
     existing = _comfyui_bases()
-    if len(existing) >= min_workers:
+    if explicit_urls and len(existing) >= min_workers:
         # User configured enough workers via env. Verify they're reachable
         # before returning, so the very first call after start-max.bat
         # doesn't fire image jobs into a half-booted worker. If
@@ -450,20 +451,20 @@ def ensure_workers(min_workers: int = 2, wait_for_spawn: bool = False,
             )
         return existing
 
-    # Auto-discover
+    # Auto-discover actual local workers. The default 8188 URL is only a
+    # fallback address, not proof that a worker exists.
     discovered: list[str] = []
     gpu = is_running_at(COMFYUI_BASE)
     if gpu["running"]:
         discovered.append(COMFYUI_BASE)
-        # If we need more workers, also probe the next port in case one
-        # is already running there.
-        if min_workers >= 2:
-            for probe_port in (8189, 8190, 8191):
-                probe = is_running_at(f"http://127.0.0.1:{probe_port}")
-                if probe["running"]:
-                    discovered.append(f"http://127.0.0.1:{probe_port}")
-                    if len(discovered) >= min_workers:
-                        break
+        # Opportunistically discover optional local workers for throughput,
+        # but use a short timeout so a missing second worker never delays
+        # first-run generation.
+        for probe_port in (8189, 8190, 8191):
+            probe_url = f"http://127.0.0.1:{probe_port}"
+            probe = is_running_at(probe_url, timeout=0.5)
+            if probe["running"]:
+                discovered.append(probe_url)
 
     # If we discovered any worker on a non-default port and didn't already
     # know its kind, mark it as GPU (we only auto-spawn CPU on 8189+,
@@ -475,7 +476,7 @@ def ensure_workers(min_workers: int = 2, wait_for_spawn: bool = False,
         os.environ["COMFYUI_URLS"] = ",".join(discovered)
         return discovered
 
-    # Auto-spawn CPU worker if we still need more
+    # Auto-spawn fallback worker if we still need more.
     if len(discovered) < min_workers:
         with _cpu_lock:
             if not _cpu_spawn_attempted:
@@ -494,7 +495,7 @@ def ensure_workers(min_workers: int = 2, wait_for_spawn: bool = False,
                 discovered.append(cpu_url)
                 break
             time.sleep(1.5)
-    elif is_running_at(cpu_url)["running"]:
+    elif cpu_url not in discovered and is_running_at(cpu_url)["running"]:
         discovered.append(cpu_url)
 
     os.environ["COMFYUI_URLS"] = ",".join(discovered)
@@ -818,10 +819,10 @@ def generate_image(
     Returns:
         Output filename on success, None on failure.
     """
-    # Auto-spawn a CPU ComfyUI worker if we don't already have at least 2
-    # workers configured/running. This is a no-op if COMFYUI_URLS is set or
-    # a CPU worker is already up.
-    ensure_workers(min_workers=2, wait_for_spawn=False)
+    # Ensure at least one worker is known. A single healthy GPU is sufficient
+    # for first-run generation; optional extra workers are used only when they
+    # are already healthy.
+    ensure_workers(min_workers=1, wait_for_spawn=False)
 
     # Pick a healthy worker via round-robin. This is the actual fix:
     # previously we hardcoded port 8188 here, which meant any setup
@@ -1020,18 +1021,29 @@ def _generate_image_to_base(base_url: str, prompt: str, output_prefix: str,
         original_base = COMFYUI_BASE
         COMFYUI_BASE = base_url
         try:
-            return generate_image(
-                prompt=prompt,
-                output_prefix=output_prefix,
-                output_dir=output_dir,
-                negative_prompt=negative_prompt,
-                seed=seed,
-                checkpoint=checkpoint,
-                width=width,
-                height=height,
-                timeout=timeout,
-                workflow_path=workflow_path,
-            )
+            # Temporarily override _pick_healthy_base to return this specific base
+            original_pick = globals().get('_pick_healthy_base')
+            _original_bases = _comfyui_bases()
+            # Monkey-patch to return only this base
+            import types
+            def _pick_this_base():
+                return base_url if is_running_at(base_url, timeout=2.0)["running"] else None
+            globals()['_pick_healthy_base'] = _pick_this_base
+            try:
+                return generate_image(
+                    prompt=prompt,
+                    output_prefix=output_prefix,
+                    output_dir=output_dir,
+                    negative_prompt=negative_prompt,
+                    seed=seed,
+                    checkpoint=checkpoint,
+                    width=width,
+                    height=height,
+                    timeout=timeout,
+                    workflow_path=workflow_path,
+                )
+            finally:
+                globals()['_pick_healthy_base'] = original_pick
         finally:
             COMFYUI_BASE = original_base
 
@@ -1054,12 +1066,12 @@ def generate_images_parallel(
     Returns:
         list of filenames (or None) in the same order as `jobs`.
     """
-    # Auto-spawn a CPU ComfyUI worker if we don't already have at least 2.
-    # Block up to 90s for it to come up so the first batch of jobs can
-    # actually use it. Subsequent calls return immediately.
-    ensure_workers(min_workers=2, wait_for_spawn=True, wait_timeout=90)
+    # First-run stories only require one healthy worker. Extra workers still
+    # improve throughput once they are up, but a second configured worker must
+    # not delay the first image.
+    ensure_workers(min_workers=1, wait_for_spawn=True, wait_timeout=90)
 
-    bases = _bases_by_priority(_comfyui_bases())
+    bases = _bases_by_priority(_healthy_bases())
     if not bases:
         return [None] * len(jobs)
     if max_workers is None:
@@ -1149,9 +1161,10 @@ def generate_scene_images(
             filename = generate_image(
                 prompt=prompt_text,
                 output_prefix=prefix,
-                seed=hash(story_id + str(i) + str(img_idx)) % (2**32 - 1),
+                seed=int(hashlib.md5(f"{story_id}{i}{img_idx}".encode()).hexdigest()[:8], 16) % (2**32 - 1),
                 checkpoint=ckpt_name,
-                quality=quality,
+                width=quality.get("width") if quality else None,
+                height=quality.get("height") if quality else None,
             )
             if filename:
                 images.append(filename)

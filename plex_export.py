@@ -21,7 +21,9 @@ References used for the design:
 
 from __future__ import annotations
 
+import datetime
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -48,6 +50,18 @@ DEFAULT_FPS = 30
 VIDEO_CRF = 20
 AUDIO_BITRATE = "192k"
 DEFAULT_BACKGROUND_LOOP_FADE = 0  # seconds of crossfade between loop iterations (0 = hard cut)
+
+# Default Plex library root. Overridable per-call via the `destination`
+# kwarg or per-environment via FANTASEE_PLEX_DEST. The Movies/<Title>
+# (<Year>)/ folder layout is the Plex-recommended convention for
+# auto-detection of title + year.
+DEFAULT_PLEX_DEST = r"D:\Downloads\Plex"
+
+# Windows + Plex filename blacklist. Plex follows the OS for path
+# validity, so we strip everything that Windows can't store.
+_PLEX_INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_PLEX_TRAILING_DOTS = re.compile(r'[\s.]+$')
+_PLEX_COLLAPSE_WS = re.compile(r'\s+')
 
 
 # ── Time helpers ───────────────────────────────────────────────────────
@@ -489,6 +503,139 @@ def mix_audio_into_video(
     return out_path
 
 
+# ── Plex library destination copy ─────────────────────────────────────
+
+# Plex's official Movies library layout is:
+#   <Library>/Movies/<Title> (<Year>)/<Title> (<Year>).mp4
+# The folder name is the source of truth for both the title and the year
+# that Plex shows in the UI. We follow that convention exactly so the
+# library scanner picks up the new file with no metadata sidecars.
+
+
+def _sanitize_for_plex(value: str, fallback: str = "Untitled") -> str:
+    """Make a string safe to use as a Windows folder / file name.
+
+    Strips the characters Windows + Plex reject, collapses whitespace,
+    drops trailing dots/spaces (which Windows would refuse), and falls
+    back to ``fallback`` if the result is empty.
+    """
+    cleaned = _PLEX_INVALID_CHARS.sub(" ", value or "").strip()
+    cleaned = _PLEX_COLLAPSE_WS.sub(" ", cleaned)
+    cleaned = _PLEX_TRAILING_DOTS.sub("", cleaned).rstrip()
+    if not cleaned or not any(c.isalnum() for c in cleaned):
+        return fallback
+    # Plex folders max out around 255 chars on most filesystems; cap well
+    # below that so the year suffix and any extension still fit.
+    return cleaned[:200]
+
+
+def _resolve_year(manifest: dict) -> int:
+    """Best-effort story year. Manifest, then manifest's created_at, then now."""
+    raw = manifest.get("year")
+    if isinstance(raw, int) and 1900 < raw < 3000:
+        return raw
+    if isinstance(raw, str) and raw.strip().isdigit():
+        y = int(raw.strip())
+        if 1900 < y < 3000:
+            return y
+    created = manifest.get("created_at")
+    if isinstance(created, (int, float)):
+        try:
+            return datetime.datetime.fromtimestamp(float(created)).year
+        except (OSError, ValueError, OverflowError):
+            pass
+    return datetime.datetime.now().year
+
+
+def _plex_movie_folder_name(manifest: dict) -> str:
+    """Return ``<Title> (<Year>)`` for the Movies subfolder."""
+    title = _sanitize_for_plex(
+        manifest.get("title") or manifest.get("id") or "Untitled",
+        fallback="Untitled",
+    )
+    year = _resolve_year(manifest)
+    return f"{title} ({year})"
+
+
+def _plex_file_stem(manifest: dict, slug: str) -> str:
+    """Return the on-disk file stem (without extension) used in the Plex folder.
+
+    Matches the folder name so Plex sees ``Title (Year).mp4`` /
+    ``Title (Year).en.srt`` etc., which is what the scanner expects.
+    """
+    return _plex_movie_folder_name(manifest)
+
+
+def _copy_to_plex_destination(
+    plex_dir: Path,
+    manifest: dict,
+    slug: str,
+    *,
+    destination_root: str,
+) -> dict:
+    """Copy the finished package into the user's Plex library.
+
+    Creates ``<destination_root>/Movies/<Title> (<Year>)/`` if missing and
+    copies the MP4 + subtitle + poster files into it. Raises on any IO
+    failure (caller decides whether to fail the whole export).
+
+    Returns a dict with ``root`` (the library root as the caller passed
+    it), ``dir`` (the created folder), and ``files`` (list of names
+    actually copied).
+    """
+    root = Path(destination_root).expanduser()
+    if not root.exists():
+        # Best-effort create — Plex users sometimes forget to mkdir
+        # the root the first time.
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise RuntimeError(
+                f"Plex destination {root} does not exist and could not be created: {e}"
+            ) from e
+
+    folder_name = _plex_movie_folder_name(manifest)
+    target_dir = root / "Movies" / folder_name
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    file_stem = _plex_file_stem(manifest, slug)
+
+    # What to copy: the final MP4, the .en.srt / .en.vtt sidecars, the
+    # poster (any extension), and the chapters file. We skip the
+    # chapters.ffmeta by default — Plex reads chapters from inside the
+    # MP4's ffmpeg metadata, not from a sidecar — but copy it too so
+    # the user can re-mux without losing the data.
+    candidates: list[tuple[Path, str]] = []
+    mp4 = plex_dir / f"{slug}.mp4"
+    if mp4.exists():
+        candidates.append((mp4, f"{file_stem}.mp4"))
+    srt = plex_dir / f"{slug}.en.srt"
+    if srt.exists():
+        candidates.append((srt, f"{file_stem}.en.srt"))
+    vtt = plex_dir / f"{slug}.en.vtt"
+    if vtt.exists():
+        candidates.append((vtt, f"{file_stem}.en.vtt"))
+    chapters = plex_dir / "chapters.ffmeta"
+    if chapters.exists():
+        candidates.append((chapters, "chapters.ffmeta"))
+    # Poster can be png/jpg/jpeg/svg — keep the same extension.
+    for poster_path in plex_dir.glob(f"{slug}-poster.*"):
+        suffix = poster_path.suffix.lower()
+        candidates.append((poster_path, f"{file_stem}-poster{suffix}"))
+
+    copied: list[str] = []
+    for src, dst_name in candidates:
+        dst = target_dir / dst_name
+        shutil.copy2(src, dst)
+        copied.append(dst_name)
+
+    return {
+        "root": str(root).replace("\\", "/"),
+        "dir": str(target_dir).replace("\\", "/"),
+        "files": copied,
+    }
+
+
 # ── Top-level export ──────────────────────────────────────────────────
 
 
@@ -506,6 +653,11 @@ class PlexExportResult:
     background_muted: bool = False
     duration_seconds: float = 0.0
     notes: list[str] = field(default_factory=list)
+    # Fields populated by the optional "copy to Plex library" step.
+    destination_root: Optional[str] = None
+    destination_dir: Optional[str] = None
+    destination_files: list[str] = field(default_factory=list)
+    destination_error: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -521,6 +673,10 @@ class PlexExportResult:
             "background_muted": self.background_muted,
             "duration_seconds": self.duration_seconds,
             "notes": self.notes,
+            "destination_root": self.destination_root,
+            "destination_dir": self.destination_dir,
+            "destination_files": self.destination_files,
+            "destination_error": self.destination_error,
         }
 
 
@@ -530,6 +686,7 @@ def export_plex_package(
     background_volume: Optional[float] = None,
     background_muted: Optional[bool] = None,
     background_audio: Optional[str] = None,
+    destination: Optional[str] = None,
     scenes: Optional[list[SceneAsset]] = None,
     progress_callback=None,
 ) -> PlexExportResult:
@@ -546,12 +703,15 @@ def export_plex_package(
     5. mixes narration + (looped) background into the final MP4 with
        embedded chapters and ``+faststart``,
     6. copies the poster image next to the MP4,
-    7. copies everything into ``<story-dir>/final/plex/``.
+    7. copies everything into ``<story-dir>/final/plex/``,
+    8. if ``destination`` (or env ``FANTASEE_PLEX_DEST``) is set, also
+       copies the package into ``<destination>/Movies/<Title> (<Year>)/``
+       so it can be picked up by a Plex library scan.
 
     ``progress_callback`` is an optional callable taking ``(stage, message,
     progress)`` where ``progress`` is in [0, 1]. The stages are:
     ``"discover"``, ``"subtitles"``, ``"chapters"``, ``"audio_mix"``,
-    ``"finalize"``.
+    ``"finalize"``, ``"plex_copy"``.
     """
     story_dir = existing_story_dir(story_id)
     if not story_dir.is_dir():
@@ -580,6 +740,15 @@ def export_plex_package(
             if background_muted is not None
             else bool(manifest.get("background_muted", False))
         ),
+    )
+
+    # Resolve the Plex destination root once. Per-call arg wins, then env,
+    # then the default. The "no destination" case is `None`, in which
+    # step 8 below is a no-op.
+    plex_destination = (
+        destination
+        or os.environ.get("FANTASEE_PLEX_DEST")
+        or DEFAULT_PLEX_DEST
     )
 
     def _progress(stage: str, msg: str, pct: float) -> None:
@@ -678,6 +847,24 @@ def export_plex_package(
         if tmp.exists():
             tmp.unlink()
 
+    # ── 9. Copy to Plex library destination (best-effort) ──────────
+    if plex_destination:
+        _progress("plex_copy", f"Copying to {plex_destination}...", 0.95)
+        try:
+            copied = _copy_to_plex_destination(
+                result.plex_dir, manifest, slug,
+                destination_root=plex_destination,
+            )
+            result.destination_root = copied["root"]
+            result.destination_dir = copied["dir"]
+            result.destination_files = copied["files"]
+        except Exception as e:
+            # Don't fail the whole export if the Plex copy fails (e.g.
+            # the D: drive is offline). Surface it in the result so the
+            # UI can show a warning.
+            result.destination_error = str(e)
+            result.notes.append(f"Plex copy failed: {e}")
+
     _progress("finalize", "Plex export complete.", 1.0)
     return result
 
@@ -734,12 +921,15 @@ def _concat_narration(scenes: list[SceneAsset], out_path: Path) -> float:
     _make_silence(silence, 0.5)
 
     lines: list[str] = []
+    last_added = False
     for i, sc in enumerate(scenes):
         if not sc.audio or not sc.audio.exists():
             continue
         lines.append(f"file '{sc.audio.as_posix()}'")
-        if i < len(scenes) - 1:
+        # Only add silence between two consecutive scenes that both have audio
+        if last_added and i < len(scenes) - 1:
             lines.append(f"file '{silence.as_posix()}'")
+        last_added = True
     if not lines:
         return 0.0
     list_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -794,10 +984,12 @@ def _mix_and_chapter(
         audio_map = ["-map", "0:v:0", "-map", "1:a:0"]
 
     narration_dur = _read_audio_duration(narration_path)
+    # Chapters file input index: 2 when no background, 3 when background is present
+    chapters_input_idx = 3 if (background_path and background_path.exists() and not background_muted and background_volume > 0) else 2
     cmd: list[str] = [
         "ffmpeg", *inputs,
         "-i", str(chapters_file),
-        "-map_metadata", "2",
+        "-map_metadata", str(chapters_input_idx),
         "-t", f"{narration_dur:.3f}",
     ]
     if filter_parts:

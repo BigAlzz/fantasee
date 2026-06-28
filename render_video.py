@@ -50,7 +50,6 @@ def get_scene_assets(story_dir: Path, slug: str, scene_num: int) -> dict:
     audio = None
     for pattern in [
         f"tts_{slug}_s{scene_key}.wav",
-        f"tts_{slug}_s0{scene_key}.wav",
     ]:
         candidate = story_dir / pattern
         if candidate.exists():
@@ -94,7 +93,7 @@ def subs_json_to_vtt(segments: list, vtt_path: Path):
         return f"{h:02d}:{m:02d}:{s:06.3f}"
     
     for i, seg in enumerate(segments):
-        text = seg["text"].replace("\n", " ").strip()
+        text = seg.get("text", "").replace("\n", " ").strip()
         lines.append(f"{i + 1}")
         lines.append(f"{fmt_time(seg['start'])} --> {fmt_time(seg['end'])}")
         lines.append(text)

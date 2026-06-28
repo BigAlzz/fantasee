@@ -24,6 +24,30 @@ from story_storage import STORIES_ROOT, existing_story_dir
 OUTPUTS_DIR = STORIES_ROOT
 
 
+_PARSER_METADATA_RE = re.compile(
+    r"""
+    ^\s*(?:
+        [-*_]{3,}\s*$ |
+        \#{1,6}\s*.*scene\s+breakdown\b |
+        \#{1,6}\s*scene\s*\d+\b |
+        \*\*\s*(?:characters|title|visual\s+prompt|narrative|narration)\s*: |
+        (?:title|visual\s+prompt|narrative|narration)\s*:
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def looks_like_parser_metadata(text: str) -> bool:
+    """Detect labels/headings that leaked into saved scene text."""
+    text = (text or "").strip()
+    if not text:
+        return False
+    if _PARSER_METADATA_RE.search(text):
+        return True
+    return bool(re.fullmatch(r"[-=_#*\s]+", text))
+
+
 # ── VTT Parser ───────────────────────────────────────────────────────────
 
 def parse_vtt(text: str) -> list[dict]:
@@ -80,6 +104,9 @@ def analyze_narration(narration: str) -> dict:
     
     if not narration:
         return {"issues": ["Missing narration"], "word_count": 0, "sentence_count": 0, "score": 0}
+    metadata_leak = looks_like_parser_metadata(narration)
+    if metadata_leak:
+        issues.append("Parser metadata leaked into narration")
     
     words = narration.split()
     word_count = len(words)
@@ -95,6 +122,7 @@ def analyze_narration(narration: str) -> dict:
         issues.append(f"Very long ({word_count} words) — may drag")
     
     # Sentence quality
+    avg_len = 0.0
     if sentence_count > 0:
         avg_len = word_count / sentence_count
         if avg_len > 30:
@@ -114,6 +142,8 @@ def analyze_narration(narration: str) -> dict:
         score += 1.0
     if not issues:
         score += 1.0
+    if metadata_leak:
+        score = min(score, 2.0)
     
     return {
         "issues": issues,
@@ -123,19 +153,13 @@ def analyze_narration(narration: str) -> dict:
     }
 
 
-def analyze_vtt(vtt_path: Path, audio_duration: float) -> dict:
-    """Analyze VTT subtitle file for timing and sync issues."""
+def _analyze_subtitle_cues(cues: list[dict], audio_duration: float) -> dict:
+    """Analyze subtitle cues for timing and sync issues."""
     issues = []
-    
-    if not vtt_path.exists():
-        return {"issues": ["VTT file not found"], "cue_count": 0, "score": 0}
-    
-    content = vtt_path.read_text(encoding="utf-8")
-    cues = parse_vtt(content)
-    
+
     if not cues:
         return {"issues": ["No subtitle cues found"], "cue_count": 0, "score": 0}
-    
+
     # Check timing issues
     for i, cue in enumerate(cues):
         # Negative or zero duration
@@ -183,6 +207,66 @@ def analyze_vtt(vtt_path: Path, audio_duration: float) -> dict:
         "total_text_length": sum(len(c["text"]) for c in cues),
         "score": max(0, min(10, score))
     }
+
+
+def analyze_vtt(vtt_path: Path, audio_duration: float) -> dict:
+    """Analyze VTT subtitle file for timing and sync issues."""
+    if not vtt_path.exists():
+        return {"issues": ["VTT file not found"], "cue_count": 0, "score": 0}
+
+    content = vtt_path.read_text(encoding="utf-8")
+    return _analyze_subtitle_cues(parse_vtt(content), audio_duration)
+
+
+def _load_subtitle_json(subs_path: Path) -> list[dict]:
+    """Load Fantasee subtitle JSON into the same cue shape as VTT."""
+    if not subs_path.exists():
+        return []
+    try:
+        raw = json.loads(subs_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    if not isinstance(raw, list):
+        return []
+
+    cues = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            start = float(item.get("start", 0))
+            end = float(item.get("end", 0))
+        except (TypeError, ValueError):
+            continue
+        text = str(item.get("text", "")).strip()
+        cues.append({"start": start, "end": end, "text": text})
+    return cues
+
+
+def analyze_subtitles(scene: dict, story_dir: Path, story_id: str, audio_duration: float) -> dict:
+    """Analyze subtitle data, accepting either rendered VTT or source JSON."""
+    num = scene.get("scene", "?")
+    vtt_file = scene.get("vtt_file", f"{story_id}_s{num}.vtt")
+    vtt_path = story_dir / vtt_file
+    if vtt_path.exists():
+        return analyze_vtt(vtt_path, audio_duration)
+
+    candidates = []
+    if scene.get("subtitle_file"):
+        candidates.append(story_dir / scene["subtitle_file"])
+    candidates.append(story_dir / f"subs_{story_id}_s{num}.json")
+    if str(num).isdigit():
+        padded = f"{int(num):02d}"
+        candidates.append(story_dir / f"subs_{story_id}_s{padded}.json")
+
+    for subs_path in candidates:
+        cues = _load_subtitle_json(subs_path)
+        if cues:
+            result = _analyze_subtitle_cues(cues, audio_duration)
+            result["source"] = subs_path.name
+            return result
+
+    return {"issues": ["Subtitle file not found"], "cue_count": 0, "score": 0}
 
 
 def analyze_audio(scene: dict, story_dir: Path) -> dict:
@@ -386,10 +470,10 @@ def check_continuity(story: dict) -> list[str]:
             transition_words = {"then", "after", "later", "finally", "meanwhile",
                               "next", "following", "approaching", "reaching"}
             if not any(tw in next_narr[:100] for tw in transition_words):
-                curr_name = ", ".join(curr_locs)
-                next_name = ", ".join(next_locs)
+                curr_name = ", ".join(sorted(curr_locs))
+                next_name = ", ".join(sorted(next_locs))
                 if curr_name != next_name:
-                    pass  # Don't flag normal story progression
+                    issues.append(f"Location jump: {curr_name} → {next_name} without transition")
     
     # Check for emotional arc
     mood_words = {
@@ -531,6 +615,10 @@ def compute_star_rating(result: dict) -> dict:
     issue_counts = {}
     for issue in all_issues:
         normalized = issue.split(":")[0].split("(")[0].strip()
+        if normalized == "Very short":
+            normalized = "Very short narration"
+        elif normalized.startswith("Cue "):
+            normalized = "Subtitle cue timing issue"
         issue_counts[normalized] = issue_counts.get(normalized, 0) + 1
 
     needs_work = []
@@ -620,7 +708,7 @@ def llm_story_review(story: dict) -> dict | None:
         ]
         for env_path in env_paths:
             if env_path.exists():
-                for line in env_path.read_text().splitlines():
+                for line in env_path.read_text(encoding="utf-8").splitlines():
                     stripped = line.strip()
                     if stripped.startswith("XIAOMI_API_KEY=") and not stripped.startswith("#"):
                         val = stripped.split("=", 1)[1].strip()
@@ -679,7 +767,7 @@ Output ONLY a JSON object:
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.3,
-                "max_tokens": 1024,
+                "max_completion_tokens": 1024,
             },
             headers={
                 "Authorization": f"Bearer {api_key}",
@@ -756,10 +844,9 @@ def review_story(story_id: str) -> dict | None:
             img = analyze_images(scene, story_dir)
             aud = analyze_audio(scene, story_dir)
 
-            # VTT analysis
-            vtt_file = scene.get("vtt_file", f"{story_id}_s{num}.vtt")
-            vtt_path = story_dir / vtt_file
-            vtt = analyze_vtt(vtt_path, aud["duration"])
+            # Subtitle analysis accepts rendered VTT or the source JSON that
+            # repair/render generate before final video export.
+            vtt = analyze_subtitles(scene, story_dir, story_id, aud["duration"])
 
             # Check rendered video
             mp4_file = f"{story_id}_s{num}.mp4"
@@ -893,7 +980,8 @@ def review_story(story_id: str) -> dict | None:
         ]
         llm_avg = sum(llm_scores) / max(len(llm_scores), 1)
         # Blend: 70% technical + 30% LLM
-        blended = review["overall_score"] * 0.7 + llm_avg * 0.3
+        review_data = result.get("review", {})
+        blended = review_data.get("overall_score", 5.0) * 0.7 + llm_avg * 0.3
         result["review"]["overall_score"] = round(blended, 1)
         result["review"]["rating"] = max(1.0, min(5.0, round(blended / 2, 1)))
         result["review"]["stars"] = max(1, min(5, round(result["review"]["rating"])))

@@ -166,26 +166,32 @@ def _pick_palette(tone: str, style: str) -> tuple[tuple[int, int, int], tuple[in
 
 
 def _draw_gradient(img: Image.Image, top: tuple[int, int, int], mid: tuple[int, int, int], bottom: tuple[int, int, int]) -> None:
-    """Diagonal 3-stop gradient drawn pixel by pixel (Pillow has no native gradient)."""
-    px = img.load()
+    """Diagonal 3-stop gradient using numpy for performance."""
+    import numpy as np
     w, h = img.size
-    for y in range(h):
-        for x in range(w):
-            # Diagonal t-value in [0, 1]
-            t = (x / w + y / h) / 2.0
-            if t < 0.5:
-                # top → mid
-                a = t * 2.0
-                r = int(top[0] * (1 - a) + mid[0] * a)
-                g = int(top[1] * (1 - a) + mid[1] * a)
-                b = int(top[2] * (1 - a) + mid[2] * a)
-            else:
-                # mid → bottom
-                a = (t - 0.5) * 2.0
-                r = int(mid[0] * (1 - a) + bottom[0] * a)
-                g = int(mid[1] * (1 - a) + bottom[1] * a)
-                b = int(mid[2] * (1 - a) + bottom[2] * a)
-            px[x, y] = (r, g, b)
+    
+    # Create coordinate grids
+    x = np.linspace(0, 1, w)
+    y = np.linspace(0, 1, h)
+    xx, yy = np.meshgrid(x, y)
+    
+    # Diagonal t-value in [0, 1]
+    t = (xx + yy) / 2.0
+    
+    # Create output array
+    arr = np.zeros((h, w, 3), dtype=np.uint8)
+    
+    # top → mid region (t < 0.5)
+    mask1 = t < 0.5
+    a1 = t * 2.0
+    for c in range(3):
+        arr[:, :, c] = np.where(
+            mask1,
+            top[c] * (1 - a1) + mid[c] * a1,
+            mid[c] * (1 - (t - 0.5) * 2.0) + bottom[c] * (t - 0.5) * 2.0
+        ).astype(np.uint8)
+    
+    img.paste(Image.fromarray(arr))
 
 
 def _draw_radial_glow(img: Image.Image, color: tuple[int, int, int], radius_factor: float = 0.6, alpha: float = 0.18) -> None:

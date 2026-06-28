@@ -34,6 +34,7 @@ import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Callable
 from story_storage import STORIES_ROOT
 
 OUTPUTS_DIR = STORIES_ROOT
@@ -43,6 +44,8 @@ TRASH_DIR = OUTPUTS_DIR / ".trash"
 # generations, crashed pipelines, or tmp file leftovers.
 TMP_PATTERNS = (".tmp", ".partial", ".bak")
 LOG_PATTERNS = (".log",)
+
+ProgressCallback = Callable[[dict], None]
 
 
 def human_size(n: int) -> str:
@@ -98,6 +101,38 @@ def delete_story(story_dir: Path, backup: bool = False) -> dict:
     Returns a report dict describing what was done. Always returns even
     on partial failure so the caller can report.
     """
+    return delete_story_with_progress(story_dir, backup=backup)
+
+
+def _emit_progress(
+    progress_callback: ProgressCallback | None,
+    *,
+    stage: str,
+    message: str,
+    progress: float,
+    report: dict,
+) -> None:
+    if not progress_callback:
+        return
+    event = {
+        "stage": stage,
+        "message": message,
+        "progress": max(0.0, min(1.0, progress)),
+        "report": dict(report),
+    }
+    progress_callback(event)
+
+
+def delete_story_with_progress(
+    story_dir: Path,
+    backup: bool = False,
+    progress_callback: ProgressCallback | None = None,
+) -> dict:
+    """Delete a story directory and optionally emit progress events.
+
+    The final report shape intentionally matches :func:`delete_story` so API
+    and CLI callers can reuse the same delete/backup accounting.
+    """
     report = {
         "story_id": story_dir.name,
         "existed": story_dir.exists(),
@@ -107,26 +142,91 @@ def delete_story(story_dir: Path, backup: bool = False) -> dict:
         "errors": [],
     }
     if not story_dir.exists():
+        _emit_progress(
+            progress_callback,
+            stage="missing",
+            message=f"Story not found: {story_dir.name}",
+            progress=1.0,
+            report=report,
+        )
         return report
 
+    _emit_progress(
+        progress_callback,
+        stage="discover",
+        message=f"Scanning {story_dir.name}...",
+        progress=0.02,
+        report=report,
+    )
     files = list_story_files(story_dir)
     total_bytes = sum(f.stat().st_size for f in files if f.exists())
     report["bytes_freed"] = total_bytes
     report["files_deleted"] = len(files)
+    _emit_progress(
+        progress_callback,
+        stage="discover",
+        message=f"Found {len(files)} file(s), {human_size(total_bytes)}.",
+        progress=0.10 if backup else 0.20,
+        report=report,
+    )
 
     if backup:
         try:
+            _emit_progress(
+                progress_callback,
+                stage="backup",
+                message=f"Backing up {story_dir.name}...",
+                progress=0.15,
+                report=report,
+            )
             report["backup_path"] = str(backup_story(story_dir))
+            _emit_progress(
+                progress_callback,
+                stage="backup",
+                message=f"Backup ready: {report['backup_path']}",
+                progress=0.50,
+                report=report,
+            )
         except Exception as e:
             report["errors"].append(f"backup failed: {e}")
+            _emit_progress(
+                progress_callback,
+                stage="error",
+                message=f"Backup failed: {e}",
+                progress=1.0,
+                report=report,
+            )
             return report
 
     # shutil.rmtree is atomic per-file but not per-dir on Windows if files
     # are open elsewhere; we tolerate that and report the error.
     try:
+        _emit_progress(
+            progress_callback,
+            stage="delete",
+            message=f"Deleting {len(files)} file(s) from {story_dir.name}...",
+            progress=0.65,
+            report=report,
+        )
         shutil.rmtree(story_dir)
     except OSError as e:
         report["errors"].append(f"rmtree failed: {e}")
+        _emit_progress(
+            progress_callback,
+            stage="error",
+            message=f"Delete failed: {e}",
+            progress=1.0,
+            report=report,
+        )
+        return report
+
+    _emit_progress(
+        progress_callback,
+        stage="complete",
+        message=f"Deleted {story_dir.name}: {len(files)} file(s), {human_size(total_bytes)}.",
+        progress=1.0,
+        report=report,
+    )
 
     return report
 

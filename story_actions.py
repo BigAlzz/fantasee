@@ -28,6 +28,7 @@ hash computed via Pillow — no extra dependency.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -58,6 +59,38 @@ DEFAULT_EXTEND_SCENES = 5
 # 16x16 average hashes have ~256 bits of information so distance 5 is
 # well within the "near-duplicate" zone.
 PHASH_DUPLICATE_THRESHOLD = 5
+UNFIXABLE_REPAIR_ACTIONS = {"needs_narration", "needs_prompt", "needs_regenerate"}
+
+_PARSER_METADATA_RE = re.compile(
+    r"""
+    ^\s*(?:
+        [-*_]{3,}\s*$ |
+        \#{1,6}\s*.*scene\s+breakdown\b |
+        \#{1,6}\s*scene\s*\d+\b |
+        \*\*\s*(?:characters|title|visual\s+prompt|narrative|narration)\s*: |
+        (?:title|visual\s+prompt|narrative|narration)\s*:
+    )
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+
+def _looks_like_parser_metadata(text: str) -> bool:
+    text = (text or "").strip()
+    if not text:
+        return False
+    if _PARSER_METADATA_RE.search(text):
+        return True
+    return bool(re.fullmatch(r"[-=_#*\s]+", text))
+
+
+def _has_scene_text_for_narration(scene: dict) -> bool:
+    """Return True when a missing narration can be inferred safely."""
+    for key in ("prompt", "narrative"):
+        value = (scene.get(key) or "").strip()
+        if value and not _looks_like_parser_metadata(value):
+            return True
+    return False
 
 
 # ── Result dataclasses ────────────────────────────────────────────────
@@ -208,7 +241,13 @@ def _resolve_story_dir(story_id: str, story_dir: Optional[Path] = None) -> Path:
     looks under ``STORIES_ROOT`` and the legacy ``outputs/`` tree.
     """
     if story_dir is not None:
-        return Path(story_dir)
+        candidate = Path(story_dir)
+        if candidate.is_dir():
+            return candidate
+        fallback = existing_story_dir(story_id)
+        if fallback.is_dir():
+            return fallback
+        return candidate
     return existing_story_dir(story_id)
 
 
@@ -336,14 +375,37 @@ def regenerate_story(
     # Re-run in a background task by delegating to the existing pipeline.
     # The caller (server endpoint) wraps this in a thread so the event
     # loop stays responsive.
-    result = run_pipeline(
-        concept=concept,
-        num_scenes=num_scenes,
-        style=style,
-        tone=tone,
-        voice_preset=voice,
-        images_per_scene=images_per_scene,
-    )
+    try:
+        result = run_pipeline(
+            concept=concept,
+            num_scenes=num_scenes,
+            style=style,
+            tone=tone,
+            voice_preset=voice,
+            images_per_scene=images_per_scene,
+        )
+    except Exception as pipeline_err:
+        # Pipeline failed — restore from backup if we made one
+        if backup_path and backup_path.exists():
+            # Wipe the failed attempt
+            for child in list(story_dir.iterdir()):
+                if child.is_dir() and not child.name.startswith("."):
+                    shutil.rmtree(child, ignore_errors=True)
+                else:
+                    try:
+                        child.unlink()
+                    except OSError:
+                        pass
+            # Restore from backup
+            shutil.copytree(backup_path, story_dir)
+            return {
+                "status": "error_restored",
+                "story_id": story_id,
+                "backup_path": str(backup_path),
+                "error": str(pipeline_err),
+                "note": "Pipeline failed; story restored from backup",
+            }
+        raise
 
     # run_pipeline() derives its own slug from a fresh LLM title call,
     # so the generated content lands in stories/<new-slug>/ — not the
@@ -435,6 +497,18 @@ def plan_repair(story_id: str, story_dir: Optional[Path] = None) -> RepairPlan:
                         sr.duplicate_image = True
                         sr.actions.append("regen_image")
 
+        narration = (sc.get("narration") or sc.get("narration_text") or "").strip()
+        prompt = (sc.get("prompt") or "").strip()
+        if _looks_like_parser_metadata(narration) or _looks_like_parser_metadata(prompt):
+            sr.missing.append("story_text")
+            sr.actions.append("needs_regenerate")
+        elif not narration:
+            sr.missing.append("narration")
+            if _has_scene_text_for_narration(sc):
+                sr.actions.append("regen_narration")
+            else:
+                sr.actions.append("needs_narration")
+
         # ── Audio check ──────────────────────────────────────────
         audio_name = sc.get("audio_filename") or ""
         audio_path = story_dir / audio_name if audio_name else None
@@ -457,20 +531,11 @@ def plan_repair(story_id: str, story_dir: Optional[Path] = None) -> RepairPlan:
             sr.missing.append("subs")
             sr.actions.append("regen_subs")
 
-        # ── Narration check ──────────────────────────────────────
-        narration = (sc.get("narration") or sc.get("narration_text") or "").strip()
-        if not narration:
-            sr.missing.append("narration")
-            # Can't auto-regenerate narration without the LLM — flag
-            # it so the UI can show the scene as needing manual input.
-            sr.actions.append("needs_narration")
-
-        if sr.actions and not all(a == "needs_narration" for a in sr.actions):
+        if sr.actions and not all(a in UNFIXABLE_REPAIR_ACTIONS for a in sr.actions):
             plan.scenes.append(sr)
         elif sr.actions:
             # Only "needs_narration" → still surface it so the user
             # sees the scene is broken, but it won't be auto-repaired.
-            sr.actions = []  # drop the unfixable flag
             plan.scenes.append(sr)
         else:
             plan.skipped_complete += 1
@@ -504,8 +569,10 @@ def apply_repair(story_id: str, plan: RepairPlan, *, progress: Optional[Callable
 
     sys.path.insert(0, str(Path(__file__).parent))
 
-    total_actions = sum(len(sr.actions) for sr in plan.scenes
-                        if any(a != "needs_narration" for a in sr.actions))
+    total_actions = sum(
+        len([a for a in sr.actions if a not in UNFIXABLE_REPAIR_ACTIONS])
+        for sr in plan.scenes
+    )
     actions_done = 0
     for sr in plan.scenes:
         scene_obj = manifest.get("scenes", [])[sr.scene_idx]
@@ -515,7 +582,7 @@ def apply_repair(story_id: str, plan: RepairPlan, *, progress: Optional[Callable
         scene_repaired = False
 
         for action in sr.actions:
-            if action == "needs_narration":
+            if action in UNFIXABLE_REPAIR_ACTIONS:
                 continue
             actions_done += 1
             pct = actions_done / max(1, total_actions)
@@ -523,6 +590,10 @@ def apply_repair(story_id: str, plan: RepairPlan, *, progress: Optional[Callable
                 if action == "regen_image":
                     _emit("repair", f"Regenerating image for scene {scene_key}", pct)
                     _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manifest)
+                    scene_repaired = True
+                elif action == "regen_narration":
+                    _emit("repair", f"Regenerating narration for scene {scene_key}", pct)
+                    _regen_scene_narration(story_id, scene_obj, manifest)
                     scene_repaired = True
                 elif action == "regen_tts":
                     _emit("repair", f"Regenerating audio for scene {scene_key}", pct)
@@ -548,6 +619,51 @@ def apply_repair(story_id: str, plan: RepairPlan, *, progress: Optional[Callable
     return result
 
 
+def _regen_scene_narration(story_id: str, scene_obj: dict, manifest: dict) -> None:
+    """Regenerate missing narration for one scene from existing scene text."""
+    if not _has_scene_text_for_narration(scene_obj):
+        raise RuntimeError("Scene has no prompt or narrative to regenerate narration from")
+
+    from generate_story import _clean_narration_field, call_llm
+
+    tags = manifest.get("tags") or []
+    style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
+    tone = manifest.get("tone") or (tags[1] if len(tags) > 1 else "dramatic")
+    concept = (manifest.get("story_concept") or manifest.get("description") or "").strip()
+    title = (scene_obj.get("title") or f"Scene {scene_obj.get('scene', '?')}").strip()
+    prompt = (scene_obj.get("prompt") or "").strip()
+    narrative = (scene_obj.get("narrative") or "").strip()
+
+    system = (
+        "You repair missing voiceover narration for an illustrated story. "
+        "Return only the narration text, with no labels, markdown headings, or notes."
+    )
+    user_prompt = f"""Story ID: {story_id}
+Story concept: {concept or "Unknown"}
+Style: {style}
+Tone: {tone}
+
+Scene: {title}
+Visual prompt:
+{prompt or "(missing)"}
+
+Narrative beat:
+{narrative or "(missing)"}
+
+Write one spoken narration passage for this scene, 80-150 words, present tense,
+matching the story tone and preserving the action described above. Return only
+the narration text."""
+
+    raw = call_llm(system, user_prompt, temperature=0.7)
+    raw_text = re.sub(r"^\s*(?:\*\*)?\s*narration\s*:\s*", "", raw or "", flags=re.IGNORECASE).strip()
+    narration = _clean_narration_field(raw_text)
+    if len(narration.split()) < 8:
+        raise RuntimeError("LLM did not return usable narration")
+
+    scene_obj["narration"] = narration
+    scene_obj["narration_text"] = narration
+
+
 def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manifest) -> None:
     """Regenerate the image(s) for one scene, in-place."""
     from comfyui_utils import checkpoint_for_style, generate_image, is_running
@@ -564,7 +680,7 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
     if not prompt:
         raise RuntimeError("Scene has no prompt — cannot regenerate image")
 
-    seed_base = hash(f"{story_id}{padded}repair") % (2**32 - 1)
+    seed_base = int(hashlib.md5(f"{story_id}{padded}repair".encode()).hexdigest()[:8], 16) % (2**32 - 1)
     tags = manifest.get("tags") or []
     style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
     checkpoint = checkpoint_for_style(style)
@@ -685,7 +801,7 @@ def apply_extend(
     accepts a scene count instead of target minutes, and runs the
     per-scene work in-process so we can stream progress.
     """
-    from generate_story import call_llm, STORY_OUTLINE_SYSTEM
+    from generate_story import call_llm, STORY_OUTLINE_SYSTEM, parse_scene_response
     from tts_utils import generate_tts, get_audio_duration
     from comfyui_utils import checkpoint_for_style
 
@@ -702,7 +818,7 @@ def apply_extend(
     images_per_scene = int(manifest.get("images_per_scene") or 1)
     image_checkpoint = checkpoint_for_style(style)
 
-    plan = plan_extend(story_id, scenes)
+    plan = plan_extend(story_id, scenes, story_dir=story_dir)
 
     def _emit(stage: str, msg: str, pct: float) -> None:
         if progress:
@@ -739,32 +855,7 @@ Tone: {tone}"""
     if not raw:
         raise RuntimeError("LLM did not return continuation scenes")
 
-    # Parse the LLM response (same format as `generate_story_outline`)
-    new_scenes_raw = []
-    current = None
-    for line in raw.strip().split("\n"):
-        line = line.strip()
-        if re.match(r"^---\s*SCENE\s*\d+", line, re.IGNORECASE):
-            if current:
-                new_scenes_raw.append(current)
-            current = {"title": "", "prompt": "", "narrative": "", "narration": ""}
-        elif current:
-            low = line.lower()
-            if low.startswith("title:"):
-                current["title"] = line.split(":", 1)[1].strip()
-            elif low.startswith("visual prompt:"):
-                current["prompt"] = line.split(":", 1)[1].strip()
-            elif low.startswith("narrative:"):
-                current["narrative"] = line.split(":", 1)[1].strip()
-            elif low.startswith("narration:"):
-                current["narration"] = line.split(":", 1)[1].strip()
-            else:
-                if current["narration"]:
-                    current["narration"] += " " + line
-                elif current["prompt"]:
-                    current["prompt"] += " " + line
-    if current:
-        new_scenes_raw.append(current)
+    new_scenes_raw = parse_scene_response(raw, expected_scenes=plan.will_add)
 
     # Materialize the new scenes
     base_idx = len(existing)
@@ -775,11 +866,12 @@ Tone: {tone}"""
     # optimization if image-gen is the bottleneck
 
     _emit("extend", f"Rendering {len(new_scenes_raw)} new scene(s)…", 0.30)
+    errors = []
     for i, scene in enumerate(new_scenes_raw):
         scene_num = base_idx + i + 1
         padded = f"{scene_num:02d}"
         safe_title = re.sub(r'[^a-zA-Z0-9]+', '_', scene.get("title", "")).strip("_")[:30] or f"Scene{padded}"
-        seed = hash(story_id + padded + "extend") % (2**32 - 1)
+        seed = int(hashlib.md5(f"{story_id}{padded}extend".encode()).hexdigest()[:8], 16) % (2**32 - 1)
 
         new_scene = {
             "scene": padded,
@@ -816,11 +908,26 @@ Tone: {tone}"""
             audio_filename = f"tts_{story_id}_s{padded}.wav"
             audio_path = str(story_dir / audio_filename)
             try:
-                if generate_tts(narration, audio_path, voice=voice):
-                    new_scene["audio_filename"] = audio_filename
-                    new_scene["audio_duration"] = get_audio_duration(audio_path)
+                if not generate_tts(narration, audio_path, voice=voice):
+                    raise RuntimeError("TTS generation failed")
+                new_scene["audio_filename"] = audio_filename
+                new_scene["audio_duration"] = get_audio_duration(audio_path)
+                _regen_scene_subs(story_dir, story_id, padded, new_scene, manifest)
+                sub_name = new_scene.get("subtitle_file")
+                if not sub_name or not (story_dir / sub_name).exists():
+                    raise RuntimeError("subtitle generation did not write a subtitle_file")
             except Exception as tts_err:
-                print(f"[extend] TTS scene {scene_num} failed: {tts_err}", file=sys.stderr)
+                msg = f"scene {scene_num}: {tts_err}"
+                errors.append(msg)
+                print(f"[extend] {msg}", file=sys.stderr)
+                _emit("extend", f"Skipped scene {scene_num}: {tts_err}", 0.30)
+                continue
+        else:
+            msg = f"scene {scene_num}: missing narration"
+            errors.append(msg)
+            print(f"[extend] {msg}", file=sys.stderr)
+            _emit("extend", f"Skipped scene {scene_num}: missing narration", 0.30)
+            continue
 
         existing.append(new_scene)
         added.append(new_scene["title"])
@@ -834,9 +941,11 @@ Tone: {tone}"""
         _emit("extend", f"Added scene {scene_num}: {new_scene['title']}", pct)
 
     _emit("extend", "Extend complete", 1.0)
+    status = "ok" if added and not errors else ("partial_failed" if added else "all_failed")
     return {
-        "status": "ok" if added else "all_failed",
+        "status": status,
         "new_scenes_added": len(added),
         "titles": added,
         "total_scenes": len(existing),
+        "errors": errors,
     }

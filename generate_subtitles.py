@@ -25,6 +25,15 @@ from faster_whisper import WhisperModel
 
 # ── Config ──────────────────────────────────────────────────────────────
 MODEL_SIZE = "base"  # Small enough for CPU, accurate enough for clean TTS
+_whisper_model = None  # Cache the model to avoid reloading per scene
+
+
+def _get_whisper_model() -> WhisperModel:
+    """Get or create the Whisper model singleton."""
+    global _whisper_model
+    if _whisper_model is None:
+        _whisper_model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
+    return _whisper_model
 
 
 
@@ -46,7 +55,7 @@ def generate_subtitles(
     Each output segment has {text, start, end} in seconds.
     """
     # Split narration into sentences
-    sentence_re = re.compile(r'[^.!?\n]+[.!?]+')
+    sentence_re = re.compile(r'[^.!?\n]+[.!?]+|[^.!?\n]+$')
     sentences = [
         s.strip()
         for s in sentence_re.findall(narration_text)
@@ -59,7 +68,7 @@ def generate_subtitles(
 
     # Transcribe with Whisper
     print(f"  Transcribing {audio_path}...", file=sys.stderr)
-    model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
+    model = _get_whisper_model()
     whisper_segments, info = model.transcribe(
         audio_path,
         word_timestamps=True,

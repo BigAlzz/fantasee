@@ -134,7 +134,7 @@ Priority order:
 2. Healthy CPU workers.
 3. Healthy manual workers of unknown kind.
 
-If a GPU worker is healthy, single-image generation stays on GPU and CPU workers remain idle. CPU workers are fallbacks.
+If a GPU worker is healthy, single-image generation stays on GPU and CPU workers remain idle. Startup and first-run generation require only one healthy GPU worker. Extra configured workers are optional throughput and are used only after their health checks pass.
 
 ### Worker Commands
 
@@ -160,7 +160,7 @@ This avoids `Could not acquire lock on database` and `Unsupported database URL` 
 
 ### Auto-Spawn
 
-If the server starts and no ComfyUI worker is detected, Fantasee auto-spawns a DirectML GPU worker on `8189`. Disable this with:
+If the server starts and no ComfyUI worker is detected, Fantasee auto-spawns one DirectML GPU worker on `8189`. The startup wait is satisfied as soon as one worker is healthy; second and later workers can keep booting in the background. Disable this with:
 
 ```bat
 set FANTASEE_AUTO_SPAWN_CPU=0

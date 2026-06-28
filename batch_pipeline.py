@@ -79,7 +79,7 @@ def llm_call(messages, model="mimo-v2.5-pro", temperature=0.7, max_tokens=2048, 
         try:
             resp = requests.post(
                 f"{base_url}/chat/completions",
-                json={"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens},
+                json={"model": model, "messages": messages, "temperature": temperature, "max_completion_tokens": max_tokens},
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 timeout=timeout,
             )
@@ -89,7 +89,7 @@ def llm_call(messages, model="mimo-v2.5-pro", temperature=0.7, max_tokens=2048, 
                 # Try alternate header
                 resp2 = requests.post(
                     f"{base_url}/chat/completions",
-                    json={"model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens},
+                    json={"model": model, "messages": messages, "temperature": temperature, "max_completion_tokens": max_tokens},
                     headers={"api-key": api_key, "Content-Type": "application/json"},
                     timeout=timeout,
                 )
@@ -268,7 +268,8 @@ def generate_image_for_scene(scene, scene_num, story_dir, story_id, image_index=
     padded = f"{scene_num:02d}"
     safe_title = re.sub(r'[^a-zA-Z0-9]+', '_', scene.get("title", "")).strip("_")[:30]
     prefix = f"{story_id}_s{padded}_{safe_title}_{image_index:02d}"
-    seed = hash(story_id + str(scene_num) + str(image_index)) % (2**32 - 1)
+    import hashlib
+    seed = int(hashlib.md5((story_id + str(scene_num) + str(image_index)).encode()).hexdigest(), 16) % (2**32 - 1)
 
     print(f"    [IMG] Scene {scene_num}, image {image_index}...", file=sys.stderr)
     filename = generate_image(

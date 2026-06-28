@@ -92,11 +92,12 @@ def run_poc(scene: dict, voice_preset: str = "dramatic_male", skip_images: bool 
             prefix = f"{story_id}_s{scene_num:02d}"
             print(f"  Generating scene image with DreamShaper...")
             t0 = time.time()
+            import hashlib
             filename = generate_image(
                 prompt=scene["prompt"],
                 output_prefix=prefix,
                 output_dir=str(scene_dir),
-                seed=hash(story_id + str(scene_num)) % (2**32 - 1),
+                seed=int(hashlib.md5((story_id + str(scene_num)).encode()).hexdigest(), 16) % (2**32 - 1),
                 checkpoint="fantasy",
                 timeout=600,
             )
@@ -179,7 +180,7 @@ def run_poc(scene: dict, voice_preset: str = "dramatic_male", skip_images: bool 
                 "audio_filename": results["audio"],
                 "audio_duration": results["duration"],
                 "subtitle_file": results["subtitles"],
-                "seed": hash(story_id + str(scene_num)) % (2**32 - 1),
+                "seed": int(hashlib.md5((story_id + str(scene_num)).encode()).hexdigest(), 16) % (2**32 - 1),
             }
         ],
     }

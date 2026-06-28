@@ -26,6 +26,7 @@ import shutil
 import unittest
 import wave
 from pathlib import Path
+from unittest.mock import patch
 
 from tests._helpers import has_pillow, temp_dir
 
@@ -218,6 +219,37 @@ class TestPlanRepair(unittest.TestCase):
             import story_actions
             plan = story_actions.plan_repair(slug, story_dir=story)
             self.assertIn("narration", plan.scenes[0].missing)
+            self.assertEqual(plan.scenes[0].actions, ["regen_narration"])
+
+    def test_missing_narration_without_scene_text_stays_blocked(self):
+        with temp_dir() as tmp:
+            slug = "no-narration-context"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True,
+                 "narration": "", "prompt": "", "title": "Scene 01"},
+            ])
+            manifest_path = story / f"{slug}.json"
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            data["scenes"][0]["prompt"] = ""
+            data["scenes"][0]["narrative"] = ""
+            manifest_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+            import story_actions
+            plan = story_actions.plan_repair(slug, story_dir=story)
+            self.assertEqual(plan.scenes[0].actions, ["needs_narration"])
+
+    def test_flags_parser_metadata_as_regenerate_required(self):
+        with temp_dir() as tmp:
+            slug = "parser-junk"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True,
+                 "narration": "## SCENE 1 **Title: The Dying Grove**",
+                 "prompt": "**Visual Prompt:** A wide shot that should not be stored with labels."},
+            ])
+            import story_actions
+            plan = story_actions.plan_repair(slug, story_dir=story)
+            self.assertIn("story_text", plan.scenes[0].missing)
+            self.assertEqual(plan.scenes[0].actions, ["needs_regenerate"])
 
     def test_skips_complete_scenes(self):
         with temp_dir() as tmp:
@@ -252,6 +284,82 @@ class TestPlanRepair(unittest.TestCase):
             self.assertEqual(scenes_checked, 2)
             dup = [s for s in plan.scenes if s.duplicate_image]
             self.assertEqual(len(dup), 1, "should detect the duplicate")
+
+
+# ── apply_repair ──────────────────────────────────────────────────────
+
+
+class TestApplyRepair(unittest.TestCase):
+    def test_apply_repair_regenerates_narration_only(self):
+        with temp_dir() as tmp:
+            slug = "repair-narration-only"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True,
+                 "narration": ""},
+            ])
+
+            import generate_story
+            import story_actions
+
+            repaired = (
+                "The lantern rises in the quiet hall, and every shadow seems to "
+                "draw a breath as the hidden door remembers the hand that sealed it."
+            )
+
+            with patch.object(generate_story, "call_llm", return_value=f"Narration: {repaired}"):
+                plan = story_actions.plan_repair(slug, story_dir=story)
+                result = story_actions.apply_repair(slug, plan, story_dir=story)
+
+            self.assertEqual(result.errors, [])
+            self.assertEqual(result.scenes_repaired, 1)
+            self.assertEqual([a["action"] for a in result.actions_taken], ["regen_narration"])
+
+            manifest = json.loads((story / f"{slug}.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["scenes"][0]["narration"], repaired)
+            self.assertEqual(manifest["scenes"][0]["narration_text"], repaired)
+
+    def test_apply_repair_regenerates_narration_before_audio_and_subs(self):
+        with temp_dir() as tmp:
+            slug = "repair-narration-audio-subs"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": False, "subs": False,
+                 "narration": ""},
+            ])
+
+            import generate_story
+            import generate_subtitles
+            import story_actions
+            import tts_utils
+
+            repaired = (
+                "The bridge answers with a low groan, and the traveler steps "
+                "forward while blue fire gathers beneath each ancient stone."
+            )
+            seen_tts_text = []
+
+            def fake_generate_tts(text: str, audio_path: str, voice: str = "Dean",
+                                  tone: str = "dramatic") -> bool:
+                seen_tts_text.append(text)
+                _wav(Path(audio_path), seconds=1.0)
+                return True
+
+            def fake_generate_subtitles(audio_path: str, narration: str):
+                return [{"text": narration, "start": 0.0, "end": 1.0}]
+
+            with patch.object(generate_story, "call_llm", return_value=repaired), \
+                 patch.object(tts_utils, "generate_tts", side_effect=fake_generate_tts), \
+                 patch.object(tts_utils, "get_audio_duration", return_value=1.0), \
+                 patch.object(generate_subtitles, "generate_subtitles", side_effect=fake_generate_subtitles):
+                plan = story_actions.plan_repair(slug, story_dir=story)
+                self.assertEqual(plan.scenes[0].actions, ["regen_narration", "regen_tts", "regen_subs"])
+                result = story_actions.apply_repair(slug, plan, story_dir=story)
+
+            self.assertEqual(result.errors, [])
+            self.assertEqual([a["action"] for a in result.actions_taken],
+                             ["regen_narration", "regen_tts", "regen_subs"])
+            self.assertEqual(seen_tts_text, [repaired])
+            self.assertTrue((story / f"tts_{slug}_s01.wav").exists())
+            self.assertTrue((story / f"subs_{slug}_s01.json").exists())
 
 
 # ── plan_extend ───────────────────────────────────────────────────────
@@ -290,7 +398,227 @@ class TestPlanExtend(unittest.TestCase):
 # ── regenerate_story (mocked pipeline) ──────────────────────────────
 
 
+class TestParserAndExtend(unittest.TestCase):
+    def test_parse_scene_response_handles_fences_and_numbered_headings(self):
+        from generate_story import parse_scene_response
+
+        raw = """
+```text
+SCENE 1
+Title: First Light
+Visual Prompt: A wide shot of a lantern-lit bridge in the rain.
+Narrative: The heroine steps onto the bridge.
+Narration: The heroine steps onto the bridge, and the world goes quiet.
+
+2. Second Signal
+Title: Second Signal
+Visual Prompt: A low angle view of a sealed door glowing faintly.
+Narrative: The seal begins to crack.
+Narration: The seal begins to crack, and dust spills into the hall.
+```
+"""
+        scenes = parse_scene_response(raw, expected_scenes=2)
+        self.assertEqual(len(scenes), 2)
+        self.assertEqual(scenes[0]["title"], "First Light")
+        self.assertIn("lantern-lit bridge", scenes[0]["prompt"])
+        self.assertEqual(scenes[1]["title"], "Second Signal")
+        self.assertIn("sealed door", scenes[1]["prompt"])
+
+    def test_parse_scene_response_handles_bold_markdown_scene_blocks(self):
+        from generate_story import parse_scene_response
+
+        raw = """
+# Clash of Ancient Minds — Scene Breakdown
+
+**CHARACTERS:**
+- **Kael** — Human shaman.
+- **Brennok** — Neanderthal mystic.
+
+---
+
+## SCENE 1
+**Title: The Dying Grove**
+**Visual Prompt:** A wide shot of a sacred forest grove at twilight, with black sap bleeding from split bark while Kael kneels beside a cracked stone altar.
+**Narrative:** Kael reaches the grove and discovers the land has gone silent.
+**Narration:** The grove was not supposed to look like this. Kael kneels at the altar and listens for spirits that no longer answer.
+
+---
+
+## SCENE 2 **Title: Smoke on the Ridge**
+**Visual Prompt:** A low angle shot behind Brennok on a high ridge, his mammoth-hide cloak whipping in the wind as blackness advances across the valley.
+**Narrative:** Brennok sees the corruption crossing toward his settlement.
+**Narration:** Smoke moves across the valley before the fires begin. Brennok raises his staff and understands that this darkness is hunting them all.
+"""
+        scenes = parse_scene_response(raw, expected_scenes=2)
+        self.assertEqual(len(scenes), 2)
+        self.assertEqual(scenes[0]["title"], "The Dying Grove")
+        self.assertIn("sacred forest grove", scenes[0]["prompt"])
+        self.assertEqual(scenes[1]["title"], "Smoke on the Ridge")
+        self.assertIn("Brennok raises his staff", scenes[1]["narration"])
+        self.assertNotIn("CHARACTERS", scenes[0]["prompt"])
+
+    def test_parse_scene_response_does_not_paragraph_fallback_malformed_scene_headers(self):
+        from generate_story import parse_scene_response
+
+        raw = """
+## SCENE 1
+**Title: Empty Header Only**
+
+---
+
+## SCENE 2
+**Title: Also Empty**
+"""
+        scenes = parse_scene_response(raw, expected_scenes=2)
+        self.assertEqual(scenes, [])
+
+    def test_apply_extend_writes_subtitles_for_new_scenes(self):
+        with temp_dir() as tmp:
+            slug = "extend-subs"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True},
+            ])
+
+            import comfyui_utils
+            import generate_story
+            import story_actions
+            import tts_utils
+
+            raw = """
+```text
+SCENE 2
+Title: The Hidden Door
+Visual Prompt: A wide shot of a lantern-lit corridor opening into an ancient vault.
+Narrative: The hero follows the sound into the dark.
+Narration: The hero follows the sound into the dark, lantern held high.
+
+3. The Broken Seal
+Title: The Broken Seal
+Visual Prompt: A close-up of a cracked seal glowing with blue light.
+Narrative: The seal finally gives way.
+Narration: The seal finally gives way, and cold air spills from below.
+```
+"""
+
+            def fake_call_llm(system: str, prompt: str, temperature: float = 0.7) -> str:
+                return raw
+
+            def fake_generate_tts(text: str, audio_path: str, voice: str = "Dean", tone: str = "dramatic") -> bool:
+                _wav(Path(audio_path), seconds=1.0)
+                return True
+
+            def fake_get_audio_duration(audio_path: str) -> float:
+                return 1.0
+
+            def fake_regen_scene_subs(story_dir, story_id, padded, scene_obj, manifest) -> None:
+                sub_path = story_dir / f"subs_{story_id}_s{padded}.json"
+                sub_path.write_text(json.dumps([
+                    {"text": "line one", "start": 0.0, "end": 0.5},
+                    {"text": "line two", "start": 0.5, "end": 1.0},
+                ]), encoding="utf-8")
+                scene_obj["subtitle_file"] = sub_path.name
+
+            with patch.object(generate_story, "call_llm", side_effect=fake_call_llm), \
+                 patch.object(comfyui_utils, "is_running", return_value={"running": False}), \
+                 patch.object(tts_utils, "generate_tts", side_effect=fake_generate_tts), \
+                 patch.object(tts_utils, "get_audio_duration", side_effect=fake_get_audio_duration), \
+                 patch.object(story_actions, "_regen_scene_subs", side_effect=fake_regen_scene_subs):
+                result = story_actions.apply_extend(slug, scenes=2, story_dir=story)
+
+            self.assertEqual(result["status"], "ok")
+            self.assertEqual(result["new_scenes_added"], 2)
+
+            manifest = json.loads((story / f"{slug}.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["scenes"][1]["title"], "The Hidden Door")
+            self.assertEqual(manifest["scenes"][1]["subtitle_file"], f"subs_{slug}_s02.json")
+            self.assertEqual(manifest["scenes"][2]["title"], "The Broken Seal")
+            self.assertEqual(manifest["scenes"][2]["subtitle_file"], f"subs_{slug}_s03.json")
+            self.assertTrue((story / f"subs_{slug}_s02.json").exists())
+            self.assertTrue((story / f"subs_{slug}_s03.json").exists())
+            self.assertEqual(result["errors"], [])
+
+            appended = manifest["scenes"][1:]
+            self.assertTrue(all(scene.get("audio_filename") for scene in appended))
+            self.assertTrue(all(scene.get("subtitle_file") for scene in appended))
+
+    def test_apply_extend_does_not_persist_scene_when_subtitles_fail(self):
+        with temp_dir() as tmp:
+            slug = "extend-subs-fail"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True},
+            ])
+
+            import comfyui_utils
+            import generate_story
+            import story_actions
+            import tts_utils
+
+            raw = """
+SCENE 2
+Title: The Uncaptioned Door
+Visual Prompt: A wide shot of a lantern-lit corridor opening into an ancient vault.
+Narrative: The hero follows the sound into the dark.
+Narration: The hero follows the sound into the dark, lantern held high.
+"""
+
+            def fake_generate_tts(text: str, audio_path: str, voice: str = "Dean", tone: str = "dramatic") -> bool:
+                _wav(Path(audio_path), seconds=1.0)
+                return True
+
+            with patch.object(generate_story, "call_llm", return_value=raw), \
+                 patch.object(comfyui_utils, "is_running", return_value={"running": False}), \
+                 patch.object(tts_utils, "generate_tts", side_effect=fake_generate_tts), \
+                 patch.object(tts_utils, "get_audio_duration", return_value=1.0), \
+                 patch.object(story_actions, "_regen_scene_subs", side_effect=RuntimeError("Whisper unavailable")):
+                result = story_actions.apply_extend(slug, scenes=1, story_dir=story)
+
+            self.assertEqual(result["status"], "all_failed")
+            self.assertEqual(result["new_scenes_added"], 0)
+            self.assertEqual(len(result["errors"]), 1)
+            self.assertIn("Whisper unavailable", result["errors"][0])
+
+            manifest = json.loads((story / f"{slug}.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(manifest["scenes"]), 1)
+
+
 class TestRegenerate(unittest.TestCase):
+    def test_stale_story_dir_falls_back_to_existing_story_dir(self):
+        with temp_dir() as tmp:
+            slug = "stale-dir"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True},
+            ])
+            stale = tmp / "missing" / slug
+
+            import story_actions
+            from story_storage import ensure_story_layout
+
+            with patch.object(story_actions, "existing_story_dir", return_value=story), \
+                 patch.object(story_actions, "TRASH_DIR", tmp / "trash"):
+                from generate_story import run_pipeline as _real_run_pipeline
+
+                def _fake_run_pipeline(**kwargs):
+                    ensure_story_layout(story)
+                    (story / f"{slug}.json").write_text(
+                        json.dumps({
+                            "id": slug, "scenes": [{"scene": "01"}],
+                            "status": "complete",
+                        }, indent=2),
+                        encoding="utf-8",
+                    )
+                    return {"id": slug, "scene_count": 1, "status": "complete"}
+
+                import generate_story
+                generate_story.run_pipeline = _fake_run_pipeline
+                try:
+                    result = story_actions.regenerate_story(
+                        slug, backup=True, story_dir=stale,
+                    )
+                    self.assertEqual(result["status"], "ok")
+                    self.assertTrue((story / "working").is_dir())
+                finally:
+                    generate_story.run_pipeline = _real_run_pipeline
+
     def test_backup_then_wipe_clears_old_files(self):
         """Re-generate should back the story up to .trash/ and wipe
         everything in the story dir before re-running the pipeline."""

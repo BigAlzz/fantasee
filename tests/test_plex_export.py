@@ -13,8 +13,11 @@ from pathlib import Path
 from plex_export import (
     SceneChapter,
     _ffmpeg_escape_title,
+    _plex_movie_folder_name,
+    _sanitize_for_plex,
     _seconds_to_srt_time,
     _seconds_to_vtt_time,
+    _resolve_year,
     build_chapters,
     chapters_to_ffmetadata,
     segments_to_srt,
@@ -194,6 +197,96 @@ class TestChapterEdgeCases(unittest.TestCase):
         self.assertEqual(list(map(int, starts)), [0, 5500])
         self.assertEqual(list(map(int, ends)), [5000, 12000])
         self.assertEqual(list(titles), ["Chapter 1", "Chapter 2"])
+
+
+class TestPlexFilenameSanitize(unittest.TestCase):
+    """Cover the Windows + Plex blacklist + whitespace collapse rules."""
+
+    def test_plain_title_passes_through(self):
+        self.assertEqual(
+            _sanitize_for_plex("Fragile Truce of Bone and Spirit"),
+            "Fragile Truce of Bone and Spirit",
+        )
+
+    def test_strips_invalid_chars(self):
+        self.assertEqual(
+            _sanitize_for_plex('What: "Iron" / Pursuit?'),
+            "What Iron Pursuit",
+        )
+
+    def test_collapses_whitespace(self):
+        self.assertEqual(
+            _sanitize_for_plex("Foo   bar\t\tbaz"),
+            "Foo bar baz",
+        )
+
+    def test_strips_trailing_dots_and_spaces(self):
+        # Windows refuses trailing dots/spaces in filenames.
+        self.assertEqual(
+            _sanitize_for_plex("Title...  "),
+            "Title",
+        )
+
+    def test_falls_back_on_garbage(self):
+        # Only punctuation → use the fallback instead of an empty string.
+        self.assertEqual(_sanitize_for_plex("***"), "Untitled")
+        self.assertEqual(_sanitize_for_plex(""), "Untitled")
+        self.assertEqual(_sanitize_for_plex("   "), "Untitled")
+
+    def test_strips_control_chars(self):
+        self.assertEqual(
+            _sanitize_for_plex("Title\x00\x1f with \nnewline"),
+            "Title with newline",
+        )
+
+    def test_caps_length(self):
+        long = "A" * 500
+        out = _sanitize_for_plex(long)
+        self.assertLessEqual(len(out), 200)
+
+
+class TestPlexFolderName(unittest.TestCase):
+    def test_title_with_year(self):
+        self.assertEqual(
+            _plex_movie_folder_name({"title": "Iron Pursuit", "year": 2024}),
+            "Iron Pursuit (2024)",
+        )
+
+    def test_falls_back_to_current_year(self):
+        import datetime
+        year = datetime.datetime.now().year
+        self.assertEqual(
+            _plex_movie_folder_name({"title": "Iron Pursuit"}),
+            f"Iron Pursuit ({year})",
+        )
+
+    def test_strips_invalid_title_chars(self):
+        self.assertEqual(
+            _plex_movie_folder_name({"title": "What: Iron? / Pursuit", "year": 2025}),
+            "What Iron Pursuit (2025)",
+        )
+
+    def test_rejects_garbage_year(self):
+        import datetime
+        year = datetime.datetime.now().year
+        # Bogus year strings should fall back to the current year
+        self.assertEqual(
+            _plex_movie_folder_name({"title": "Foo", "year": "not-a-year"}),
+            f"Foo ({year})",
+        )
+
+
+class TestResolveYear(unittest.TestCase):
+    def test_int_year(self):
+        self.assertEqual(_resolve_year({"year": 2024}), 2024)
+
+    def test_numeric_string_year(self):
+        self.assertEqual(_resolve_year({"year": "2024"}), 2024)
+
+    def test_missing_year_falls_back_to_current(self):
+        import datetime
+        self.assertEqual(_resolve_year({}), datetime.datetime.now().year)
+        self.assertEqual(_resolve_year({"year": "junk"}), datetime.datetime.now().year)
 
 
 if __name__ == "__main__":
