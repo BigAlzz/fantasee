@@ -13,6 +13,9 @@ audio/
 *.mp4
 *.wav
 
+# Logs
+logs/
+
 # IDE
 .vscode/
 .idea/
@@ -20,3 +23,6 @@ audio/
 # OS
 Thumbs.db
 .DS_Store
+
+# ComfyUI per-worker DBs (created at runtime)
+*.db

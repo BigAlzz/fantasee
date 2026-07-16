@@ -33,10 +33,13 @@ class TestStoryDeleteTaskEndpoint(unittest.TestCase):
             fake_ws = FakeWebSocket()
             old_tasks = dict(server._generation_tasks)
             old_clients = list(server._websocket_clients)
-            old_cache = server._stories_cache
+            # _stories_cache lives in fantasee_server.state; reach it via the
+            # module so the background task's updates are observable here.
+            from fantasee_server import state as fs_state
+            old_cache = fs_state._stories_cache
             server._generation_tasks.clear()
             server._websocket_clients[:] = [fake_ws]
-            server._stories_cache = [{"id": story_id, "scenes": []}]
+            fs_state._stories_cache = [{"id": story_id, "scenes": []}]
 
             def slow_delete(path, backup=False, progress_callback=None):
                 time.sleep(0.2)
@@ -58,8 +61,8 @@ class TestStoryDeleteTaskEndpoint(unittest.TestCase):
                 return report
 
             try:
-                with patch.object(server, "generated_story_dir", return_value=story_dir), \
-                     patch.object(server, "load_stories", return_value=[]), \
+                with patch("fantasee_server.api.delete.generated_story_dir", return_value=story_dir), \
+                     patch("fantasee_server.paths.load_stories", return_value=[]), \
                      patch.object(delete_story, "delete_story_with_progress", side_effect=slow_delete):
                     started = time.perf_counter()
                     response = await server.delete_story_endpoint(
@@ -83,7 +86,7 @@ class TestStoryDeleteTaskEndpoint(unittest.TestCase):
                     self.assertEqual(task["kind"], "delete_story")
                     self.assertEqual(task["status"], "done")
                     self.assertEqual(task["result"]["files_deleted"], 1)
-                    self.assertEqual(server._stories_cache, [])
+                    self.assertEqual(fs_state._stories_cache, [])
 
                     await asyncio.sleep(0.02)
                     task_updates = [
@@ -98,7 +101,7 @@ class TestStoryDeleteTaskEndpoint(unittest.TestCase):
                 server._generation_tasks.clear()
                 server._generation_tasks.update(old_tasks)
                 server._websocket_clients[:] = old_clients
-                server._stories_cache = old_cache
+                fs_state._stories_cache = old_cache
 
 
 if __name__ == "__main__":

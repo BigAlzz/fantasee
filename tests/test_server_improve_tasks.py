@@ -35,10 +35,11 @@ class TestStoryImproveTaskEndpoints(unittest.TestCase):
             fake_ws = FakeWebSocket()
             old_tasks = dict(server._generation_tasks)
             old_clients = list(server._websocket_clients)
-            old_cache = server._stories_cache
+            from fantasee_server import state as fs_state
+            old_cache = fs_state._stories_cache
             server._generation_tasks.clear()
             server._websocket_clients[:] = [fake_ws]
-            server._stories_cache = [{"id": story_id, "scenes": []}]
+            fs_state._stories_cache = [{"id": story_id, "scenes": []}]
 
             def fake_worker(worker_story_id, body, progress=None):
                 self.assertEqual(worker_story_id, story_id)
@@ -54,9 +55,9 @@ class TestStoryImproveTaskEndpoints(unittest.TestCase):
                 }
 
             try:
-                with patch.object(server, "generated_story_dir", return_value=story_dir), \
-                     patch.object(server, "load_stories", return_value=[{"id": story_id}]), \
-                     patch.object(server, "_run_auto_improve_sync", side_effect=fake_worker):
+                with patch("fantasee_server.api.actions.generated_story_dir", return_value=story_dir), \
+                     patch("fantasee_server.paths.load_stories", return_value=[{"id": story_id}]), \
+                     patch("fantasee_server.api.actions._run_auto_improve_sync", side_effect=fake_worker):
                     started = time.perf_counter()
                     response = await server.auto_improve(story_id, {"max_scenes": 2})
                     elapsed = time.perf_counter() - started
@@ -93,7 +94,7 @@ class TestStoryImproveTaskEndpoints(unittest.TestCase):
                 server._generation_tasks.clear()
                 server._generation_tasks.update(old_tasks)
                 server._websocket_clients[:] = old_clients
-                server._stories_cache = old_cache
+                fs_state._stories_cache = old_cache
 
     def test_improve_loop_returns_task_and_reports_progress_result(self):
         asyncio.run(self._run_improve_loop_returns_task())
@@ -113,10 +114,11 @@ class TestStoryImproveTaskEndpoints(unittest.TestCase):
             fake_ws = FakeWebSocket()
             old_tasks = dict(server._generation_tasks)
             old_clients = list(server._websocket_clients)
-            old_cache = server._stories_cache
+            from fantasee_server import state as fs_state
+            old_cache = fs_state._stories_cache
             server._generation_tasks.clear()
             server._websocket_clients[:] = [fake_ws]
-            server._stories_cache = [{"id": story_id, "scenes": []}]
+            fs_state._stories_cache = [{"id": story_id, "scenes": []}]
 
             def fake_worker(worker_story_id, body, progress=None):
                 self.assertEqual(worker_story_id, story_id)
@@ -133,9 +135,9 @@ class TestStoryImproveTaskEndpoints(unittest.TestCase):
                 }
 
             try:
-                with patch.object(server, "generated_story_dir", return_value=story_dir), \
-                     patch.object(server, "load_stories", return_value=[{"id": story_id}]), \
-                     patch.object(server, "_run_improve_loop_sync", side_effect=fake_worker):
+                with patch("fantasee_server.api.actions.generated_story_dir", return_value=story_dir), \
+                     patch("fantasee_server.paths.load_stories", return_value=[{"id": story_id}]), \
+                     patch("fantasee_server.api.actions._run_improve_loop_sync", side_effect=fake_worker):
                     started = time.perf_counter()
                     response = await server.improve_loop(story_id, {"max_rounds": 2})
                     elapsed = time.perf_counter() - started
@@ -172,7 +174,7 @@ class TestStoryImproveTaskEndpoints(unittest.TestCase):
                 server._generation_tasks.clear()
                 server._generation_tasks.update(old_tasks)
                 server._websocket_clients[:] = old_clients
-                server._stories_cache = old_cache
+                fs_state._stories_cache = old_cache
 
 
 if __name__ == "__main__":

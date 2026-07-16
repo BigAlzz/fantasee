@@ -303,7 +303,7 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
             return None
         
         size_mb = out_path.stat().st_size / 1024 / 1024
-        print(f"  → {out_path.name} ({size_mb:.1f} MB, {duration:.1f}s)")
+        print(f"  -> {out_path.name} ({size_mb:.1f} MB, {duration:.1f}s)")
         
         # Save VTT subtitle sidecar
         if subs:
@@ -311,7 +311,7 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
             with open(subs, "r", encoding="utf-8") as f:
                 sub_segs = json.load(f)
             subs_json_to_vtt(sub_segs, vtt_out)
-            print(f"  → {vtt_out.name}")
+            print(f"  -> {vtt_out.name}")
         
         return out_path
 
@@ -474,14 +474,14 @@ def main():
     else:
         scene_range = [int(s["scene"]) for s in scenes]
     
-    print(f"{'═'*60}")
+    print("=" * 60)
     print(f"  Fantasee Video Renderer")
     print(f"  Story:     {args.slug}")
     print(f"  Resolution: {width}x{height} @ {args.fps}fps")
     print(f"  CRF:       {args.crf}")
     print(f"  Scenes:    {scene_range}")
     print(f"  Burn subs: {args.burn_subs}")
-    print(f"{'═'*60}\n")
+    print("=" * 60 + "\n")
     
     t_start = _time()
     scene_videos = []
@@ -517,10 +517,10 @@ def main():
                 shutil.copy2(full_path, layout["final"] / full_path.name)
     
     elapsed = _time() - t_start
-    print(f"\n{'═'*60}")
+    print("\n" + "=" * 60)
     print(f"  Done! {len(scene_videos)} scenes rendered in {elapsed:.0f}s")
     print(f"  Output: {story_dir}")
-    print(f"{'═'*60}")
+    print("=" * 60)
 
     # Exit non-zero when nothing was rendered, so the server endpoint and
     # any caller can detect the silent no-op (story has no images / no

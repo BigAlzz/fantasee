@@ -288,7 +288,11 @@ rem  closed immediately; the 3 workers keep running.
     > "%G1%"  echo @echo off
     >>"%G1%" echo title ComfyUI GPU#1 [:8188]
     >>"%G1%" echo cd /d "%ROOT%"
-    >>"%G1%" echo call "%ROOT%\start.bat" gpu1
+    if /i "%FORCE_KILL%"=="--force" (
+        >>"%G1%" echo call "%ROOT%\start.bat" gpu1 --force
+    ) else (
+        >>"%G1%" echo call "%ROOT%\start.bat" gpu1
+    )
     start "ComfyUI GPU#1 [:8188]" "%G1%"
 
     rem --- gpu2 helper ---
@@ -296,7 +300,11 @@ rem  closed immediately; the 3 workers keep running.
     > "%G2%"  echo @echo off
     >>"%G2%" echo title ComfyUI GPU#2 [:8189]
     >>"%G2%" echo cd /d "%ROOT%"
-    >>"%G2%" echo call "%ROOT%\start.bat" gpu2
+    if /i "%FORCE_KILL%"=="--force" (
+        >>"%G2%" echo call "%ROOT%\start.bat" gpu2 --force
+    ) else (
+        >>"%G2%" echo call "%ROOT%\start.bat" gpu2
+    )
     start "ComfyUI GPU#2 [:8189]" "%G2%"
 
     rem --- server helper ---
@@ -304,7 +312,13 @@ rem  closed immediately; the 3 workers keep running.
     > "%GS%"  echo @echo off
     >>"%GS%" echo title Fantasee Server [:8765]
     >>"%GS%" echo cd /d "%ROOT%"
-    >>"%GS%" echo call "%ROOT%\start.bat" server
+    >>"%GS%" echo set "COMFYUI_URLS=http://127.0.0.1:8188,http://127.0.0.1:8189"
+    >>"%GS%" echo set "FANTASEE_AUTO_SPAWN_CPU=0"
+    if /i "%FORCE_KILL%"=="--force" (
+        >>"%GS%" echo call "%ROOT%\start.bat" server --force
+    ) else (
+        >>"%GS%" echo call "%ROOT%\start.bat" server
+    )
     start "Fantasee Server [:8765]" "%GS%"
 
     echo   All 3 windows are open. Check your taskbar.
@@ -516,8 +530,17 @@ rem  is rare and best handled by the user.
     echo.
     exit /b 0
 :quick_busy
+    if /i "%FORCE_KILL%"=="--force" goto :quick_kill_force
     echo   [WARN] Port %PORT% is busy (PID %QUICK_PID%). ComfyUI may fail to bind.
     echo          Run with --force to auto-kill, or use start.bat gpu1 --force.
+    echo.
+    exit /b 0
+
+:quick_kill_force
+    echo   [WARN] --force set: killing process on port %PORT% (PID %QUICK_PID%)...
+    taskkill /PID %QUICK_PID% /F >nul 2>&1
+    timeout /t 2 /nobreak >nul
+    echo   [OK] Port %PORT% cleared.
     echo.
     exit /b 0
 

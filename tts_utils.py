@@ -30,6 +30,7 @@ import requests
 
 # ── Config ──────────────────────────────────────────────────────────────
 TTS_API_URL = "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions"
+DEFAULT_TTS_SPEED = float(os.environ.get("FANTASEE_TTS_SPEED", "1.3"))
 
 # Xiaomi named voices (built-in, per official v2.5 TTS docs)
 XIAOMI_VOICES = {
@@ -163,6 +164,30 @@ TONE_MODIFIERS = {
     "excited":     "\n\n[Tone] Gently energized, warm enthusiasm, not loud. Lifted pitch on the closing line of a beat. (laughs) at happy moments.",
     "calm":        "\n\n[Tone] Soft, unhurried, inviting. The voice should feel like a steady hand on a shoulder. (gentle exhale) at natural breath points.",
 }
+
+# Current house style: smooth audiobook voice acting, not trailer narration.
+# These overrides intentionally keep some performance/emotion while removing
+# the exaggerated pauses, gasps, and melodramatic spikes that made subtitles
+# drift and the player feel over-acted.
+VOICE_PRESETS["Dean"]["style"] = (
+    "[Character] A middle-aged male narrator with a deep, warm chest voice "
+    "and a light touch of gravel. He sounds grounded, intelligent, and close "
+    "to the listener, like a skilled audiobook actor rather than a movie "
+    "trailer announcer.\n\n"
+    "[Guidance] Smooth, natural voice acting with clear phrasing and restrained "
+    "emotion. Let character beats color the line, but keep the performance "
+    "conversational and believable. Avoid booming, whispering, gasping, "
+    "theatrical pauses, exaggerated breaths, and over-sold dramatic reveals."
+)
+TONE_MODIFIERS.update({
+    "normal": "\n\n[Tone] Clear, smooth, lightly expressive narration.",
+    "dramatic": "\n\n[Tone] Light dramatic shading only. Keep it believable and conversational; never stage-act, boom, whisper, or oversell.",
+    "dark": "\n\n[Tone] Serious and shadowed, but calm. No horror-trailer intensity, long ominous pauses, or melodrama.",
+    "epic": "\n\n[Tone] Measured and spacious with restrained gravitas. Do not make the voice larger than life.",
+    "manhwa": "\n\n[Tone] Modern serialized adventure narration with momentum and subtle attitude. Keep it controlled, clear, and human. No sharp inhales, smirks, huge trailer pauses, shouted action beats, or exaggerated emotional drops.",
+    "urgent": "\n\n[Tone] Focused and purposeful with mild urgency. Stay smooth and controlled; do not rush or gasp.",
+    "emotional": "\n\n[Tone] Emotionally present but restrained. Let warmth and vulnerability come through naturally, without breaking into melodrama.",
+})
 
 # Map of which built-in voice to use per language (when the LLM picks a language)
 VOICE_FOR_LANGUAGE = {
@@ -356,6 +381,65 @@ def synthesize(
     return None
 
 
+def _atempo_filter(speed: float) -> str:
+    """Build an ffmpeg atempo chain, preserving pitch while changing speed."""
+    speed = max(0.5, min(float(speed or 1.0), 4.0))
+    parts = []
+    while speed > 2.0:
+        parts.append("atempo=2.0")
+        speed /= 2.0
+    while speed < 0.5:
+        parts.append("atempo=0.5")
+        speed /= 0.5
+    parts.append(f"atempo={speed:.3f}")
+    return ",".join(parts)
+
+
+def _write_tts_audio(audio_bytes: bytes, output_path: Path, speed: float = DEFAULT_TTS_SPEED) -> bool:
+    """Write synthesized audio, applying the app-wide narration speed."""
+    raw_wav = output_path.with_name(output_path.stem + ".raw_tts.wav")
+    sped_wav = output_path.with_name(output_path.stem + ".speed_tts.wav")
+    try:
+        raw_wav.write_bytes(audio_bytes)
+        if abs(float(speed or 1.0) - 1.0) > 0.01:
+            subprocess.run(
+                [
+                    "ffmpeg", "-y",
+                    "-i", str(raw_wav),
+                    "-filter:a", _atempo_filter(speed),
+                    str(sped_wav),
+                ],
+                capture_output=True,
+                timeout=60,
+                check=True,
+            )
+            source = sped_wav
+        else:
+            source = raw_wav
+
+        if output_path.suffix.lower() == ".mp3":
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", str(source), "-codec:a", "libmp3lame", "-b:a", "128k", str(output_path)],
+                capture_output=True,
+                timeout=60,
+                check=True,
+            )
+        else:
+            output_path.write_bytes(source.read_bytes())
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"[tts_utils] WARNING: ffmpeg speed processing failed ({e}); saving original audio", file=sys.stderr)
+        output_path.write_bytes(audio_bytes)
+        return True
+    finally:
+        for tmp in (raw_wav, sped_wav):
+            try:
+                if tmp.exists():
+                    tmp.unlink()
+            except Exception:
+                pass
+
+
 def generate_tts(
     text: str,
     output_path: str,
@@ -363,6 +447,7 @@ def generate_tts(
     style: str = "",
     voice_preset: Optional[str] = None,
     tone: str = "",
+    speed: float = DEFAULT_TTS_SPEED,
 ) -> bool:
     """Generate TTS audio from text.
 
@@ -378,6 +463,8 @@ def generate_tts(
         tone: Story tone (dramatic/dark/epic/mysterious/...). When set,
             TONE_MODIFIERS[tone] is appended to the style prompt so the
             delivery matches the mood.
+        speed: Playback speed baked into the generated file. Defaults to
+            1.3x so player captions align to the faster narration.
 
     Returns:
         True if successful, False otherwise.
@@ -400,26 +487,7 @@ def generate_tts(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if output_path.suffix.lower() == ".mp3":
-        # Save WAV first, then convert
-        wav_path = output_path.with_suffix(".wav")
-        with open(wav_path, "wb") as f:
-            f.write(audio_bytes)
-        try:
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(wav_path), "-codec:a", "libmp3lame", "-b:a", "128k", str(output_path)],
-                capture_output=True, timeout=30, check=True,
-            )
-            wav_path.unlink()
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            print(f"[tts_utils] WARNING: ffmpeg conversion failed ({e}), keeping WAV", file=sys.stderr)
-            wav_path.rename(output_path.with_suffix(".wav"))
-            return True
-    else:
-        with open(output_path, "wb") as f:
-            f.write(audio_bytes)
-        return True
+    return _write_tts_audio(audio_bytes, output_path, speed=speed)
 
 
 def generate_tts_batch(

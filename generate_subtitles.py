@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+import difflib
 import json
 import os
 import re
@@ -36,6 +37,130 @@ def _get_whisper_model() -> WhisperModel:
     return _whisper_model
 
 
+def _generate_subtitles_word_aligned(audio_path: str, narration_text: str) -> list[dict]:
+    """Align script sentences to Whisper word timestamps."""
+    sentence_re = re.compile(r'[^.!?\n]+[.!?]+|[^.!?\n]+$')
+    sentences = [s.strip() for s in sentence_re.findall(narration_text) if s.strip()]
+    if not sentences:
+        sentences = [narration_text.strip()]
+
+    print(f"  Narration: {len(sentences)} sentences", file=sys.stderr)
+    print(f"  Transcribing {audio_path}...", file=sys.stderr)
+    model = _get_whisper_model()
+    whisper_segments, info = model.transcribe(
+        audio_path,
+        word_timestamps=True,
+        language="en",
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=200),
+    )
+    if info.language != "en":
+        print(
+            f"  WARNING: detected language {info.language} "
+            f"(p={info.language_probability:.2f})",
+            file=sys.stderr,
+        )
+
+    def norm_word(word: str) -> str:
+        return re.sub(r"[^a-z0-9']+", "", word.lower()).strip("'")
+
+    def script_words(text: str) -> list[str]:
+        words = []
+        for raw in re.findall(r"[A-Za-z0-9']+", text):
+            norm = norm_word(raw)
+            if norm:
+                words.append(norm)
+        return words
+
+    whisper_words = []
+    for seg in whisper_segments:
+        for word in getattr(seg, "words", None) or []:
+            raw = getattr(word, "word", "") or ""
+            norm = norm_word(raw)
+            start = getattr(word, "start", None)
+            end = getattr(word, "end", None)
+            if norm and start is not None and end is not None:
+                whisper_words.append({
+                    "word": norm,
+                    "start": float(start),
+                    "end": float(end),
+                })
+
+    print(f"  Whisper: {len(whisper_words)} words", file=sys.stderr)
+    if not whisper_words:
+        print("  WARNING: no speech words detected!", file=sys.stderr)
+        return [{"text": s, "start": 0, "end": 0} for s in sentences]
+
+    recognized_tokens = [w["word"] for w in whisper_words]
+    audio_end = max(w["end"] for w in whisper_words)
+    total_chars = sum(max(1, len(s)) for s in sentences)
+
+    def estimated_range(sentence_idx: int) -> tuple[float, float]:
+        before = sum(max(1, len(s)) for s in sentences[:sentence_idx])
+        this = max(1, len(sentences[sentence_idx]))
+        start = audio_end * (before / total_chars) if total_chars else 0.0
+        end = audio_end * ((before + this) / total_chars) if total_chars else audio_end
+        return start, max(end, start + 0.5)
+
+    segments = []
+    search_from = 0
+    for sent_idx, sentence in enumerate(sentences):
+        words = script_words(sentence)
+        if words:
+            target_len = len(words)
+            best_score = -1.0
+            best_start = search_from
+            best_end = min(len(recognized_tokens), search_from + max(1, target_len))
+            max_scan = min(len(recognized_tokens), search_from + max(40, target_len * 5))
+            for start_idx in range(search_from, max_scan):
+                min_len = max(1, target_len - max(2, target_len // 3))
+                max_len = target_len + max(3, target_len // 3)
+                for win_len in range(min_len, max_len + 1):
+                    end_idx = min(len(recognized_tokens), start_idx + win_len)
+                    if end_idx <= start_idx:
+                        continue
+                    candidate = recognized_tokens[start_idx:end_idx]
+                    score = difflib.SequenceMatcher(None, words, candidate, autojunk=False).ratio()
+                    if score > best_score:
+                        best_score = score
+                        best_start = start_idx
+                        best_end = end_idx
+                if best_score >= 0.92:
+                    break
+            if best_score >= 0.25 and best_end > best_start:
+                start = whisper_words[best_start]["start"]
+                end = whisper_words[best_end - 1]["end"]
+                search_from = max(best_end, best_start + 1)
+            else:
+                start, end = estimated_range(sent_idx)
+        else:
+            start, end = estimated_range(sent_idx)
+        segments.append({
+            "text": sentence,
+            "start": round(max(0.0, start), 3),
+            "end": round(max(start + 0.35, end), 3),
+        })
+
+    for i in range(len(segments) - 1):
+        next_start = segments[i + 1]["start"]
+        if segments[i]["end"] > next_start:
+            segments[i]["end"] = round(max(segments[i]["start"] + 0.25, next_start), 3)
+        if segments[i + 1]["start"] < segments[i]["end"]:
+            segments[i + 1]["start"] = round(segments[i]["end"], 3)
+        if segments[i + 1]["end"] <= segments[i + 1]["start"]:
+            segments[i + 1]["end"] = round(segments[i + 1]["start"] + 0.35, 3)
+    for seg in segments:
+        seg["start"] = round(min(max(0.0, seg["start"]), audio_end), 3)
+        seg["end"] = round(min(max(seg["end"], seg["start"] + 0.25), audio_end + 0.5), 3)
+
+    print(f"  Generated {len(segments)} subtitle segments", file=sys.stderr)
+    for seg in segments:
+        dur = seg["end"] - seg["start"]
+        preview = seg["text"][:60].replace("\n", " ")
+        print(f"    [{seg['start']:.2f}s-{seg['end']:.2f}s] ({dur:.2f}s) {preview}...", file=sys.stderr)
+    return segments
+
+
 
 
 
@@ -54,6 +179,8 @@ def generate_subtitles(
 
     Each output segment has {text, start, end} in seconds.
     """
+    return _generate_subtitles_word_aligned(audio_path, narration_text)
+
     # Split narration into sentences
     sentence_re = re.compile(r'[^.!?\n]+[.!?]+|[^.!?\n]+$')
     sentences = [

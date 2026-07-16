@@ -11,6 +11,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 import requests
 
@@ -27,6 +28,9 @@ def _comfyui_bases() -> list[str]:
     returns a single-element list with the default COMFYUI_BASE so all
     existing call sites keep working unchanged.
     """
+    if "COMFYUI_URLS" in os.environ:
+        env_val = os.environ.get("COMFYUI_URLS", "").strip()
+        return [u.strip().rstrip("/") for u in env_val.split(",") if u.strip()]
     env_val = os.environ.get("COMFYUI_URLS", "").strip()
     if env_val:
         return [u.strip().rstrip("/") for u in env_val.split(",") if u.strip()]
@@ -279,7 +283,9 @@ import subprocess
 import threading
 
 _cpu_process: Optional[subprocess.Popen] = None
+_gpu_processes: dict[str, subprocess.Popen] = {}
 _cpu_lock = threading.Lock()
+_gpu_lock = threading.Lock()
 _cpu_spawn_attempted: bool = False
 
 
@@ -373,6 +379,211 @@ def _spawn_cpu_comfyui(port: int) -> Optional[subprocess.Popen]:
     except Exception as e:
         print(f"[comfyui_utils] GPU spawn failed: {e}", file=sys.stderr)
         return None
+
+
+def _worker_db_url(comfyui_dir: str, port: int) -> str:
+    db_path = Path(comfyui_dir) / "user" / f"comfyui_{port}.db"
+    return "sqlite:///" + str(db_path).replace("\\", "/")
+
+
+def _add_comfyui_url(url: str) -> None:
+    explicit = os.environ.get("COMFYUI_URLS", "").strip()
+    urls = _comfyui_bases() if explicit else []
+    if not explicit and url != COMFYUI_BASE and is_running_at(COMFYUI_BASE, timeout=0.5)["running"]:
+        urls.append(COMFYUI_BASE)
+    if url not in urls:
+        urls.append(url)
+    os.environ["COMFYUI_URLS"] = ",".join(urls)
+
+
+def _remove_comfyui_url(url: str) -> None:
+    urls = [u for u in _comfyui_bases() if u != url]
+    os.environ["COMFYUI_URLS"] = ",".join(urls)
+    _worker_kinds.pop(url, None)
+
+
+def _find_free_worker_port(preferred: int, *, search_to: int = 8205) -> int:
+    for port in range(preferred, search_to + 1):
+        if not is_running_at(f"http://127.0.0.1:{port}", timeout=0.5)["running"]:
+            return port
+    raise RuntimeError(f"No free ComfyUI worker port found from {preferred} to {search_to}")
+
+
+def _normalize_local_worker_url(url_or_port: str) -> tuple[str, int]:
+    raw = str(url_or_port or "").strip()
+    if not raw:
+        raise ValueError("Worker URL is required")
+    if raw.isdigit():
+        raw = f"http://127.0.0.1:{raw}"
+    parsed = urlparse(raw)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname or not parsed.port:
+        raise ValueError(f"Invalid worker URL: {url_or_port}")
+    host = parsed.hostname.lower()
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        raise ValueError("Only local ComfyUI workers can be killed from the UI")
+    if parsed.port < 1 or parsed.port > 65535:
+        raise ValueError(f"Invalid worker port: {parsed.port}")
+    normalized_host = "127.0.0.1" if host in ("localhost", "::1") else host
+    return f"{parsed.scheme}://{normalized_host}:{parsed.port}", parsed.port
+
+
+def _pid_for_listening_port(port: int) -> Optional[int]:
+    try:
+        if os.name == "nt":
+            cmd = [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                (
+                    f"$p = Get-NetTCPConnection -LocalPort {port} -State Listen "
+                    "-ErrorAction SilentlyContinue | Select-Object -First 1 "
+                    "-ExpandProperty OwningProcess; if ($p) { $p }"
+                ),
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            lines = (proc.stdout or "").strip().splitlines()
+            return int(lines[0]) if lines and lines[0].strip().isdigit() else None
+        proc = subprocess.run(
+            ["sh", "-c", f"lsof -ti tcp:{port} -sTCP:LISTEN | head -n 1"],
+            capture_output=True, text=True, timeout=10,
+        )
+        text = (proc.stdout or "").strip()
+        return int(text) if text.isdigit() else None
+    except Exception as e:
+        print(f"[comfyui_utils] pid lookup failed for :{port}: {e}", file=sys.stderr)
+        return None
+
+
+def kill_worker(worker_url: str) -> dict:
+    """Kill one local ComfyUI worker by URL or port."""
+    global _cpu_process
+    url, port = _normalize_local_worker_url(worker_url)
+    pid = _pid_for_listening_port(port)
+    if not pid:
+        _remove_comfyui_url(url)
+        return {"url": url, "port": port, "killed": False, "message": "Worker was not listening"}
+
+    try:
+        if os.name == "nt":
+            proc_result = subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                capture_output=True, text=True, timeout=15,
+            )
+            if proc_result.returncode != 0:
+                msg = (proc_result.stderr or proc_result.stdout or "").strip()
+                raise RuntimeError(msg or f"taskkill exited {proc_result.returncode}")
+        else:
+            os.kill(pid, 15)
+    except Exception as e:
+        raise RuntimeError(f"Failed to kill worker on :{port}: {e}") from e
+
+    proc = _gpu_processes.pop(url, None)
+    if proc and proc.poll() is None:
+        try:
+            proc.wait(timeout=2)
+        except Exception:
+            pass
+    if _cpu_process and getattr(_cpu_process, "pid", None) == pid:
+        _cpu_process = None
+    _remove_comfyui_url(url)
+    return {"url": url, "port": port, "pid": pid, "killed": True}
+
+
+def _spawn_explicit_worker(port: int, kind: str) -> Optional[subprocess.Popen]:
+    """Spawn a detached CPU or DirectML worker using start.bat conventions."""
+    if kind not in ("cpu", "gpu"):
+        raise ValueError(f"Unsupported worker kind: {kind}")
+
+    py, d = _comfyui_paths()
+    if not py or not d:
+        print("[comfyui_utils] worker spawn skipped: COMFYUI_PY/COMFYUI_DIR not found",
+              file=sys.stderr)
+        return None
+
+    log_path = Path(d).parent / f"comfyui-{kind}-{port}.log"
+    log_fh = open(log_path, "ab", buffering=0)
+    spawn_env = os.environ.copy()
+    spawn_env["PYTHONIOENCODING"] = "utf-8"
+    spawn_env["PYTHONUTF8"] = "1"
+
+    mode_arg = "--directml" if kind == "gpu" else "--cpu"
+    kwargs = {
+        "args": [py, "main.py", mode_arg, "--listen", "127.0.0.1", "--port", str(port),
+                 "--disable-auto-launch", "--database-url", _worker_db_url(d, port)],
+        "cwd": d,
+        "stdout": log_fh,
+        "stderr": log_fh,
+        "stdin": subprocess.DEVNULL,
+        "env": spawn_env,
+    }
+    if os.name == "nt":
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+
+    print(f"[comfyui_utils] spawning {kind.upper()} ComfyUI on :{port} (log={log_path})",
+          file=sys.stderr)
+    try:
+        proc = subprocess.Popen(**kwargs)
+        log_fh.close()
+        url = f"http://127.0.0.1:{port}"
+        _register_worker_kind(url, kind)
+        _add_comfyui_url(url)
+        return proc
+    except Exception as e:
+        print(f"[comfyui_utils] {kind.upper()} spawn failed: {e}", file=sys.stderr)
+        return None
+
+
+def spawn_gpu_worker(port: Optional[int] = None, *, wait: bool = True,
+                     wait_timeout: int = 120) -> dict:
+    """Force-spawn an additional DirectML/GPU ComfyUI worker."""
+    preferred = port or int(os.environ.get("COMFYUI_GPU_PORT", "8188"))
+    chosen_port = port or _find_free_worker_port(preferred)
+    url = f"http://127.0.0.1:{chosen_port}"
+    if is_running_at(url, timeout=0.5)["running"]:
+        _register_worker_kind(url, "gpu")
+        _add_comfyui_url(url)
+        return {"url": url, "port": chosen_port, "started": False}
+
+    with _gpu_lock:
+        proc = _spawn_explicit_worker(chosen_port, "gpu")
+        if proc:
+            _gpu_processes[url] = proc
+
+    if wait:
+        start = time.time()
+        while time.time() - start < wait_timeout:
+            if is_running_at(url, timeout=1.5)["running"]:
+                break
+            time.sleep(1.5)
+    return {"url": url, "port": chosen_port, "started": True}
+
+
+def spawn_cpu_worker(port: Optional[int] = None, *, wait: bool = True,
+                     wait_timeout: int = 120) -> dict:
+    """Force-spawn a CPU-only ComfyUI worker."""
+    global _cpu_process
+    preferred = port or int(os.environ.get("COMFYUI_CPU_PORT", "8189"))
+    chosen_port = port or _find_free_worker_port(preferred)
+    url = f"http://127.0.0.1:{chosen_port}"
+    if is_running_at(url, timeout=0.5)["running"]:
+        _register_worker_kind(url, "cpu")
+        _add_comfyui_url(url)
+        return {"url": url, "port": chosen_port, "started": False}
+
+    with _cpu_lock:
+        proc = _spawn_explicit_worker(chosen_port, "cpu")
+        if proc:
+            _cpu_process = proc
+
+    if wait:
+        start = time.time()
+        while time.time() - start < wait_timeout:
+            if is_running_at(url, timeout=1.5)["running"]:
+                break
+            time.sleep(1.5)
+    return {"url": url, "port": chosen_port, "started": True}
 
 
 def _kill_cpu_comfyui() -> None:
@@ -525,7 +736,19 @@ def get_worker_status() -> dict:
         seen.add(url)
         info = is_running_at(url)
         info["url"] = url
-        info["kind"] = _worker_kinds.get(url, "gpu" if url == COMFYUI_BASE else "manual")
+        try:
+            _, port = _normalize_local_worker_url(url)
+            info["pid"] = _pid_for_listening_port(port)
+        except Exception:
+            info["pid"] = None
+        inferred_kind = "gpu" if url == COMFYUI_BASE else "manual"
+        argv = ((info.get("system_stats") or {}).get("system") or {}).get("argv") or ""
+        argv_text = " ".join(str(x) for x in argv) if isinstance(argv, list) else str(argv)
+        if "--directml" in argv_text:
+            inferred_kind = "gpu"
+        elif "--cpu" in argv_text:
+            inferred_kind = "cpu"
+        info["kind"] = _worker_kinds.get(url, inferred_kind)
         status["workers"].append(info)
     return status
 
@@ -750,30 +973,22 @@ def _bases_by_priority(bases: list[str]) -> list[str]:
 
 
 def _pick_healthy_base() -> Optional[str]:
-    """Pick a healthy ComfyUI worker, preferring GPU over CPU.
+    """Pick a healthy ComfyUI worker.
 
-    Order of preference: healthy GPU workers (round-robin) > healthy
-    CPU workers (round-robin) > healthy "manual" workers (round-robin).
-    CPU workers are only used when no GPU worker is up, so a single
-    healthy GPU gets all the jobs and CPU workers stay idle.
+    Workers are ordered GPU, then CPU, then manual, but selection
+    round-robins across the entire healthy pool. That keeps GPU first
+    after startup while still allowing CPU and GPU workers to process
+    different queued image jobs in parallel.
 
     Returns None if no configured worker is currently up.
     """
     healthy = _healthy_bases()
     if not healthy:
         return None
-    gpus = [b for b in healthy if _worker_kind(b) == "gpu"]
-    cpus = [b for b in healthy if _worker_kind(b) == "cpu"]
-    manuals = [b for b in healthy if _worker_kind(b) not in ("gpu", "cpu")]
+    pool = _bases_by_priority(healthy)
 
     global _rr_counter
     with _rr_lock:
-        if gpus:
-            pool = gpus
-        elif cpus:
-            pool = cpus
-        else:
-            pool = manuals
         idx = _rr_counter % len(pool)
         _rr_counter += 1
         return pool[idx]
@@ -791,6 +1006,7 @@ def generate_image(
     timeout: int = 600,
     workflow_path: Optional[str] = None,
     append_positive_guard: bool = True,
+    base_url: Optional[str] = None,
 ) -> Optional[str]:
     """
     Generate a single image via ComfyUI.
@@ -815,6 +1031,7 @@ def generate_image(
             positive prompt so medium / close-up shots get an explicit
             well-defined-human-nose cue. Disable only when an external caller
             has already baked the guard into its prompt.
+        base_url: Optional explicit ComfyUI worker URL for queue fan-out.
 
     Returns:
         Output filename on success, None on failure.
@@ -834,8 +1051,15 @@ def generate_image(
     # on CPU). Without this, the very first image job would silently
     # fail. ~5s total wait is enough for the spawn loop to finish and
     # the /system_stats endpoint to come up.
-    base = None
+    base = base_url.rstrip("/") if base_url else None
     for wait_attempt in range(5):
+        if base:
+            if is_running_at(base, timeout=2.0)["running"]:
+                break
+            base = None
+            if base_url:
+                time.sleep(1.0)
+                continue
         base = _pick_healthy_base()
         if base:
             break
@@ -894,7 +1118,7 @@ def generate_image(
             if health.status_code == 200:
                 break
             print(f"[comfyui_utils] {base} health check failed, picking another worker", file=sys.stderr)
-            base = _pick_healthy_base()
+            base = base_url.rstrip("/") if base_url else _pick_healthy_base()
             if not base:
                 print("[comfyui_utils] No healthy ComfyUI worker on retry", file=sys.stderr)
                 return None
@@ -1016,36 +1240,19 @@ def _generate_image_to_base(base_url: str, prompt: str, output_prefix: str,
     Same as generate_image() but accepts an explicit base URL, which lets us
     fan out work across multiple ComfyUI instances running on different ports.
     """
-    global COMFYUI_BASE
-    with _base_lock:
-        original_base = COMFYUI_BASE
-        COMFYUI_BASE = base_url
-        try:
-            # Temporarily override _pick_healthy_base to return this specific base
-            original_pick = globals().get('_pick_healthy_base')
-            _original_bases = _comfyui_bases()
-            # Monkey-patch to return only this base
-            import types
-            def _pick_this_base():
-                return base_url if is_running_at(base_url, timeout=2.0)["running"] else None
-            globals()['_pick_healthy_base'] = _pick_this_base
-            try:
-                return generate_image(
-                    prompt=prompt,
-                    output_prefix=output_prefix,
-                    output_dir=output_dir,
-                    negative_prompt=negative_prompt,
-                    seed=seed,
-                    checkpoint=checkpoint,
-                    width=width,
-                    height=height,
-                    timeout=timeout,
-                    workflow_path=workflow_path,
-                )
-            finally:
-                globals()['_pick_healthy_base'] = original_pick
-        finally:
-            COMFYUI_BASE = original_base
+    return generate_image(
+        prompt=prompt,
+        output_prefix=output_prefix,
+        output_dir=output_dir,
+        negative_prompt=negative_prompt,
+        seed=seed,
+        checkpoint=checkpoint,
+        width=width,
+        height=height,
+        timeout=timeout,
+        workflow_path=workflow_path,
+        base_url=base_url,
+    )
 
 
 def generate_images_parallel(

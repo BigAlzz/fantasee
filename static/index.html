@@ -532,6 +532,13 @@ img { display: block; max-width: 100%; }
   font-size: 11px;
   font-weight: 700;
 }
+.story-card-maintenance {
+  margin-top: 6px;
+  color: var(--warn-running);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
 .row-scroll {
   display: flex;
   gap: 10px;
@@ -3076,7 +3083,7 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
     <div id="workers-modal-list" style="margin-bottom:16px"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
       <button type="button" class="btn-secondary" data-action="workers-spawn">+ Spawn CPU</button>
-      <button type="button" class="btn-secondary" data-action="workers-kill">- Kill CPU</button>
+      <button type="button" class="btn-secondary" data-action="workers-spawn-gpu">+ Spawn GPU</button>
       <button type="button" class="btn-secondary" data-action="workers-refresh">Refresh</button>
       <button type="button" class="btn-secondary" data-action="close-workers">Close</button>
     </div>
@@ -3435,6 +3442,12 @@ const API = {
     }
     return res.json();
   },
+  async fetchTasks() {
+    const res = await fetch('/api/generate/tasks');
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.tasks || [];
+  },
   async exportPlex(storyId, opts = {}) {
     const res = await fetch(`/api/stories/${storyId}/export-plex`, {
       method: 'POST',
@@ -3491,24 +3504,42 @@ function sortStoriesNewest(stories) {
 }
 
 function incompleteStories(stories) {
-  return sortStoriesNewest((stories || []).filter(s => !(s.completion || {}).complete));
+  return sortStoriesNewest((stories || []).filter(s => {
+    if (s.completion && typeof s.completion.complete === 'boolean') {
+      return s.completion.complete === false;
+    }
+    return false;
+  }));
 }
 
-function maintenanceSummary(story) {
-  const missing = (story.completion || {}).missing || [];
-  if (!missing.length) return 'Needs completion';
+function maintenanceMissingKinds(story) {
+  const completion = story.completion || {};
+  const direct = Array.isArray(completion.missing) ? completion.missing.filter(Boolean) : [];
+  if (direct.length) return direct;
+  const fromIssues = Array.isArray(completion.issues)
+    ? completion.issues.map(issue => issue && issue.kind).filter(Boolean)
+    : [];
+  return [...new Set(fromIssues)];
+}
+
+function maintenanceSummary(story, options = {}) {
+  const missing = maintenanceMissingKinds(story);
+  if (!missing.length) return 'Needs scan';
   const labels = {
-    story: 'story',
+    story: 'story scenes',
     status: 'status',
-    story_text: 'text',
+    story_text: 'scene text',
     image: 'images',
-    audio: 'audio',
+    audio: 'audio narration',
     subtitles: 'subtitles',
-    scene_video: 'MP4',
+    scene_video: 'scene MP4s',
     full_video: 'full MP4',
-    plex: 'Plex',
+    plex: 'Plex export',
   };
-  return `Missing ${missing.slice(0, 3).map(k => labels[k] || k).join(', ')}`;
+  const limit = options.limit || 4;
+  const shown = missing.slice(0, limit).map(k => labels[k] || k);
+  const extra = missing.length > limit ? ` +${missing.length - limit}` : '';
+  return `Missing: ${shown.join(', ')}${extra}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -3612,10 +3643,11 @@ function storyCardMarkup(story, options = {}) {
           <span class="play-badge">${ICONS.play} Play</span>
         </div>
         ${resumeBadge}
-        ${needsMaintenance ? `<div class="maintenance-badge">${escapeHtml(maintenanceSummary(story))}</div>` : ''}
+        ${needsMaintenance ? `<div class="maintenance-badge">Needs completion</div>` : ''}
         <div class="story-card-body">
           <div class="story-card-title">${escapeHtml(story.title)}</div>
           <div class="story-card-subtitle">${escapeHtml(subtitleBits.join(' · '))}</div>
+          ${needsMaintenance ? `<div class="story-card-maintenance">${escapeHtml(maintenanceSummary(story))}</div>` : ''}
           ${tags ? `<div class="story-card-tags">${tags}</div>` : ''}
           ${story.critic_stars ? `
           <div class="story-card-rating" aria-label="${story.critic_stars} of 5 stars">
@@ -3727,6 +3759,10 @@ function renderCards(stories) {
       <div class="row-header">
         <h2 class="row-title">My Stories</h2>
         <span class="row-count">${stories.length} stories</span>
+        <span class="row-header-spacer"></span>
+        <button type="button" class="row-action" data-action="queue-library-maintenance">
+          Queue incomplete
+        </button>
       </div>
       <div class="row-scroll-wrap">
         <button class="row-scroll-arrow left" data-row="row-main"
@@ -3945,6 +3981,10 @@ async function openDetail(storyId) {
             <button class="btn-secondary" id="btn-repair" data-action="repair-story" data-id="${story.id}"
                     title="Find missing images / audio / subtitles and regenerate only those">
               🔧 Repair
+            </button>
+            <button class="btn-secondary" id="btn-queue-completion" data-action="queue-story-maintenance" data-id="${story.id}"
+                    title="Queue this story for repair, render, and Plex export">
+              Queue Completion
             </button>
             <button class="btn-secondary" id="btn-extend" data-action="extend-story" data-id="${story.id}"
                     title="Add 5 new scenes that continue the story">
@@ -4352,7 +4392,7 @@ function closeWorkersModal() {
   closeDialog(workersModal);
 }
 
-async function workersAction(action) {
+async function workersAction(action, payload = null) {
   const listEl = document.getElementById('workers-modal-list');
   listEl.innerHTML = '<div style="padding:12px;color:var(--text-muted)">Working...</div>';
 
@@ -4364,8 +4404,18 @@ async function workersAction(action) {
     } else if (action === 'spawn-cpu') {
       res = await fetch('/api/comfyui/workers/spawn-cpu', { method: 'POST' });
       data = await res.json();
+    } else if (action === 'spawn-gpu') {
+      res = await fetch('/api/comfyui/workers/spawn-gpu', { method: 'POST' });
+      data = await res.json();
     } else if (action === 'kill-cpu') {
       res = await fetch('/api/comfyui/workers/kill-cpu', { method: 'POST' });
+      data = await res.json();
+    } else if (action === 'kill-worker') {
+      res = await fetch('/api/comfyui/workers/kill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {}),
+      });
       data = await res.json();
     }
   } catch (e) {
@@ -4381,7 +4431,7 @@ async function workersAction(action) {
   // Render the worker list
   const workers = data.workers || [];
   if (workers.length === 0) {
-    listEl.innerHTML = `<div style="padding:16px;color:var(--text-muted);text-align:center">No workers running. Click "+ Spawn CPU" to start one.</div>`;
+    listEl.innerHTML = `<div style="padding:16px;color:var(--text-muted);text-align:center">No workers running. Click "+ Spawn CPU" or "+ Spawn GPU" to start one.</div>`;
   } else {
     listEl.innerHTML = workers.map(w => {
       const port = w.url ? new URL(w.url).port : '?';
@@ -4389,18 +4439,41 @@ async function workersAction(action) {
       const kind = (w.kind || 'manual').toUpperCase();
       const status = w.running ? 'running' : 'stopped';
       const statusColor = w.running ? '#46d369' : '#f44336';
+      const pid = w.pid ? `pid ${w.pid}` : 'pid unknown';
+      const killButton = w.running ? `
+        <button type="button" class="btn-secondary"
+                data-action="workers-kill-one"
+                data-url="${escapeAttr(w.url || '')}"
+                data-kind="${escapeAttr(kind)}"
+                data-port="${escapeAttr(port)}"
+                data-queue="${escapeAttr(q)}"
+                style="padding:6px 10px;color:#ff7066">
+          Kill
+        </button>` : '';
       return `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg-elevated);border-radius:6px;margin-bottom:6px">
         <span style="width:8px;height:8px;border-radius:50%;background:${statusColor}"></span>
         <span style="font-weight:600;min-width:60px">${kind}</span>
         <span style="color:var(--text-muted)">:${port}</span>
+        <span style="color:var(--text-muted);font-size:12px">${pid}</span>
         <span style="margin-left:auto;color:var(--text-muted);font-size:12px">queue ${q}</span>
         <span style="font-size:11px;color:${statusColor}">${status}</span>
+        ${killButton}
       </div>`;
     }).join('');
   }
 
   // Update the navbar badge too
   pollComfyUI();
+}
+
+async function killSelectedWorker(el) {
+  const url = el.dataset.url;
+  const kind = el.dataset.kind || 'worker';
+  const port = el.dataset.port || '?';
+  const q = parseInt(el.dataset.queue || '0', 10);
+  const busyNote = q > 0 ? ` It has ${q} queued/running item${q === 1 ? '' : 's'}, so killing it may interrupt work.` : '';
+  if (!confirm(`Kill ${kind} ComfyUI worker on port ${port}?${busyNote}`)) return;
+  await workersAction('kill-worker', { url });
 }
 
 // Close modals on overlay click. Uses a mousedown/mouseup match to
@@ -6337,6 +6410,25 @@ function toggleProgressPanel() {
   panel.classList.toggle('active');
 }
 
+async function syncActiveTasks({ openIfRunning = false } = {}) {
+  try {
+    const tasks = await API.fetchTasks();
+    if (!Array.isArray(tasks)) return;
+    for (const task of tasks) {
+      if (!task || !task.id) continue;
+      const existing = state.tasks.find(t => t.id === task.id);
+      if (existing) Object.assign(existing, task);
+      else state.tasks.push(task);
+    }
+    if (tasks.some(t => t.status === 'running' || t.status === 'queued')) {
+      if (openIfRunning) openProgressPanel();
+    }
+    updateProgressDisplay();
+  } catch (e) {
+    console.warn('[tasks] sync failed', e);
+  }
+}
+
 /** HTML-escape a string for safe interpolation into innerHTML. */
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
@@ -6360,10 +6452,12 @@ function updateProgressDisplay() {
   }
   // Group sub-tasks under their parent queue
   const isQueueTask = (t) => (
-    t.kind === 'queue'
-    || t.kind === 'library_maintenance'
-    || t.id?.startsWith('q-')
-    || t.id?.startsWith('library-')
+    !t.parent && (
+      t.kind === 'queue'
+      || t.kind === 'library_maintenance'
+      || t.id?.startsWith('q-')
+      || t.id?.startsWith('library-')
+    )
   );
   const queueTasks = state.tasks.filter(isQueueTask);
   const subTasks = state.tasks.filter(t => t.parent);
@@ -6377,7 +6471,7 @@ function updateProgressDisplay() {
     const pct = Math.round((t.progress || 0) * 100);
     const isQueue = isQueueTask(t);
     const bar = isQueue
-      ? `<div class="progress-bar-outer" style="margin-top:4px"><div class="progress-bar-inner" style="width:${pct}%"></div></div>`
+      ? `<div class="progress-bar-outer" style="margin-top:4px"><div class="progress-bar-inner" style="--pct:${(t.progress || 0)}"></div></div>`
       : '';
     const sub = isQueue && t.item_count
       ? `<span class="progress-item-sub">${t.item_count} stories</span>`
@@ -6387,7 +6481,7 @@ function updateProgressDisplay() {
     // concept; finally use a short id. Never show "undefined".
     const title = isQueue
       ? (t.kind === 'library_maintenance' ? 'Library maintenance' : 'Generation queue')
-      : (t.title || t.concept || `Task ${(t.id || '').slice(0, 6) || '—'}`);
+      : (t.title || t.story_id || t.concept || `Task ${(t.id || '').slice(0, 6) || '—'}`);
     return `
       <div class="progress-item ${isChild ? 'progress-item-child-row' : ''}">
         <div class="progress-status ${statusClass}"></div>
@@ -6443,15 +6537,21 @@ const toast = {
   info:    (msg, opts) => showToast(msg, 'info',    opts),
 };
 
-async function queueLibraryMaintenance(el) {
+async function queueLibraryMaintenance(el, storyId = null) {
   setBusy(el, true, 'Queueing...');
   try {
-    const result = await API.queueLibraryMaintenance({ include_failed: true });
+    const body = storyId
+      ? { include_failed: true, story_ids: [storyId] }
+      : { include_failed: true };
+    const result = await API.queueLibraryMaintenance(body);
     if (result.status === 'done' || !result.count) {
       toast.success(result.message || 'All stories are complete.');
       return;
     }
-    toast.success(`Queued ${result.count} incomplete stor${result.count === 1 ? 'y' : 'ies'} for maintenance.`);
+    toast.success(storyId
+      ? 'Queued this story for repair and completion.'
+      : `Queued ${result.count} incomplete stor${result.count === 1 ? 'y' : 'ies'} for maintenance.`
+    );
     prefillProgressPanel(result.task_id, 'Library maintenance', {
       kind: 'library_maintenance',
       item_count: result.count,
@@ -6481,6 +6581,7 @@ const ACTION_HANDLERS = {
   },
   'open-create':    () => openCreateModal(),
   'queue-library-maintenance': (el) => queueLibraryMaintenance(el),
+  'queue-story-maintenance': (el) => queueLibraryMaintenance(el, el.dataset.id),
   'close-create':   () => closeCreateModal(),
   'open-workers':   () => openWorkersModal(),
   'close-workers':  () => closeWorkersModal(),
@@ -6504,7 +6605,9 @@ const ACTION_HANDLERS = {
   'confirm-delete': () => executeDeleteStory(),
   'toggle-progress':() => toggleProgressPanel(),
   'workers-spawn':  () => workersAction('spawn-cpu'),
+  'workers-spawn-gpu': () => workersAction('spawn-gpu'),
   'workers-kill':   () => workersAction('kill-cpu'),
+  'workers-kill-one': (el) => killSelectedWorker(el),
   'workers-refresh':() => workersAction('refresh'),
 
   // Story / scene / card actions
@@ -6753,6 +6856,7 @@ async function init() {
       document.getElementById('hero-container').innerHTML = '';
       renderCards([]);
     }
+    syncActiveTasks({ openIfRunning: true });
   } catch (err) {
     console.warn('[init] failed to load stories:', err);
     document.getElementById('hero-container').innerHTML = `
@@ -6764,6 +6868,12 @@ async function init() {
     `;
   }
 }
+
+setInterval(() => {
+  if (document.getElementById('progress-panel')?.classList.contains('active')) {
+    syncActiveTasks();
+  }
+}, 5000);
 
 function showInitialSkeleton() {
   // Skeleton hero + 2 skeleton rows. Mirrors the final layout exactly.
