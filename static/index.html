@@ -2847,6 +2847,12 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
 .settings-combo-wrap { position: relative; }
 .settings-combo-wrap input { width: 100%; }
 
+.codec-badge {
+  display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; margin-left: 4px;
+}
+.codec-badge.ok { background: rgba(72,187,120,0.15); color: #48bb78; }
+.codec-badge.fail { background: rgba(252,129,129,0.15); color: #fc8181; }
+
 </style>
 </head>
 <body>
@@ -3012,6 +3018,13 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
           <span class="settings-hint">
             Fantasee creates <code>&lt;Title&gt; (&lt;Year&gt;)/</code> inside this folder.
             Point this at your Plex Movies library root for auto-import.
+          </span>
+        </div>
+        <div class="settings-field">
+          <label>FFmpeg (required for video rendering)</label>
+          <span class="settings-hint" id="ffmpeg-hint">
+            FFmpeg is used to render MP4 video and mix audio for Plex export.<br>
+            Test connections to check FFmpeg status.
           </span>
         </div>
       </section>
@@ -4802,6 +4815,31 @@ async function testConnections() {
       html += `<div class="${plexOk ? 'ok' : 'fail'}">Plex: ${plexOk ? 'Directory exists' : 'Directory not found: ' + data.plex.path}</div>`;
       if (data.plex.writable === false && data.plex.ok) {
         html += `<div style="color:#ecc94b;font-size:12px">⚠ Directory exists but may not be writable</div>`;
+      }
+    }
+
+    // FFmpeg
+    if (data.ffmpeg) {
+      if (data.ffmpeg.ok) {
+        const ver = data.ffmpeg.version || 'unknown';
+        const c = data.ffmpeg.codecs || {};
+        let codecBadges = '';
+        if (c.h264) codecBadges += ' <span class="codec-badge ok">H.264</span>';
+        else         codecBadges += ' <span class="codec-badge fail">H.264</span>';
+        if (c.hevc) codecBadges += ' <span class="codec-badge ok">HEVC</span>';
+        if (c.mp3)  codecBadges += ' <span class="codec-badge ok">MP3</span>';
+        else         codecBadges += ' <span class="codec-badge fail">MP3</span>';
+        if (c.aac)  codecBadges += ' <span class="codec-badge ok">AAC</span>';
+        html += `<div class="ok">FFmpeg ${ver}: Found ${codecBadges}</div>`;
+        // Update the hint area
+        const hint = document.getElementById('ffmpeg-hint');
+        if (hint) {
+          hint.innerHTML = `<span class="ok">✓ FFmpeg ${ver}</span> — ${data.ffmpeg.path}<br>Codecs: H.264=${c.h264 ? '✓' : '✗'} HEVC=${c.hevc ? '✓' : '✗'} MP3=${c.mp3 ? '✓' : '✗'} AAC=${c.aac ? '✓' : '✗'}`;
+        }
+      } else {
+        html += `<div class="fail">FFmpeg: ${data.ffmpeg.error || 'Not found'}</div>`;
+        const hint = document.getElementById('ffmpeg-hint');
+        if (hint) hint.innerHTML = `<span class="fail">✗ FFmpeg not found</span> — Install from <a href="https://www.gyan.dev/ffmpeg/builds/" target="_blank" class="settings-link">gyan.dev/ffmpeg/builds</a> or <code>winget install Gyan.FFmpeg</code>`;
       }
     }
 

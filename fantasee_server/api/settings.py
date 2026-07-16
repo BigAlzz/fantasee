@@ -220,6 +220,8 @@ def list_llm_models():
 @router.post("/test-connection")
 def test_connection(body: dict):
     """Test connectivity to configured services."""
+    import shutil
+    import subprocess
     import requests as req
     results = {}
 
@@ -256,6 +258,43 @@ def test_connection(body: dict):
         results["llm"] = {"ok": r.status_code == 200, "status": r.status_code, "models": model_list}
     except Exception as e:
         results["llm"] = {"ok": False, "error": str(e), "models": []}
+
+    # ── FFmpeg ────────────────────────────────────────────────
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path:
+        try:
+            out = subprocess.run(
+                ["ffmpeg", "-version"], capture_output=True, text=True, timeout=5
+            )
+            # Parse version from first line: "ffmpeg version X.Y.Z-..."
+            first_line = out.stdout.splitlines()[0] if out.stdout else ""
+            ver = first_line.split("version ")[1].split(" ")[0] if "version " in first_line else "unknown"
+
+            # Check critical codecs for Plex export
+            codecs_out = subprocess.run(
+                ["ffmpeg", "-codecs"], capture_output=True, text=True, timeout=5
+            )
+            codec_text = codecs_out.stdout
+            has_h264 = "libx264" in codec_text
+            has_hevc = "libx265" in codec_text
+            has_mp3 = "libmp3lame" in codec_text
+            has_aac = "aac " in codec_text
+
+            results["ffmpeg"] = {
+                "ok": True,
+                "path": ffmpeg_path,
+                "version": ver,
+                "codecs": {
+                    "h264": has_h264,
+                    "hevc": has_hevc,
+                    "mp3": has_mp3,
+                    "aac": has_aac,
+                }
+            }
+        except Exception as e:
+            results["ffmpeg"] = {"ok": False, "path": ffmpeg_path, "error": str(e)}
+    else:
+        results["ffmpeg"] = {"ok": False, "error": "ffmpeg not found in PATH"}
 
     # ── Plex destination ─────────────────────────────────────
     plex_dest = body.get("plex_destination", DEFAULTS["plex_destination"])
