@@ -2834,6 +2834,19 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
 .settings-test-results .ok { color: #48bb78; }
 .settings-test-results .fail { color: #fc8181; }
 
+.settings-link { color: var(--accent); text-decoration: none; font-size: 13px; }
+.settings-link:hover { text-decoration: underline; }
+
+.settings-info { font-size: 13px; line-height: 1.6; color: var(--text-secondary); margin: 0 0 12px 0; }
+
+.settings-picker-row { display: flex; gap: 6px; }
+.settings-picker-row input { flex: 1; }
+.settings-btn-browse { background: rgba(255,255,255,0.08); color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
+.settings-btn-browse:hover { background: rgba(255,255,255,0.14); color: var(--text-primary); }
+
+.settings-combo-wrap { position: relative; }
+.settings-combo-wrap input { width: 100%; }
+
 </style>
 </head>
 <body>
@@ -2922,12 +2935,15 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
     </div>
     <div class="settings-body">
 
+      <!-- ComfyUI -->
       <section class="settings-section">
         <h3>ComfyUI</h3>
         <div class="settings-field">
           <label for="setting-comfyui-urls">Worker URLs</label>
           <input type="text" id="setting-comfyui-urls" placeholder="http://127.0.0.1:8188" />
-          <span class="settings-hint">Comma-separated for multiple workers</span>
+          <span class="settings-hint">
+            Comma-separated for multiple workers (e.g. http://127.0.0.1:8188,http://127.0.0.1:8189)
+          </span>
         </div>
         <div class="settings-field settings-toggle-row">
           <label for="setting-comfyui-auto">Auto-spawn worker on startup</label>
@@ -2936,8 +2952,18 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
             <span class="toggle-slider"></span>
           </label>
         </div>
+        <div class="settings-field">
+          <label>Setup Help</label>
+          <a href="https://github.com/comfyanonymous/ComfyUI" target="_blank" class="settings-link">ComfyUI GitHub →</a>
+          <span class="settings-hint">
+            Need: Python 3.10+, ComfyUI installed, SD 1.5 or SDXL checkpoint,<br>
+            workflow.json in the Fantasee project root.<br>
+            See <code>docs/SETUP.md</code> or the README for full instructions.
+          </span>
+        </div>
       </section>
 
+      <!-- LLM -->
       <section class="settings-section">
         <h3>LLM (Language Model)</h3>
         <div class="settings-field">
@@ -2947,34 +2973,50 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
         <div class="settings-field">
           <label for="setting-llm-key">API Key</label>
           <input type="password" id="setting-llm-key" placeholder="Enter API key" autocomplete="off" />
+          <span class="settings-hint">Click "Test Connections" to discover available models</span>
         </div>
         <div class="settings-field">
           <label for="setting-llm-model">Model</label>
-          <input type="text" id="setting-llm-model" placeholder="mimo-v2.5-pro" />
+          <select id="setting-llm-model">
+            <option value="mimo-v2.5-pro">mimo-v2.5-pro</option>
+          </select>
+          <span class="settings-hint">Models are fetched from the LLM endpoint when you test the connection</span>
         </div>
       </section>
 
+      <!-- TTS -->
       <section class="settings-section">
         <h3>TTS (Text-to-Speech)</h3>
+        <p class="settings-info">Fantasee uses <strong>Xiaomi MiMo TTS</strong> (mimo-v2.5-tts) — the same API endpoint as the LLM. Voices are generated via the Xiaomi MiMo voice API. Built-in presets: Dean, Milo, Mia, Chloe.</p>
         <div class="settings-field">
           <label for="setting-tts-voice">Default Voice</label>
           <select id="setting-tts-voice">
-            <option value="Dean">Dean</option>
-            <option value="Milo">Milo</option>
-            <option value="Mia">Mia</option>
-            <option value="Chloe">Chloe</option>
+            <option value="Dean">Dean — deep masculine</option>
+            <option value="Milo">Milo — warm baritone</option>
+            <option value="Mia">Mia — clear feminine</option>
+            <option value="Chloe">Chloe — soft feminine</option>
           </select>
         </div>
       </section>
 
+      <!-- Plex -->
       <section class="settings-section">
         <h3>Plex Export</h3>
         <div class="settings-field">
           <label for="setting-plex-dest">Export Destination</label>
-          <input type="text" id="setting-plex-dest" placeholder="D:\Downloads\Plex" />
+          <div class="settings-picker-row">
+            <input type="text" id="setting-plex-dest" placeholder="D:\Downloads\Plex" />
+            <button type="button" class="settings-btn settings-btn-browse" data-action="browse-plex">Browse</button>
+          </div>
+          <input type="file" id="setting-plex-picker" style="display:none" webkitdirectory mozdirectory />
+          <span class="settings-hint">
+            Fantasee creates <code>&lt;Title&gt; (&lt;Year&gt;)/</code> inside this folder.
+            Point this at your Plex Movies library root for auto-import.
+          </span>
         </div>
       </section>
 
+      <!-- Story Defaults -->
       <section class="settings-section">
         <h3>Story Defaults</h3>
         <div class="settings-row-2">
@@ -2990,15 +3032,28 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
         <div class="settings-row-2">
           <div class="settings-field">
             <label for="setting-default-style">Style</label>
-            <input type="text" id="setting-default-style" placeholder="fantasy painterly" />
+            <div class="settings-combo-wrap">
+              <input type="text" id="setting-default-style" list="style-suggestions" placeholder="fantasy painterly" />
+              <datalist id="style-suggestions"></datalist>
+            </div>
+            <span class="settings-hint">Art style for generated images (freeform text)</span>
           </div>
           <div class="settings-field">
             <label for="setting-default-tone">Tone</label>
-            <input type="text" id="setting-default-tone" placeholder="dramatic" />
+            <select id="setting-default-tone">
+              <option value="dramatic">Dramatic</option>
+              <option value="normal">Normal</option>
+              <option value="dark">Dark</option>
+              <option value="whimsical">Whimsical</option>
+              <option value="epic">Epic</option>
+              <option value="mysterious">Mysterious</option>
+            </select>
+            <span class="settings-hint">Narration delivery style</span>
           </div>
         </div>
       </section>
 
+      <!-- Actions -->
       <div class="settings-actions">
         <button class="settings-btn settings-btn-test" data-action="test-connections">Test Connections</button>
         <button class="settings-btn settings-btn-save" data-action="save-settings">Save Settings</button>
@@ -4600,7 +4655,6 @@ async function openSettings() {
   const overlay = document.getElementById('settings-overlay');
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
-  // Load current settings from API
   try {
     const resp = await fetch('/api/settings');
     const s = await resp.json();
@@ -4609,13 +4663,33 @@ async function openSettings() {
     document.getElementById('setting-llm-url').value = s.llm_base_url || '';
     document.getElementById('setting-llm-key').value = '';
     document.getElementById('setting-llm-key').placeholder = s.llm_api_key || 'Enter API key';
-    document.getElementById('setting-llm-model').value = s.llm_model || '';
+    // Set model dropdown — try to find the saved model, else add it
+    const modelSel = document.getElementById('setting-llm-model');
+    const savedModel = s.llm_model || 'mimo-v2.5-pro';
+    if (![...modelSel.options].some(o => o.value === savedModel)) {
+      modelSel.innerHTML += `<option value="${savedModel.replace(/"/g, '&quot;')}">${savedModel}</option>`;
+    }
+    modelSel.value = savedModel;
     document.getElementById('setting-tts-voice').value = s.tts_voice_preset || 'Dean';
     document.getElementById('setting-plex-dest').value = s.plex_destination || '';
     document.getElementById('setting-default-scenes').value = s.default_scenes || 5;
     document.getElementById('setting-default-images').value = s.default_images_per_scene || 5;
     document.getElementById('setting-default-style').value = s.default_style || '';
-    document.getElementById('setting-default-tone').value = s.default_tone || '';
+
+    // Populate style suggestions from API
+    const dl = document.getElementById('style-suggestions');
+    if (s._suggested_styles && Array.isArray(s._suggested_styles)) {
+      dl.innerHTML = s._suggested_styles.map(st => `<option value="${st.replace(/"/g, '&quot;')}">`).join('');
+    }
+
+    // Populate tone dropdown from API
+    const toneSel = document.getElementById('setting-default-tone');
+    if (s._known_tones && Array.isArray(s._known_tones)) {
+      const currentTone = document.getElementById('setting-default-tone').value;
+      toneSel.innerHTML = s._known_tones.map(t =>
+        `<option value="${t}"${t === (s.default_tone || 'dramatic') ? ' selected' : ''}>${t.charAt(0).toUpperCase() + t.slice(1)}</option>`
+      ).join('');
+    }
   } catch (e) {
     showToast('Failed to load settings: ' + e.message, 'error');
   }
@@ -4627,6 +4701,24 @@ function closeSettings() {
   overlay.setAttribute('aria-hidden', 'true');
 }
 
+function browsePlex() {
+  const picker = document.getElementById('setting-plex-picker');
+  picker.click();
+  picker.onchange = function() {
+    if (picker.files && picker.files.length > 0) {
+      // Take the first file's webkitRelativePath to get the directory
+      const path = picker.files[0].webkitRelativePath || picker.files[0].name;
+      const dirEnd = path.indexOf('/');
+      if (dirEnd > -1) {
+        document.getElementById('setting-plex-dest').value = path.substring(0, dirEnd);
+      } else {
+        document.getElementById('setting-plex-dest').value = picker.value;
+      }
+    }
+    picker.value = '';
+  };
+}
+
 async function saveSettings() {
   const body = {
     comfyui_urls: document.getElementById('setting-comfyui-urls').value,
@@ -4634,8 +4726,6 @@ async function saveSettings() {
     llm_base_url: document.getElementById('setting-llm-url').value,
     llm_api_key: document.getElementById('setting-llm-key').value,
     llm_model: document.getElementById('setting-llm-model').value,
-    tts_base_url: document.getElementById('setting-llm-url').value,
-    tts_api_key: document.getElementById('setting-llm-key').value,
     tts_voice_preset: document.getElementById('setting-tts-voice').value,
     plex_destination: document.getElementById('setting-plex-dest').value,
     default_scenes: parseInt(document.getElementById('setting-default-scenes').value) || 5,
@@ -4664,7 +4754,7 @@ async function saveSettings() {
 
 async function testConnections() {
   const results = document.getElementById('settings-test-results');
-  results.innerHTML = '<span style="opacity:0.5">Testing...</span>';
+  results.innerHTML = '<span style="opacity:0.5">Testing connections...</span>';
 
   const body = {
     comfyui_urls: document.getElementById('setting-comfyui-urls').value,
@@ -4685,21 +4775,51 @@ async function testConnections() {
     // ComfyUI
     if (data.comfyui && data.comfyui.length) {
       for (const w of data.comfyui) {
-        html += `<div class="${w.ok ? 'ok' : 'fail'}">ComfyUI ${w.url}: ${w.ok ? 'Connected' : w.error || 'Failed'}</div>`;
+        const label = w.version ? `ComfyUI ${w.url} (v${w.version})` : `ComfyUI ${w.url}`;
+        html += `<div class="${w.ok ? 'ok' : 'fail'}">${label}: ${w.ok ? 'Connected' : (w.error || 'Failed')}</div>`;
       }
     }
 
     // LLM
     if (data.llm) {
-      html += `<div class="${data.llm.ok ? 'ok' : 'fail'}">LLM: ${data.llm.ok ? 'Connected' : data.llm.error || 'Failed'}</div>`;
+      const llmOk = data.llm.ok;
+      html += `<div class="${llmOk ? 'ok' : 'fail'}">LLM: ${llmOk ? 'Connected' : (data.llm.error || 'HTTP ' + data.llm.status)}</div>`;
+
+      // Populate model dropdown
+      const modelSel = document.getElementById('setting-llm-model');
+      if (data.llm.models && data.llm.models.length > 0) {
+        const current = modelSel.value;
+        modelSel.innerHTML = data.llm.models.map(m =>
+          `<option value="${m.replace(/"/g, '&quot;')}"${m === current ? ' selected' : ''}>${m}</option>`
+        ).join('');
+        html += `<div style="color:var(--text-secondary);font-size:12px;margin-left:12px">${data.llm.models.length} models available</div>`;
+      }
     }
 
     // Plex
     if (data.plex) {
-      html += `<div class="${data.plex.ok ? 'ok' : 'fail'}">Plex: ${data.plex.ok ? 'Directory exists' : 'Directory not found: ' + data.plex.path}</div>`;
+      const plexOk = data.plex.ok;
+      html += `<div class="${plexOk ? 'ok' : 'fail'}">Plex: ${plexOk ? 'Directory exists' : 'Directory not found: ' + data.plex.path}</div>`;
+      if (data.plex.writable === false && data.plex.ok) {
+        html += `<div style="color:#ecc94b;font-size:12px">⚠ Directory exists but may not be writable</div>`;
+      }
     }
 
     results.innerHTML = html || '<span style="opacity:0.5">No results</span>';
+
+    // If LLM models were fetched, also populate style suggestions
+    if (data.llm && data.llm.ok) {
+      try {
+        const styleResp = await fetch('/api/settings');
+        const styleData = await styleResp.json();
+        const dl = document.getElementById('style-suggestions');
+        if (styleData._suggested_styles) {
+          dl.innerHTML = styleData._suggested_styles.map(st =>
+            `<option value="${st.replace(/"/g, '&quot;')}">`
+          ).join('');
+        }
+      } catch (_) {}
+    }
   } catch (e) {
     results.innerHTML = `<div class="fail">Error: ${e.message}</div>`;
   }
@@ -6926,6 +7046,7 @@ const ACTION_HANDLERS = {
   'close-settings': () => closeSettings(),
   'save-settings':  () => saveSettings(),
   'test-connections': () => testConnections(),
+  'browse-plex':    () => browsePlex(),
 
   // Story / scene / card actions
   'open-detail':     (el) => openDetail(el.dataset.id),

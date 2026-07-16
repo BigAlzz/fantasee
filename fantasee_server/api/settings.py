@@ -21,6 +21,28 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 SETTINGS_FILE = Path(__file__).parent.parent.parent / "fantasee_settings.json"
 
+# ── Known tone presets (from tts_utils.py TONE_MODIFIERS) ─────────
+# These map to specific narration tone modifiers. Freeform strings
+# are also accepted by the generation pipeline.
+KNOWN_TONES = ["dramatic", "normal", "dark", "whimsical", "epic", "mysterious"]
+
+# ── Suggested art styles (freeform text, not exhaustive) ──────────
+SUGGESTED_STYLES = [
+    "fantasy painterly",
+    "cyberpunk neon",
+    "anime manga",
+    "dark gothic",
+    "watercolor storybook",
+    "cinematic realism",
+    "pixel art retro",
+    "steampunk",
+    "ink wash",
+    "noir chiaroscuro",
+    "sci-fi concept",
+    "children's illustration",
+]
+
+
 # ── Defaults ──────────────────────────────────────────────────────
 
 DEFAULTS: dict = {
@@ -33,9 +55,8 @@ DEFAULTS: dict = {
     "llm_api_key": "",
     "llm_model": "mimo-v2.5-pro",
 
-    # TTS
-    "tts_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
-    "tts_api_key": "",
+    # TTS — uses the same Xiaomi MiMo TTS endpoint (mimo-v2.5-tts models)
+    # Voice presets: Dean, Milo, Mia, Chloe. Most voice aliases map to Mia.
     "tts_voice_preset": "Dean",
 
     # Plex
@@ -65,9 +86,7 @@ class Settings(BaseModel):
     llm_model: str = Field(default="mimo-v2.5-pro", description="LLM model name")
 
     # TTS
-    tts_base_url: str = Field(default="https://token-plan-sgp.xiaomimimo.com/v1", description="TTS API base URL")
-    tts_api_key: str = Field(default="", description="TTS API key")
-    tts_voice_preset: str = Field(default="Dean", description="Default TTS voice preset")
+    tts_voice_preset: str = Field(default="Dean", description="Default TTS voice preset (Dean, Milo, Mia, Chloe)")
 
     # Plex
     plex_destination: str = Field(default=r"D:\Downloads\Plex", description="Plex export destination directory")
@@ -90,7 +109,6 @@ def _load_settings() -> dict:
         try:
             with open(SETTINGS_FILE, encoding="utf-8") as f:
                 saved = json.load(f)
-            # Merge with defaults so new fields are always present
             merged = {**DEFAULTS, **saved}
             return merged
         except (json.JSONDecodeError, OSError):
@@ -106,23 +124,12 @@ def _save_settings(data: dict) -> None:
 
 
 def apply_settings_to_env(settings: dict) -> None:
-    """Push settings into environment variables so existing code picks them up.
-
-    This is called after loading from disk and after every PUT, so the
-    rest of the codebase (comfyui_utils, generate_story.py, tts_utils,
-    critic.py, plex_export.py) sees the updated values via os.environ.
-    """
+    """Push settings into environment variables so existing code picks them up."""
     os.environ["COMFYUI_URLS"] = settings.get("comfyui_urls", DEFAULTS["comfyui_urls"])
-    os.environ["FANTASEE_AUTO_SPAWN_CPU"] = "0" if settings.get("comfyui_auto_spawn") else "1"
+    os.environ["FANTASEE_AUTO_SPAWN_CPU"] = "0" if not settings.get("comfyui_auto_spawn", True) else "1"
     os.environ["XIAOMI_BASE_URL"] = settings.get("llm_base_url", DEFAULTS["llm_base_url"])
     os.environ["XIAOMI_API_KEY"] = settings.get("llm_api_key", DEFAULTS["llm_api_key"])
     os.environ["FANTASEE_PLEX_DEST"] = settings.get("plex_destination", DEFAULTS["plex_destination"])
-
-    # TTS uses the same Xiaomi endpoint by default
-    if settings.get("tts_base_url"):
-        os.environ["XIAOMI_BASE_URL"] = settings["tts_base_url"]
-    if settings.get("tts_api_key"):
-        os.environ["XIAOMI_API_KEY"] = settings["tts_api_key"]
 
 
 # ── Apply on import ───────────────────────────────────────────────
@@ -135,18 +142,20 @@ apply_settings_to_env(_load_settings())
 def get_settings():
     """Return current settings. API keys are masked for the browser."""
     data = _load_settings()
-    # Mask keys so the frontend never sees the real value
     masked = dict(data)
     for key in ("llm_api_key", "tts_api_key"):
         if masked.get(key):
             val = masked[key]
             masked[key] = f"{val[:4]}...{val[-4:]}" if len(val) > 8 else "••••"
+    # Include known presets for UI dropdowns
+    masked["_known_tones"] = KNOWN_TONES
+    masked["_suggested_styles"] = SUGGESTED_STYLES
     return masked
 
 
 @router.get("/raw")
 def get_settings_raw():
-    """Return unmasked settings (internal use only — not exposed to browser)."""
+    """Return unmasked settings (internal use only)."""
     return _load_settings()
 
 
@@ -157,9 +166,9 @@ def update_settings(body: Settings):
 
     # Don't overwrite keys with masked values
     current = _load_settings()
-    for key in ("llm_api_key", "tts_api_key"):
+    for key in ("llm_api_key",):
         val = data.get(key, "")
-        if val and ("..." in val or val == "••••"):
+        if val and ("..." in val or "••••" in val):
             data[key] = current.get(key, "")
         elif not val:
             data[key] = current.get(key, "")
@@ -167,13 +176,45 @@ def update_settings(body: Settings):
     _save_settings(data)
     apply_settings_to_env(data)
 
-    # Return masked version
     masked = dict(data)
-    for key in ("llm_api_key", "tts_api_key"):
+    for key in ("llm_api_key",):
         if masked.get(key):
             val = masked[key]
             masked[key] = f"{val[:4]}...{val[-4:]}" if len(val) > 8 else "••••"
     return {"ok": True, "settings": masked}
+
+
+@router.get("/llm-models")
+def list_llm_models():
+    """Fetch available models from the configured LLM endpoint.
+
+    Returns the model list so the frontend can populate a dropdown.
+    The endpoint reads the current XIAOMI_BASE_URL and XIAOMI_API_KEY
+    from the environment (which were pushed from settings on startup).
+    """
+    import requests as req
+    base_url = os.environ.get("XIAOMI_BASE_URL", DEFAULTS["llm_base_url"])
+    api_key = os.environ.get("XIAOMI_API_KEY", "")
+
+    if not api_key:
+        # Try loading from saved settings as fallback
+        settings = _load_settings()
+        api_key = settings.get("llm_api_key", "")
+
+    try:
+        r = req.get(f"{base_url}/models", headers={
+            "Authorization": f"Bearer {api_key}"
+        }, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            # Handle both { data: [...] } and [...] response formats
+            models = data.get("data", data) if isinstance(data, dict) else data
+            ids = [m["id"] for m in models if isinstance(m, dict) and m.get("id")]
+            return {"ok": True, "models": ids}
+        else:
+            return {"ok": False, "error": f"HTTP {r.status_code}", "models": []}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "models": []}
 
 
 @router.post("/test-connection")
@@ -182,7 +223,7 @@ def test_connection(body: dict):
     import requests as req
     results = {}
 
-    # Test ComfyUI
+    # ── ComfyUI ───────────────────────────────────────────────
     urls = body.get("comfyui_urls", DEFAULTS["comfyui_urls"]).split(",")
     comfyui_results = []
     for url in urls:
@@ -191,23 +232,39 @@ def test_connection(body: dict):
             continue
         try:
             r = req.get(f"{url}/system_stats", timeout=3)
-            comfyui_results.append({"url": url, "ok": r.status_code == 200, "status": r.status_code})
+            stats = r.json() if r.status_code == 200 else {}
+            comfyui_results.append({
+                "url": url,
+                "ok": r.status_code == 200,
+                "status": r.status_code,
+                "version": stats.get("system", {}).get("comfyui_version", ""),
+            })
         except Exception as e:
             comfyui_results.append({"url": url, "ok": False, "error": str(e)})
     results["comfyui"] = comfyui_results
 
-    # Test LLM
+    # ── LLM ──────────────────────────────────────────────────
     llm_url = body.get("llm_base_url", DEFAULTS["llm_base_url"])
     llm_key = body.get("llm_api_key", "") or _load_settings().get("llm_api_key", "")
+    model_list = []
     try:
-        r = req.get(f"{llm_url}/models", headers={"Authorization": f"Bearer {llm_key}"}, timeout=5)
-        results["llm"] = {"ok": r.status_code == 200, "status": r.status_code}
+        r = req.get(f"{llm_url}/models", headers={"Authorization": f"Bearer {llm_key}"}, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            models = data.get("data", data) if isinstance(data, dict) else data
+            model_list = [m["id"] for m in models if isinstance(m, dict) and m.get("id")]
+        results["llm"] = {"ok": r.status_code == 200, "status": r.status_code, "models": model_list}
     except Exception as e:
-        results["llm"] = {"ok": False, "error": str(e)}
+        results["llm"] = {"ok": False, "error": str(e), "models": []}
 
-    # Test Plex destination
+    # ── Plex destination ─────────────────────────────────────
     plex_dest = body.get("plex_destination", DEFAULTS["plex_destination"])
     plex_path = Path(plex_dest)
-    results["plex"] = {"ok": plex_path.exists(), "path": str(plex_path), "exists": plex_path.exists()}
+    results["plex"] = {
+        "ok": plex_path.exists(),
+        "path": str(plex_path),
+        "exists": plex_path.exists(),
+        "writable": os.access(str(plex_path), os.W_OK) if plex_path.exists() else False,
+    }
 
     return results
