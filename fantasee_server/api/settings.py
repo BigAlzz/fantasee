@@ -58,6 +58,7 @@ DEFAULTS: dict = {
     # TTS — uses the same Xiaomi MiMo TTS endpoint (mimo-v2.5-tts models)
     # Voice presets: Dean, Milo, Mia, Chloe. Most voice aliases map to Mia.
     "tts_voice_preset": "Dean",
+    "tts_speed": 1.3,
 
     # Plex
     "plex_destination": r"D:\Downloads\Plex",
@@ -87,6 +88,7 @@ class Settings(BaseModel):
 
     # TTS
     tts_voice_preset: str = Field(default="Dean", description="Default TTS voice preset (Dean, Milo, Mia, Chloe)")
+    tts_speed: float = Field(default=1.3, ge=0.5, le=3.0, description="TTS playback speed (0.5-3.0)")
 
     # Plex
     plex_destination: str = Field(default=r"D:\Downloads\Plex", description="Plex export destination directory")
@@ -130,6 +132,8 @@ def apply_settings_to_env(settings: dict) -> None:
     os.environ["XIAOMI_BASE_URL"] = settings.get("llm_base_url", DEFAULTS["llm_base_url"])
     os.environ["XIAOMI_API_KEY"] = settings.get("llm_api_key", DEFAULTS["llm_api_key"])
     os.environ["FANTASEE_PLEX_DEST"] = settings.get("plex_destination", DEFAULTS["plex_destination"])
+    os.environ["FANTASEE_TTS_SPEED"] = str(settings.get("tts_speed", DEFAULTS["tts_speed"]))
+    os.environ["FANTASEE_WHISPER_MODEL"] = settings.get("whisper_model_size", DEFAULTS["whisper_model_size"])
 
 
 # ── Apply on import ───────────────────────────────────────────────

@@ -1093,7 +1093,7 @@ Be evocative but concise."""
         try:
             if whisper_model is None:
                 import whisper
-                whisper_model = whisper.load_model("base")
+                whisper_model = whisper.load_model(os.environ.get("FANTASEE_WHISPER_MODEL", "base"))
             # fp16=False on CPU — avoids the "FP16 is not supported on CPU;
             # using FP32 instead" warning on every scene.
             result = whisper_model.transcribe(

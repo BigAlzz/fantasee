@@ -2756,7 +2756,7 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
 
 .settings-panel {
   background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
-  width: 560px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column;
+  width: 640px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column;
   box-shadow: 0 24px 64px rgba(0,0,0,0.5);
 }
 .settings-header {
@@ -2853,6 +2853,24 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
 .codec-badge.ok { background: rgba(72,187,120,0.15); color: #48bb78; }
 .codec-badge.fail { background: rgba(252,129,129,0.15); color: #fc8181; }
 
+/* ── Settings Tabs ──────────────────────────────────────────────── */
+.settings-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding: 0 24px; background: rgba(0,0,0,0.15);
+}
+.settings-tab {
+  padding: 10px 16px; font-size: 13px; font-weight: 500; cursor: pointer;
+  color: var(--text-secondary); background: none; border: none;
+  border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.settings-tab:hover { color: var(--text-primary); }
+.settings-tab.active {
+  color: var(--accent); border-bottom-color: var(--accent);
+}
+.settings-tab-panel { display: none; }
+.settings-tab-panel.active { display: block; }
+
 </style>
 </head>
 <body>
@@ -2939,134 +2957,176 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
       <h2 id="settings-title">Settings</h2>
       <button class="settings-close" data-action="close-settings" aria-label="Close settings">&times;</button>
     </div>
+
+    <div class="settings-tabs" id="settings-tabs">
+      <button class="settings-tab active" data-tab="tab-generation">Generation</button>
+      <button class="settings-tab" data-tab="tab-voice">Voice &amp; Audio</button>
+      <button class="settings-tab" data-tab="tab-image">Image Engine</button>
+      <button class="settings-tab" data-tab="tab-export">Export</button>
+    </div>
+
     <div class="settings-body">
 
-      <!-- ComfyUI -->
-      <section class="settings-section">
-        <h3>ComfyUI</h3>
-        <div class="settings-field">
-          <label for="setting-comfyui-urls">Worker URLs</label>
-          <input type="text" id="setting-comfyui-urls" placeholder="http://127.0.0.1:8188" />
-          <span class="settings-hint">
-            Comma-separated for multiple workers (e.g. http://127.0.0.1:8188,http://127.0.0.1:8189)
-          </span>
-        </div>
-        <div class="settings-field settings-toggle-row">
-          <label for="setting-comfyui-auto">Auto-spawn worker on startup</label>
-          <label class="toggle">
-            <input type="checkbox" id="setting-comfyui-auto" />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="settings-field">
-          <label>Setup Help</label>
-          <a href="https://github.com/comfyanonymous/ComfyUI" target="_blank" class="settings-link">ComfyUI GitHub →</a>
-          <span class="settings-hint">
-            Need: Python 3.10+, ComfyUI installed, SD 1.5 or SDXL checkpoint,<br>
-            workflow.json in the Fantasee project root.<br>
-            See <code>docs/SETUP.md</code> or the README for full instructions.
-          </span>
-        </div>
-      </section>
+      <!-- ═══ TAB: Generation ═══ -->
+      <div class="settings-tab-panel active" id="tab-generation">
 
-      <!-- LLM -->
-      <section class="settings-section">
-        <h3>LLM (Language Model)</h3>
-        <div class="settings-field">
-          <label for="setting-llm-url">API Base URL</label>
-          <input type="text" id="setting-llm-url" placeholder="https://token-plan-sgp.xiaomimimo.com/v1" />
-        </div>
-        <div class="settings-field">
-          <label for="setting-llm-key">API Key</label>
-          <input type="password" id="setting-llm-key" placeholder="Enter API key" autocomplete="off" />
-          <span class="settings-hint">Click "Test Connections" to discover available models</span>
-        </div>
-        <div class="settings-field">
-          <label for="setting-llm-model">Model</label>
-          <select id="setting-llm-model">
-            <option value="mimo-v2.5-pro">mimo-v2.5-pro</option>
-          </select>
-          <span class="settings-hint">Models are fetched from the LLM endpoint when you test the connection</span>
-        </div>
-      </section>
-
-      <!-- TTS -->
-      <section class="settings-section">
-        <h3>TTS (Text-to-Speech)</h3>
-        <p class="settings-info">Fantasee uses <strong>Xiaomi MiMo TTS</strong> (mimo-v2.5-tts) — the same API endpoint as the LLM. Voices are generated via the Xiaomi MiMo voice API. Built-in presets: Dean, Milo, Mia, Chloe.</p>
-        <div class="settings-field">
-          <label for="setting-tts-voice">Default Voice</label>
-          <select id="setting-tts-voice">
-            <option value="Dean">Dean — deep masculine</option>
-            <option value="Milo">Milo — warm baritone</option>
-            <option value="Mia">Mia — clear feminine</option>
-            <option value="Chloe">Chloe — soft feminine</option>
-          </select>
-        </div>
-      </section>
-
-      <!-- Plex -->
-      <section class="settings-section">
-        <h3>Plex Export</h3>
-        <div class="settings-field">
-          <label for="setting-plex-dest">Export Destination</label>
-          <div class="settings-picker-row">
-            <input type="text" id="setting-plex-dest" placeholder="D:\Downloads\Plex" />
-            <button type="button" class="settings-btn settings-btn-browse" data-action="browse-plex">Browse</button>
-          </div>
-          <input type="file" id="setting-plex-picker" style="display:none" webkitdirectory mozdirectory />
-          <span class="settings-hint">
-            Fantasee creates <code>&lt;Title&gt; (&lt;Year&gt;)/</code> inside this folder.
-            Point this at your Plex Movies library root for auto-import.
-          </span>
-        </div>
-        <div class="settings-field">
-          <label>FFmpeg (required for video rendering)</label>
-          <span class="settings-hint" id="ffmpeg-hint">
-            FFmpeg is used to render MP4 video and mix audio for Plex export.<br>
-            Test connections to check FFmpeg status.
-          </span>
-        </div>
-      </section>
-
-      <!-- Story Defaults -->
-      <section class="settings-section">
-        <h3>Story Defaults</h3>
-        <div class="settings-row-2">
+        <section class="settings-section">
+          <h3>LLM (Language Model)</h3>
           <div class="settings-field">
-            <label for="setting-default-scenes">Scenes</label>
-            <input type="number" id="setting-default-scenes" min="1" max="50" value="5" />
+            <label for="setting-llm-url">API Base URL</label>
+            <input type="text" id="setting-llm-url" placeholder="https://token-plan-sgp.xiaomimimo.com/v1" />
           </div>
           <div class="settings-field">
-            <label for="setting-default-images">Images per Scene</label>
-            <input type="number" id="setting-default-images" min="1" max="10" value="5" />
-          </div>
-        </div>
-        <div class="settings-row-2">
-          <div class="settings-field">
-            <label for="setting-default-style">Style</label>
-            <div class="settings-combo-wrap">
-              <input type="text" id="setting-default-style" list="style-suggestions" placeholder="fantasy painterly" />
-              <datalist id="style-suggestions"></datalist>
-            </div>
-            <span class="settings-hint">Art style for generated images (freeform text)</span>
+            <label for="setting-llm-key">API Key</label>
+            <input type="password" id="setting-llm-key" placeholder="Enter API key" autocomplete="off" />
+            <span class="settings-hint">Click "Test Connections" to discover available models</span>
           </div>
           <div class="settings-field">
-            <label for="setting-default-tone">Tone</label>
-            <select id="setting-default-tone">
-              <option value="dramatic">Dramatic</option>
-              <option value="normal">Normal</option>
-              <option value="dark">Dark</option>
-              <option value="whimsical">Whimsical</option>
-              <option value="epic">Epic</option>
-              <option value="mysterious">Mysterious</option>
+            <label for="setting-llm-model">Model</label>
+            <select id="setting-llm-model">
+              <option value="mimo-v2.5-pro">mimo-v2.5-pro</option>
             </select>
-            <span class="settings-hint">Narration delivery style</span>
+            <span class="settings-hint">Models are fetched from the LLM endpoint when you test the connection</span>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- Actions -->
+        <section class="settings-section">
+          <h3>Story Defaults</h3>
+          <div class="settings-row-2">
+            <div class="settings-field">
+              <label for="setting-default-scenes">Scenes</label>
+              <input type="number" id="setting-default-scenes" min="1" max="50" value="5" />
+            </div>
+            <div class="settings-field">
+              <label for="setting-default-images">Images per Scene</label>
+              <input type="number" id="setting-default-images" min="1" max="10" value="5" />
+            </div>
+          </div>
+          <div class="settings-row-2">
+            <div class="settings-field">
+              <label for="setting-default-style">Style</label>
+              <div class="settings-combo-wrap">
+                <input type="text" id="setting-default-style" list="style-suggestions" placeholder="fantasy painterly" />
+                <datalist id="style-suggestions"></datalist>
+              </div>
+              <span class="settings-hint">Art style for generated images (freeform text)</span>
+            </div>
+            <div class="settings-field">
+              <label for="setting-default-tone">Tone</label>
+              <select id="setting-default-tone">
+                <option value="dramatic">Dramatic</option>
+              </select>
+              <span class="settings-hint">Narration delivery style</span>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ═══ TAB: Voice & Audio ═══ -->
+      <div class="settings-tab-panel" id="tab-voice">
+
+        <section class="settings-section">
+          <h3>TTS (Text-to-Speech)</h3>
+          <p class="settings-info">Fantasee uses <strong>Xiaomi MiMo TTS</strong> (mimo-v2.5-tts) — the same API endpoint as the LLM. Voices are generated via the Xiaomi MiMo voice API.</p>
+          <div class="settings-field">
+            <label for="setting-tts-voice">Default Voice</label>
+            <select id="setting-tts-voice">
+              <option value="Dean">Dean — deep masculine</option>
+              <option value="Milo">Milo — warm baritone</option>
+              <option value="Mia">Mia — clear feminine</option>
+              <option value="Chloe">Chloe — soft feminine</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label for="setting-tts-speed">Speech Speed</label>
+            <div class="settings-row-2" style="align-items:center">
+              <input type="range" id="setting-tts-speed" min="0.5" max="3.0" step="0.1" value="1.3" style="width:100%" />
+              <span id="tts-speed-label" style="font-size:14px;color:var(--text-primary);text-align:center;min-width:40px">1.3×</span>
+            </div>
+            <span class="settings-hint">Playback speed multiplier (1.0 = natural, &gt;1.0 = faster)</span>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h3>Whisper (Subtitle Alignment)</h3>
+          <p class="settings-info">Whisper transcribes narration audio and aligns subtitles to word-level timestamps. Larger models are more accurate but slower.</p>
+          <div class="settings-field">
+            <label for="setting-whisper-model">Model Size</label>
+            <select id="setting-whisper-model">
+              <option value="tiny">Tiny — fastest, least accurate</option>
+              <option value="base" selected>Base — good balance (default)</option>
+              <option value="small">Small — better accuracy</option>
+              <option value="medium">Medium — high accuracy</option>
+              <option value="large">Large — best accuracy, slowest</option>
+            </select>
+            <span class="settings-hint">Requires ~1-5 GB VRAM depending on model size</span>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ═══ TAB: Image Engine ═══ -->
+      <div class="settings-tab-panel" id="tab-image">
+
+        <section class="settings-section">
+          <h3>ComfyUI</h3>
+          <div class="settings-field">
+            <label for="setting-comfyui-urls">Worker URLs</label>
+            <input type="text" id="setting-comfyui-urls" placeholder="http://127.0.0.1:8188" />
+            <span class="settings-hint">
+              Comma-separated for multiple workers (e.g. http://127.0.0.1:8188,http://127.0.0.1:8189)
+            </span>
+          </div>
+          <div class="settings-field settings-toggle-row">
+            <label for="setting-comfyui-auto">Auto-spawn worker on startup</label>
+            <label class="toggle">
+              <input type="checkbox" id="setting-comfyui-auto" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="settings-field">
+            <label>Setup Help</label>
+            <a href="https://github.com/comfyanonymous/ComfyUI" target="_blank" class="settings-link">ComfyUI GitHub →</a>
+            <span class="settings-hint">
+              Need: Python 3.10+, ComfyUI installed, SD 1.5 or SDXL checkpoint,<br>
+              workflow.json in the Fantasee project root.<br>
+              See <code>docs/SETUP.md</code> or the README for full instructions.
+            </span>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ═══ TAB: Export ═══ -->
+      <div class="settings-tab-panel" id="tab-export">
+
+        <section class="settings-section">
+          <h3>Plex Export</h3>
+          <div class="settings-field">
+            <label for="setting-plex-dest">Export Destination</label>
+            <div class="settings-picker-row">
+              <input type="text" id="setting-plex-dest" placeholder="D:\Downloads\Plex" />
+              <button type="button" class="settings-btn settings-btn-browse" data-action="browse-plex">Browse</button>
+            </div>
+            <input type="file" id="setting-plex-picker" style="display:none" webkitdirectory mozdirectory />
+            <span class="settings-hint">
+              Fantasee creates <code>&lt;Title&gt; (&lt;Year&gt;)/</code> inside this folder.
+              Point this at your Plex Movies library root for auto-import.
+            </span>
+          </div>
+          <div class="settings-field">
+            <label>FFmpeg (required for video rendering)</label>
+            <span class="settings-hint" id="ffmpeg-hint">
+              FFmpeg is used to render MP4 video and mix audio for Plex export.<br>
+              Test connections to check FFmpeg status.
+            </span>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Actions (outside tabs, always visible) -->
       <div class="settings-actions">
         <button class="settings-btn settings-btn-test" data-action="test-connections">Test Connections</button>
         <button class="settings-btn settings-btn-save" data-action="save-settings">Save Settings</button>
@@ -4664,10 +4724,38 @@ function closeWorkersModal() {
 }
 
 /* ── Settings ──────────────────────────────────────────────────── */
+function initSettingsTabs() {
+  const tabs = document.querySelectorAll('#settings-tabs .settings-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelectorAll('.settings-tab-panel').forEach(p => p.classList.remove('active'));
+      const target = document.getElementById(tab.dataset.tab);
+      if (target) target.classList.add('active');
+    });
+  });
+  // TTS speed slider live label
+  const speedSlider = document.getElementById('setting-tts-speed');
+  const speedLabel = document.getElementById('tts-speed-label');
+  if (speedSlider && speedLabel) {
+    speedSlider.addEventListener('input', () => {
+      speedLabel.textContent = parseFloat(speedSlider.value).toFixed(1) + '×';
+    });
+  }
+}
+
 async function openSettings() {
   const overlay = document.getElementById('settings-overlay');
   overlay.classList.add('open');
   overlay.setAttribute('aria-hidden', 'false');
+  // Reset to first tab
+  document.querySelectorAll('#settings-tabs .settings-tab').forEach((t, i) => {
+    t.classList.toggle('active', i === 0);
+  });
+  document.querySelectorAll('.settings-tab-panel').forEach((p, i) => {
+    p.classList.toggle('active', i === 0);
+  });
   try {
     const resp = await fetch('/api/settings');
     const s = await resp.json();
@@ -4684,6 +4772,12 @@ async function openSettings() {
     }
     modelSel.value = savedModel;
     document.getElementById('setting-tts-voice').value = s.tts_voice_preset || 'Dean';
+    // TTS speed
+    const ttsSpeed = s.tts_speed || 1.3;
+    document.getElementById('setting-tts-speed').value = ttsSpeed;
+    document.getElementById('tts-speed-label').textContent = parseFloat(ttsSpeed).toFixed(1) + '×';
+    // Whisper
+    document.getElementById('setting-whisper-model').value = s.whisper_model_size || 'base';
     document.getElementById('setting-plex-dest').value = s.plex_destination || '';
     document.getElementById('setting-default-scenes').value = s.default_scenes || 5;
     document.getElementById('setting-default-images').value = s.default_images_per_scene || 5;
@@ -4740,12 +4834,13 @@ async function saveSettings() {
     llm_api_key: document.getElementById('setting-llm-key').value,
     llm_model: document.getElementById('setting-llm-model').value,
     tts_voice_preset: document.getElementById('setting-tts-voice').value,
+    tts_speed: parseFloat(document.getElementById('setting-tts-speed').value) || 1.3,
+    whisper_model_size: document.getElementById('setting-whisper-model').value || 'base',
     plex_destination: document.getElementById('setting-plex-dest').value,
     default_scenes: parseInt(document.getElementById('setting-default-scenes').value) || 5,
     default_images_per_scene: parseInt(document.getElementById('setting-default-images').value) || 5,
     default_style: document.getElementById('setting-default-style').value || 'fantasy painterly',
     default_tone: document.getElementById('setting-default-tone').value || 'dramatic',
-    whisper_model_size: 'base',
   };
   try {
     const resp = await fetch('/api/settings', {
@@ -7320,6 +7415,7 @@ async function init() {
   // so the user gets an immediate visual response instead of a blank
   // viewport. The skeleton matches the final layout's shape, so the
   // transition to real content has zero layout shift.
+  initSettingsTabs();
   showInitialSkeleton();
   try {
     const stories = await API.fetchStories();
