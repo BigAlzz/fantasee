@@ -26,3 +26,4 @@ Thumbs.db
 
 # ComfyUI per-worker DBs (created at runtime)
 *.db
+fantasee_settings.json
