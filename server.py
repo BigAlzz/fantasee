@@ -35,6 +35,7 @@ from fantasee_server.api import (
     improvement,
     library_routes,
     plex,
+    settings,
     stories,
     tts,
     ws,
@@ -121,6 +122,7 @@ app.include_router(plex.router)
 app.include_router(delete.router)
 app.include_router(actions.router)
 app.include_router(library_routes.router)
+app.include_router(settings.router)
 app.include_router(ws.router)
 
 # Serve the bundled frontend (index.html, CSS, JS, etc.) at /static/.

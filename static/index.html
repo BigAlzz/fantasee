@@ -2738,6 +2738,102 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
 .empty-state svg { width: 64px; height: 64px; margin-bottom: 16px; opacity: 0.4; }
 .empty-state h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary); }
 .empty-state p { font-size: 14px; line-height: 1.6; max-width: 400px; margin: 0 auto; }
+
+/* ── Settings Panel ───────────────────────────────────────────── */
+.btn-settings {
+  background: none; border: none; color: var(--text-secondary); cursor: pointer;
+  padding: 6px; border-radius: 6px; display: flex; align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+.btn-settings:hover { color: var(--text-primary); background: rgba(255,255,255,0.08); }
+
+.settings-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1100;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+.settings-overlay.open { opacity: 1; pointer-events: auto; }
+
+.settings-panel {
+  background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+  width: 560px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+}
+.settings-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.settings-header h2 { font-size: 18px; font-weight: 600; margin: 0; }
+.settings-close {
+  background: none; border: none; color: var(--text-secondary); font-size: 24px;
+  cursor: pointer; padding: 4px 8px; border-radius: 6px;
+}
+.settings-close:hover { color: var(--text-primary); background: rgba(255,255,255,0.08); }
+
+.settings-body { padding: 16px 24px 24px; overflow-y: auto; flex: 1; }
+
+.settings-section { margin-bottom: 24px; }
+.settings-section h3 {
+  font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--accent); margin: 0 0 12px 0;
+}
+
+.settings-field { margin-bottom: 14px; }
+.settings-field label {
+  display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px;
+}
+.settings-field input, .settings-field select {
+  width: 100%; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px; background: rgba(0,0,0,0.3); color: var(--text-primary);
+  font-size: 14px; font-family: inherit; box-sizing: border-box;
+}
+.settings-field input:focus, .settings-field select:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(229,62,62,0.2);
+}
+.settings-hint { display: block; font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 3px; }
+
+.settings-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.settings-toggle-row label:first-child { margin-bottom: 0; }
+
+.toggle { position: relative; display: inline-block; width: 40px; height: 22px; cursor: pointer; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: rgba(255,255,255,0.12); border-radius: 22px;
+  transition: background 0.2s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute; width: 16px; height: 16px; left: 3px; bottom: 3px;
+  background: #fff; border-radius: 50%; transition: transform 0.2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--accent); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+.settings-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.settings-actions {
+  display: flex; gap: 10px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06);
+}
+.settings-btn {
+  padding: 8px 16px; border: none; border-radius: 6px; font-size: 13px;
+  font-weight: 500; cursor: pointer; transition: background 0.15s;
+}
+.settings-btn-test {
+  background: rgba(255,255,255,0.08); color: var(--text-secondary);
+}
+.settings-btn-test:hover { background: rgba(255,255,255,0.14); color: var(--text-primary); }
+.settings-btn-save {
+  background: var(--accent); color: #fff; margin-left: auto;
+}
+.settings-btn-save:hover { filter: brightness(1.1); }
+
+.settings-test-results {
+  margin-top: 12px; font-size: 13px; line-height: 1.6;
+}
+.settings-test-results .ok { color: #48bb78; }
+.settings-test-results .fail { color: #fc8181; }
+
 </style>
 </head>
 <body>
@@ -2768,6 +2864,14 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
             title="ComfyUI workers status" aria-label="ComfyUI workers status">
       <span class="badge-dot" id="comfyui-dot" aria-hidden="true"></span>
       <span id="comfyui-label" aria-live="polite">ComfyUI</span>
+    </button>
+    <button type="button" class="btn-settings" data-action="open-settings"
+            title="Settings" aria-label="Open settings">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
     </button>
     <button type="button" class="btn-nav-create" data-action="open-create">+ Create Story</button>
     <!-- Mobile hamburger — hidden on desktop, shown via @media (max-width:768px) -->
@@ -2804,6 +2908,105 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
   </div>
   <div class="detail-content" id="detail-content">
     <!-- Injected by JS -->
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     SETTINGS PAGE
+     ══════════════════════════════════════════════════════════════════════ -->
+<div class="settings-overlay" id="settings-overlay" aria-hidden="true">
+  <div class="settings-panel" id="settings-panel" role="dialog" aria-labelledby="settings-title">
+    <div class="settings-header">
+      <h2 id="settings-title">Settings</h2>
+      <button class="settings-close" data-action="close-settings" aria-label="Close settings">&times;</button>
+    </div>
+    <div class="settings-body">
+
+      <section class="settings-section">
+        <h3>ComfyUI</h3>
+        <div class="settings-field">
+          <label for="setting-comfyui-urls">Worker URLs</label>
+          <input type="text" id="setting-comfyui-urls" placeholder="http://127.0.0.1:8188" />
+          <span class="settings-hint">Comma-separated for multiple workers</span>
+        </div>
+        <div class="settings-field settings-toggle-row">
+          <label for="setting-comfyui-auto">Auto-spawn worker on startup</label>
+          <label class="toggle">
+            <input type="checkbox" id="setting-comfyui-auto" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>LLM (Language Model)</h3>
+        <div class="settings-field">
+          <label for="setting-llm-url">API Base URL</label>
+          <input type="text" id="setting-llm-url" placeholder="https://token-plan-sgp.xiaomimimo.com/v1" />
+        </div>
+        <div class="settings-field">
+          <label for="setting-llm-key">API Key</label>
+          <input type="password" id="setting-llm-key" placeholder="Enter API key" autocomplete="off" />
+        </div>
+        <div class="settings-field">
+          <label for="setting-llm-model">Model</label>
+          <input type="text" id="setting-llm-model" placeholder="mimo-v2.5-pro" />
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>TTS (Text-to-Speech)</h3>
+        <div class="settings-field">
+          <label for="setting-tts-voice">Default Voice</label>
+          <select id="setting-tts-voice">
+            <option value="Dean">Dean</option>
+            <option value="Milo">Milo</option>
+            <option value="Mia">Mia</option>
+            <option value="Chloe">Chloe</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Plex Export</h3>
+        <div class="settings-field">
+          <label for="setting-plex-dest">Export Destination</label>
+          <input type="text" id="setting-plex-dest" placeholder="D:\Downloads\Plex" />
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Story Defaults</h3>
+        <div class="settings-row-2">
+          <div class="settings-field">
+            <label for="setting-default-scenes">Scenes</label>
+            <input type="number" id="setting-default-scenes" min="1" max="50" value="5" />
+          </div>
+          <div class="settings-field">
+            <label for="setting-default-images">Images per Scene</label>
+            <input type="number" id="setting-default-images" min="1" max="10" value="5" />
+          </div>
+        </div>
+        <div class="settings-row-2">
+          <div class="settings-field">
+            <label for="setting-default-style">Style</label>
+            <input type="text" id="setting-default-style" placeholder="fantasy painterly" />
+          </div>
+          <div class="settings-field">
+            <label for="setting-default-tone">Tone</label>
+            <input type="text" id="setting-default-tone" placeholder="dramatic" />
+          </div>
+        </div>
+      </section>
+
+      <div class="settings-actions">
+        <button class="settings-btn settings-btn-test" data-action="test-connections">Test Connections</button>
+        <button class="settings-btn settings-btn-save" data-action="save-settings">Save Settings</button>
+      </div>
+
+      <div class="settings-test-results" id="settings-test-results" aria-live="polite"></div>
+
+    </div>
   </div>
 </div>
 
@@ -4390,6 +4593,116 @@ function closeWorkersModal() {
   if (!workersModal.classList.contains('active')) return;
   workersModal.classList.remove('active');
   closeDialog(workersModal);
+}
+
+/* ── Settings ──────────────────────────────────────────────────── */
+async function openSettings() {
+  const overlay = document.getElementById('settings-overlay');
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  // Load current settings from API
+  try {
+    const resp = await fetch('/api/settings');
+    const s = await resp.json();
+    document.getElementById('setting-comfyui-urls').value = s.comfyui_urls || '';
+    document.getElementById('setting-comfyui-auto').checked = s.comfyui_auto_spawn !== false;
+    document.getElementById('setting-llm-url').value = s.llm_base_url || '';
+    document.getElementById('setting-llm-key').value = '';
+    document.getElementById('setting-llm-key').placeholder = s.llm_api_key || 'Enter API key';
+    document.getElementById('setting-llm-model').value = s.llm_model || '';
+    document.getElementById('setting-tts-voice').value = s.tts_voice_preset || 'Dean';
+    document.getElementById('setting-plex-dest').value = s.plex_destination || '';
+    document.getElementById('setting-default-scenes').value = s.default_scenes || 5;
+    document.getElementById('setting-default-images').value = s.default_images_per_scene || 5;
+    document.getElementById('setting-default-style').value = s.default_style || '';
+    document.getElementById('setting-default-tone').value = s.default_tone || '';
+  } catch (e) {
+    showToast('Failed to load settings: ' + e.message, 'error');
+  }
+}
+
+function closeSettings() {
+  const overlay = document.getElementById('settings-overlay');
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+}
+
+async function saveSettings() {
+  const body = {
+    comfyui_urls: document.getElementById('setting-comfyui-urls').value,
+    comfyui_auto_spawn: document.getElementById('setting-comfyui-auto').checked,
+    llm_base_url: document.getElementById('setting-llm-url').value,
+    llm_api_key: document.getElementById('setting-llm-key').value,
+    llm_model: document.getElementById('setting-llm-model').value,
+    tts_base_url: document.getElementById('setting-llm-url').value,
+    tts_api_key: document.getElementById('setting-llm-key').value,
+    tts_voice_preset: document.getElementById('setting-tts-voice').value,
+    plex_destination: document.getElementById('setting-plex-dest').value,
+    default_scenes: parseInt(document.getElementById('setting-default-scenes').value) || 5,
+    default_images_per_scene: parseInt(document.getElementById('setting-default-images').value) || 5,
+    default_style: document.getElementById('setting-default-style').value || 'fantasy painterly',
+    default_tone: document.getElementById('setting-default-tone').value || 'dramatic',
+    whisper_model_size: 'base',
+  };
+  try {
+    const resp = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      showToast('Settings saved', 'success');
+      closeSettings();
+    } else {
+      showToast('Failed to save settings', 'error');
+    }
+  } catch (e) {
+    showToast('Failed to save settings: ' + e.message, 'error');
+  }
+}
+
+async function testConnections() {
+  const results = document.getElementById('settings-test-results');
+  results.innerHTML = '<span style="opacity:0.5">Testing...</span>';
+
+  const body = {
+    comfyui_urls: document.getElementById('setting-comfyui-urls').value,
+    llm_base_url: document.getElementById('setting-llm-url').value,
+    llm_api_key: document.getElementById('setting-llm-key').value || undefined,
+    plex_destination: document.getElementById('setting-plex-dest').value,
+  };
+
+  try {
+    const resp = await fetch('/api/settings/test-connection', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    let html = '';
+
+    // ComfyUI
+    if (data.comfyui && data.comfyui.length) {
+      for (const w of data.comfyui) {
+        html += `<div class="${w.ok ? 'ok' : 'fail'}">ComfyUI ${w.url}: ${w.ok ? 'Connected' : w.error || 'Failed'}</div>`;
+      }
+    }
+
+    // LLM
+    if (data.llm) {
+      html += `<div class="${data.llm.ok ? 'ok' : 'fail'}">LLM: ${data.llm.ok ? 'Connected' : data.llm.error || 'Failed'}</div>`;
+    }
+
+    // Plex
+    if (data.plex) {
+      html += `<div class="${data.plex.ok ? 'ok' : 'fail'}">Plex: ${data.plex.ok ? 'Directory exists' : 'Directory not found: ' + data.plex.path}</div>`;
+    }
+
+    results.innerHTML = html || '<span style="opacity:0.5">No results</span>';
+  } catch (e) {
+    results.innerHTML = `<div class="fail">Error: ${e.message}</div>`;
+  }
 }
 
 async function workersAction(action, payload = null) {
@@ -6609,6 +6922,10 @@ const ACTION_HANDLERS = {
   'workers-kill':   () => workersAction('kill-cpu'),
   'workers-kill-one': (el) => killSelectedWorker(el),
   'workers-refresh':() => workersAction('refresh'),
+  'open-settings':  () => openSettings(),
+  'close-settings': () => closeSettings(),
+  'save-settings':  () => saveSettings(),
+  'test-connections': () => testConnections(),
 
   // Story / scene / card actions
   'open-detail':     (el) => openDetail(el.dataset.id),
