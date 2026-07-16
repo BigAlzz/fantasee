@@ -20,6 +20,7 @@ import sys
 from pathlib import Path
 from dataclasses import dataclass, field
 from story_storage import STORIES_ROOT, existing_story_dir
+from fantasee_server.security import validate_provider_url
 
 OUTPUTS_DIR = STORIES_ROOT
 
@@ -719,6 +720,10 @@ def llm_story_review(story: dict) -> dict | None:
 
     if not api_key:
         return None
+    try:
+        base_url = validate_provider_url(base_url, kind="llm")
+    except ValueError:
+        return None
 
     # Build story summary for the LLM
     scenes_summary = []
@@ -774,6 +779,7 @@ Output ONLY a JSON object:
                 "Content-Type": "application/json",
             },
             timeout=120,
+            allow_redirects=False,
         )
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"]

@@ -17,6 +17,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from fantasee_server.security import validate_provider_url, validate_provider_urls
+
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 SETTINGS_FILE = Path(__file__).parent.parent.parent / "fantasee_settings.json"
@@ -127,13 +129,32 @@ def _save_settings(data: dict) -> None:
 
 def apply_settings_to_env(settings: dict) -> None:
     """Push settings into environment variables so existing code picks them up."""
-    os.environ["COMFYUI_URLS"] = settings.get("comfyui_urls", DEFAULTS["comfyui_urls"])
+    comfyui_urls = validate_provider_urls(
+        settings.get("comfyui_urls", DEFAULTS["comfyui_urls"]),
+        resolve_dns=False,
+    )
+    llm_base_url = validate_provider_url(
+        settings.get("llm_base_url", DEFAULTS["llm_base_url"]),
+        kind="llm",
+        resolve_dns=False,
+    )
+    os.environ["COMFYUI_URLS"] = comfyui_urls
     os.environ["FANTASEE_AUTO_SPAWN_CPU"] = "0" if not settings.get("comfyui_auto_spawn", True) else "1"
-    os.environ["XIAOMI_BASE_URL"] = settings.get("llm_base_url", DEFAULTS["llm_base_url"])
+    os.environ["XIAOMI_BASE_URL"] = llm_base_url
     os.environ["XIAOMI_API_KEY"] = settings.get("llm_api_key", DEFAULTS["llm_api_key"])
     os.environ["FANTASEE_PLEX_DEST"] = settings.get("plex_destination", DEFAULTS["plex_destination"])
     os.environ["FANTASEE_TTS_SPEED"] = str(settings.get("tts_speed", DEFAULTS["tts_speed"]))
     os.environ["FANTASEE_WHISPER_MODEL"] = settings.get("whisper_model_size", DEFAULTS["whisper_model_size"])
+
+
+def _mask_settings(data: dict) -> dict:
+    """Return settings safe for a browser or operator response."""
+    masked = dict(data)
+    for key in ("llm_api_key", "tts_api_key"):
+        if masked.get(key):
+            val = str(masked[key])
+            masked[key] = f"{val[:4]}...{val[-4:]}" if len(val) > 8 else "****"
+    return masked
 
 
 # ── Apply on import ───────────────────────────────────────────────
@@ -145,12 +166,7 @@ apply_settings_to_env(_load_settings())
 @router.get("")
 def get_settings():
     """Return current settings. API keys are masked for the browser."""
-    data = _load_settings()
-    masked = dict(data)
-    for key in ("llm_api_key", "tts_api_key"):
-        if masked.get(key):
-            val = masked[key]
-            masked[key] = f"{val[:4]}...{val[-4:]}" if len(val) > 8 else "••••"
+    masked = _mask_settings(_load_settings())
     # Include known presets for UI dropdowns
     masked["_known_tones"] = KNOWN_TONES
     masked["_suggested_styles"] = SUGGESTED_STYLES
@@ -159,14 +175,20 @@ def get_settings():
 
 @router.get("/raw")
 def get_settings_raw():
-    """Return unmasked settings (internal use only)."""
-    return _load_settings()
+    """Compatibility endpoint that never returns raw credentials."""
+    return _mask_settings(_load_settings())
 
 
 @router.put("")
 def update_settings(body: Settings):
     """Update settings. Saves to disk and pushes into env vars."""
     data = body.model_dump()
+
+    try:
+        data["comfyui_urls"] = validate_provider_urls(data["comfyui_urls"])
+        data["llm_base_url"] = validate_provider_url(data["llm_base_url"], kind="llm")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Don't overwrite keys with masked values
     current = _load_settings()
@@ -180,12 +202,7 @@ def update_settings(body: Settings):
     _save_settings(data)
     apply_settings_to_env(data)
 
-    masked = dict(data)
-    for key in ("llm_api_key",):
-        if masked.get(key):
-            val = masked[key]
-            masked[key] = f"{val[:4]}...{val[-4:]}" if len(val) > 8 else "••••"
-    return {"ok": True, "settings": masked}
+    return {"ok": True, "settings": _mask_settings(data)}
 
 
 @router.get("/llm-models")
@@ -206,9 +223,14 @@ def list_llm_models():
         api_key = settings.get("llm_api_key", "")
 
     try:
-        r = req.get(f"{base_url}/models", headers={
-            "Authorization": f"Bearer {api_key}"
-        }, timeout=10)
+        base_url = validate_provider_url(base_url, kind="llm")
+        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+        r = req.get(
+            f"{base_url}/models",
+            headers=headers,
+            timeout=10,
+            allow_redirects=False,
+        )
         if r.status_code == 200:
             data = r.json()
             # Handle both { data: [...] } and [...] response formats
@@ -237,7 +259,8 @@ def test_connection(body: dict):
         if not url:
             continue
         try:
-            r = req.get(f"{url}/system_stats", timeout=3)
+            url = validate_provider_url(url, kind="comfyui")
+            r = req.get(f"{url}/system_stats", timeout=3, allow_redirects=False)
             stats = r.json() if r.status_code == 200 else {}
             comfyui_results.append({
                 "url": url,
@@ -254,7 +277,14 @@ def test_connection(body: dict):
     llm_key = body.get("llm_api_key", "") or _load_settings().get("llm_api_key", "")
     model_list = []
     try:
-        r = req.get(f"{llm_url}/models", headers={"Authorization": f"Bearer {llm_key}"}, timeout=10)
+        llm_url = validate_provider_url(llm_url, kind="llm")
+        headers = {"Authorization": f"Bearer {llm_key}"} if llm_key else {}
+        r = req.get(
+            f"{llm_url}/models",
+            headers=headers,
+            timeout=10,
+            allow_redirects=False,
+        )
         if r.status_code == 200:
             data = r.json()
             models = data.get("data", data) if isinstance(data, dict) else data

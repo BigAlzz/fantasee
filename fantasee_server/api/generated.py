@@ -21,7 +21,7 @@ import os
 import subprocess
 import sys
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
 from fantasee_server.discovery import (
@@ -34,7 +34,10 @@ from fantasee_server.paths import (
     STORY_VIEWER_DIR,
     generated_path,
     generated_story_dir,
+    path_under,
 )
+from fantasee_server.security import require_operator
+from story_storage import validate_story_id
 from fantasee_server.state import (
     _resolve_env_var,
     _story_sort_ts,
@@ -65,7 +68,12 @@ def serve_generated_image(filename: str):
 @router.get("/generated/{story_id}/{filename:path}")
 def serve_generated_asset(story_id: str, filename: str):
     """Serve any asset (image/audio/subs) from a generated story's directory."""
-    filepath = generated_path(story_id, filename)
+    try:
+        validate_story_id(story_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    story_dir = generated_story_dir(story_id)
+    filepath = path_under(story_dir, filename)
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="Asset not found")
     # Determine media type
@@ -195,7 +203,10 @@ def get_story_review(story_id: str):
     raise HTTPException(status_code=404, detail="No review found for this story")
 
 
-@router.post("/api/generated-stories/{story_id}/run-critic")
+@router.post(
+    "/api/generated-stories/{story_id}/run-critic",
+    dependencies=[Depends(require_operator)],
+)
 async def run_critic(story_id: str):
     """Run the critic on a generated story and return the review."""
     story_dir = generated_story_dir(story_id)

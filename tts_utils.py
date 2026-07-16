@@ -28,6 +28,8 @@ from typing import Optional
 
 import requests
 
+from fantasee_server.security import validate_provider_url
+
 # ── Config ──────────────────────────────────────────────────────────────
 TTS_API_URL = "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions"
 DEFAULT_TTS_SPEED = float(os.environ.get("FANTASEE_TTS_SPEED", "1.3"))
@@ -305,7 +307,11 @@ def synthesize(
         print("[tts_utils] ERROR: XIAOMI_API_KEY not found", file=sys.stderr)
         return None
 
-    base_url = _get_base_url()
+    try:
+        base_url = validate_provider_url(_get_base_url(), kind="llm")
+    except ValueError as exc:
+        print(f"[tts_utils] ERROR: unsafe provider URL: {exc}", file=sys.stderr)
+        return None
     voice = normalize_voice(voice)
 
     # Determine if we're using voice-design mode
@@ -357,6 +363,7 @@ def synthesize(
                 headers=attempt_headers,
                 json=payload,
                 timeout=timeout,
+                allow_redirects=False,
             )
             if r.status_code == 200:
                 data = r.json()

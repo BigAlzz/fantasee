@@ -48,9 +48,11 @@ from fantasee_server.state import (
     _library_agent_failures,
     _library_maintenance_running,
     _story_sort_ts,
+    atomic_write_json,
     new_uuid,
     now,
 )
+from story_pipeline import sync_from_completion, update_stage
 
 
 # ── Per-story completion report ────────────────────────────────────
@@ -61,7 +63,25 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
     story_dir = story_dir or generated_story_dir(story_id)
     if story is None:
         manifest_path = story_dir / f"{story_id}.json"
-        story = json.loads(manifest_path.read_text(encoding="utf-8"))
+        try:
+            story = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, json.JSONDecodeError):
+            return {
+                "complete": False,
+                "missing": ["story", "status"],
+                "issues": [{"kind": "story", "message": "Story manifest is missing or unreadable"}],
+                "issue_count": 1,
+                "counts": {
+                    "scenes": 0,
+                    "scenes_with_text": 0,
+                    "scenes_with_images": 0,
+                    "scenes_with_audio": 0,
+                    "scenes_with_subtitles": 0,
+                    "scene_videos": 0,
+                },
+                "full_video_ok": False,
+                "plex_video_ok": False,
+            }
 
     scenes = story.get("scenes") or []
     issues: list[dict] = []
@@ -80,7 +100,7 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
             issue["scene"] = scene
         issues.append(issue)
 
-    if story.get("status") not in (None, "", "complete"):
+    if story.get("status") not in (None, "", "complete", "draft", "generating", "incomplete"):
         add_issue("status", f"Manifest status is {story.get('status')}")
     if not scenes:
         add_issue("story", "No generated scenes found")
@@ -113,21 +133,49 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
         if padded_key != scene_key:
             subs_names.append(f"subs_{story_id}_s{padded_key}.json")
         subs_ok = False
+        subs_error = "Scene is missing subtitle alignment"
         for subs_name in [name for name in subs_names if name]:
             subs_path = story_dir / subs_name
             if not subs_path.exists():
                 continue
             try:
                 subs = json.loads(subs_path.read_text(encoding="utf-8"))
-                subs_ok = isinstance(subs, list) and len(subs) > 0
+                if not isinstance(subs, list) or not subs:
+                    subs_error = "Subtitle alignment file is empty"
+                    continue
+                previous_end = 0.0
+                valid_segments = True
+                for segment in subs:
+                    if not isinstance(segment, dict) or not (segment.get("text") or "").strip():
+                        valid_segments = False
+                        subs_error = "Subtitle alignment contains an empty segment"
+                        break
+                    try:
+                        start = float(segment["start"])
+                        end = float(segment["end"])
+                    except (KeyError, TypeError, ValueError):
+                        valid_segments = False
+                        subs_error = "Subtitle alignment contains invalid timestamps"
+                        break
+                    audio_duration = float(scene.get("audio_duration") or 0.0)
+                    if start < 0 or end <= start or start < previous_end - 0.05:
+                        valid_segments = False
+                        subs_error = "Subtitle alignment contains overlapping or invalid timestamps"
+                        break
+                    if audio_duration > 0 and end > audio_duration + 1.0:
+                        valid_segments = False
+                        subs_error = "Subtitle alignment extends beyond the narration audio"
+                        break
+                    previous_end = end
+                subs_ok = valid_segments
             except (json.JSONDecodeError, OSError):
-                subs_ok = False
+                subs_error = "Subtitle alignment file is unreadable"
             if subs_ok:
                 break
         if subs_ok:
             counts["scenes_with_subtitles"] += 1
         else:
-            add_issue("subtitles", "Scene is missing subtitle alignment", scene=scene_key)
+            add_issue("subtitles", subs_error, scene=scene_key)
 
         scene_mp4s = [story_dir / f"{story_id}_s{scene_key}.mp4"]
         if padded_key != scene_key:
@@ -241,6 +289,8 @@ def _complete_story_for_library(story_id: str, progress) -> dict:
 
     emit("scan", f"Scanning {story_id}", 0.02)
     report = story_completion_report(story_id)
+    story_dir = generated_story_dir(story_id)
+    sync_from_completion(story_dir, report)
     missing = set(report.get("missing") or [])
 
     if "story" in missing or "status" in missing:
@@ -250,6 +300,7 @@ def _complete_story_for_library(story_id: str, progress) -> dict:
         if regen.get("status") not in ("ok",):
             raise RuntimeError(regen.get("error") or f"Regenerate returned {regen.get('status')}")
         report = story_completion_report(story_id)
+        sync_from_completion(story_dir, report)
         missing = set(report.get("missing") or [])
 
     if missing.intersection({"story_text", "image", "audio", "subtitles"}):
@@ -264,17 +315,21 @@ def _complete_story_for_library(story_id: str, progress) -> dict:
         if repair.errors:
             raise RuntimeError("; ".join(repair.errors[:3]))
         report = story_completion_report(story_id)
+        sync_from_completion(story_dir, report)
         missing = set(report.get("missing") or [])
 
     if missing.intersection({"scene_video", "full_video"}):
         emit("render", f"Rendering MP4 files for {story_id}", 0.62)
+        update_stage(story_dir, "render", "running", message="Rendering scene and full-story MP4 files")
         render = _run_render_for_library(story_id)
         result["steps"].append({"step": "render", "result": render})
         report = story_completion_report(story_id)
+        sync_from_completion(story_dir, report)
         missing = set(report.get("missing") or [])
 
     if "plex" in missing:
         emit("plex", f"Exporting Plex package for {story_id}", 0.78)
+        update_stage(story_dir, "plex", "running", message="Exporting Plex-ready package")
         plex = export_plex_package(
             story_id,
             progress_callback=lambda stage, msg, pct: emit(stage, msg, 0.78 + pct * 0.20),
@@ -284,8 +339,26 @@ def _complete_story_for_library(story_id: str, progress) -> dict:
     final_report = story_completion_report(story_id)
     result["completion"] = final_report
     if not final_report.get("complete"):
+        sync_from_completion(story_dir, final_report)
         missing_final = ", ".join(final_report.get("missing") or ["unknown"])
         raise RuntimeError(f"Story still incomplete after maintenance: {missing_final}")
+    manifest_path = story_dir / f"{story_id}.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["status"] = "complete"
+        pipeline = manifest.get("pipeline")
+        if not isinstance(pipeline, dict):
+            pipeline = {}
+        pipeline.update({
+            "status": "complete",
+            "next_stage": "complete",
+            "completion_verified_at": now(),
+        })
+        manifest["pipeline"] = pipeline
+        atomic_write_json(manifest_path, manifest)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Could not persist completion status: {exc}") from exc
+    sync_from_completion(story_dir, final_report)
     emit("complete", f"{story_id} complete", 1.0)
     return result
 

@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -42,6 +42,7 @@ from fantasee_server.api import (
 )
 from fantasee_server.library import _library_agent_loop
 from fantasee_server.paths import STATIC_DIR, load_stories
+from fantasee_server.security import require_operator
 from fantasee_server.startup import startup_ensure_workers
 from fantasee_server.state import _library_agent_task
 
@@ -101,8 +102,15 @@ app = FastAPI(title="Story Viewer", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=[
+        origin.strip()
+        for origin in os.environ.get(
+            "FANTASEE_CORS_ORIGINS",
+            "http://127.0.0.1:8765,http://localhost:8765",
+        ).split(",")
+        if origin.strip()
+    ],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -114,15 +122,15 @@ app.add_middleware(
 
 app.include_router(stories.router)
 app.include_router(generated.router)
-app.include_router(generation.router)
-app.include_router(comfyui.router)
-app.include_router(tts.router)
-app.include_router(improvement.router)
-app.include_router(plex.router)
-app.include_router(delete.router)
-app.include_router(actions.router)
-app.include_router(library_routes.router)
-app.include_router(settings.router)
+app.include_router(generation.router, dependencies=[Depends(require_operator)])
+app.include_router(comfyui.router, dependencies=[Depends(require_operator)])
+app.include_router(tts.router, dependencies=[Depends(require_operator)])
+app.include_router(improvement.router, dependencies=[Depends(require_operator)])
+app.include_router(plex.router, dependencies=[Depends(require_operator)])
+app.include_router(delete.router, dependencies=[Depends(require_operator)])
+app.include_router(actions.router, dependencies=[Depends(require_operator)])
+app.include_router(library_routes.router, dependencies=[Depends(require_operator)])
+app.include_router(settings.router, dependencies=[Depends(require_operator)])
 app.include_router(ws.router)
 
 # Serve the bundled frontend (index.html, CSS, JS, etc.) at /static/.

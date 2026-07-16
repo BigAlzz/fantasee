@@ -26,6 +26,7 @@ from story_storage import (
     STORIES_ROOT,
     ensure_story_layout,
     existing_story_dir,
+    validate_story_id,
 )
 
 from fantasee_server.state import atomic_write_json
@@ -64,7 +65,11 @@ def generated_path(*parts: str) -> Path:
 
 
 def generated_story_dir(story_id: str, create: bool = False) -> Path:
-    """Return a story directory, preferring stories/ over legacy outputs/."""
+    """Return a story directory, preferring stories/ over legacy outputs."""
+    try:
+        validate_story_id(story_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     story_dir = existing_story_dir(story_id)
     if create:
         ensure_story_layout(story_dir)

@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from fantasee_server.paths import STORY_VIEWER_DIR, generated_story_dir
+from fantasee_server.security import validate_provider_url
 from fantasee_server.state import _resolve_env_var, atomic_write_json
 
 
@@ -79,6 +80,7 @@ def _llm_call_text(api_key: str, base_url: str, system: str, user: str,
     """Single-shot LLM call returning the response text or None on failure."""
     from fantasee_server.state import requests
     try:
+        base_url = validate_provider_url(base_url, kind="llm")
         resp = requests.post(
             f"{base_url}/chat/completions",
             json={
@@ -92,6 +94,7 @@ def _llm_call_text(api_key: str, base_url: str, system: str, user: str,
             },
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             timeout=timeout,
+            allow_redirects=False,
         )
         if resp.ok:
             return resp.json()["choices"][0]["message"]["content"].strip().strip('"')
@@ -175,6 +178,7 @@ def _run_improve_loop_sync(story_id: str, body: dict | None = None, progress=Non
 
     api_key = _resolve_env_var("XIAOMI_API_KEY")
     base_url = _resolve_env_var("XIAOMI_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1")
+    base_url = validate_provider_url(base_url, kind="llm")
 
     history = []
     previously_improved = set()
@@ -278,14 +282,18 @@ def _run_improve_loop_sync(story_id: str, body: dict | None = None, progress=Non
 
             # ── Action 1: Refine narration if flagged ────────────────────
             if actions["refine_narration"] and sc.get("narration"):
+                from generate_story import load_story_style_prompt
+
                 new_narration = _llm_call_text(
                     api_key, base_url,
                     system=("You are a narration editor. Fix the given voiceover text: "
                             "tighten run-on sentences, vary sentence length, remove excessive "
                             "ellipses. Keep the same content, tone, and approximate length. "
-                            "Write in present tense, dramatic storytelling voice. "
+                            "Use the mandatory canonical narration style below. "
+                            "Keep third person and never use first-person internal monologue. "
                             "Output ONLY the revised narration, no commentary. "
-                            "Target 80-150 words."),
+                            "Target 80-150 words.\n\n"
+                            + load_story_style_prompt()),
                     user=sc["narration"],
                     temperature=0.6, max_tokens=512,
                 )
@@ -479,6 +487,7 @@ def _run_auto_improve_sync(story_id: str, body: dict | None = None, progress=Non
 
     api_key = _resolve_env_var("XIAOMI_API_KEY")
     base_url = _resolve_env_var("XIAOMI_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1")
+    base_url = validate_provider_url(base_url, kind="llm")
 
     improved = []
     total_targets = max(1, len(targets))
@@ -514,6 +523,7 @@ def _run_auto_improve_sync(story_id: str, body: dict | None = None, progress=Non
                 },
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 timeout=120,
+                allow_redirects=False,
             )
             if resp.ok:
                 sc["prompt"] = resp.json()["choices"][0]["message"]["content"].strip().strip('"')

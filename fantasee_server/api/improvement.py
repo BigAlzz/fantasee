@@ -25,6 +25,7 @@ from fantasee_server.paths import (
     STORY_VIEWER_DIR,
     generated_story_dir,
 )
+from fantasee_server.security import validate_provider_url
 from fantasee_server.state import (
     _resolve_env_var,
     atomic_write_json,
@@ -188,6 +189,10 @@ async def refine_prompt(story_id: str, scene_idx: int, body: dict = Body(default
 
     api_key = _resolve_env_var("XIAOMI_API_KEY")
     base_url = _resolve_env_var("XIAOMI_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1")
+    try:
+        base_url = validate_provider_url(base_url, kind="llm")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     resp = requests.post(
         f"{base_url}/chat/completions",
@@ -202,6 +207,7 @@ async def refine_prompt(story_id: str, scene_idx: int, body: dict = Body(default
         },
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         timeout=120,
+        allow_redirects=False,
     )
     resp.raise_for_status()
     new_prompt = resp.json()["choices"][0]["message"]["content"].strip().strip('"')

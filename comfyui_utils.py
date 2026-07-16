@@ -15,6 +15,8 @@ from urllib.parse import urlparse
 
 import requests
 
+from fantasee_server.security import validate_provider_url
+
 # ── Config ──────────────────────────────────────────────────────────────
 COMFYUI_HOST = "127.0.0.1"
 COMFYUI_PORT = 8188
@@ -28,13 +30,16 @@ def _comfyui_bases() -> list[str]:
     returns a single-element list with the default COMFYUI_BASE so all
     existing call sites keep working unchanged.
     """
-    if "COMFYUI_URLS" in os.environ:
-        env_val = os.environ.get("COMFYUI_URLS", "").strip()
-        return [u.strip().rstrip("/") for u in env_val.split(",") if u.strip()]
     env_val = os.environ.get("COMFYUI_URLS", "").strip()
-    if env_val:
-        return [u.strip().rstrip("/") for u in env_val.split(",") if u.strip()]
-    return [COMFYUI_BASE]
+    if not env_val:
+        return [COMFYUI_BASE]
+    bases = []
+    for raw_url in env_val.split(","):
+        try:
+            bases.append(validate_provider_url(raw_url, kind="comfyui"))
+        except ValueError as exc:
+            print(f"[comfyui_utils] Ignoring unsafe worker URL: {exc}", file=sys.stderr)
+    return bases
 
 # Default base workflow template (the generator will inject prompt + seed).
 # Resolved at request time via ``_resolve_workflow_path`` so a per-story
@@ -187,12 +192,14 @@ def is_running_at(base_url: str, timeout: float = 3.0) -> dict:
         "system_stats": None,
     }
     try:
-        resp = requests.get(f"{base_url}/system_stats", timeout=timeout)
+        resp = requests.get(f"{base_url}/system_stats", timeout=timeout, allow_redirects=False)
         if resp.status_code == 200:
             result["running"] = True
             result["system_stats"] = resp.json()
             try:
-                q = requests.get(f"{base_url}/queue", timeout=timeout).json()
+                q = requests.get(
+                    f"{base_url}/queue", timeout=timeout, allow_redirects=False
+                ).json()
                 result["queue_running"] = len(q.get("queue_running", []))
                 result["queue_pending"] = len(q.get("queue_pending", []))
             except Exception:
@@ -229,7 +236,11 @@ def is_running(timeout: float = 3.0) -> dict:
     short_timeout = min(timeout, 1.5)
     for base in _comfyui_bases():
         try:
-            resp = requests.get(f"{base}/system_stats", timeout=short_timeout)
+            resp = requests.get(
+                f"{base}/system_stats",
+                timeout=short_timeout,
+                allow_redirects=False,
+            )
             if resp.status_code == 200:
                 result = {
                     "running": True,
@@ -240,7 +251,11 @@ def is_running(timeout: float = 3.0) -> dict:
                 }
                 # Fetch queue info for the same worker
                 try:
-                    q = requests.get(f"{base}/queue", timeout=short_timeout).json()
+                    q = requests.get(
+                        f"{base}/queue",
+                        timeout=short_timeout,
+                        allow_redirects=False,
+                    ).json()
                     result["queue_running"] = len(q.get("queue_running", []))
                     result["queue_pending"] = len(q.get("queue_pending", []))
                 except Exception:
@@ -1114,7 +1129,9 @@ def generate_image(
         # healthy one (up to 3 attempts).
         health_tries = 0
         while health_tries < 3:
-            health = requests.get(f"{base}/system_stats", timeout=5)
+            health = requests.get(
+                f"{base}/system_stats", timeout=5, allow_redirects=False
+            )
             if health.status_code == 200:
                 break
             print(f"[comfyui_utils] {base} health check failed, picking another worker", file=sys.stderr)
@@ -1128,7 +1145,12 @@ def generate_image(
             return None
 
         payload = {"prompt": workflow}
-        resp = requests.post(f"{base}/prompt", json=payload, timeout=30)
+        resp = requests.post(
+            f"{base}/prompt",
+            json=payload,
+            timeout=30,
+            allow_redirects=False,
+        )
         if resp.status_code != 200:
             print(f"[comfyui_utils] ComfyUI returned {resp.status_code}: {resp.text[:300]}", file=sys.stderr)
             # Retry once after a brief pause (transient issue) and on
@@ -1137,7 +1159,12 @@ def generate_image(
             alt = _pick_healthy_base()
             if alt and alt != base:
                 base = alt
-            resp = requests.post(f"{base}/prompt", json=payload, timeout=30)
+            resp = requests.post(
+                f"{base}/prompt",
+                json=payload,
+                timeout=30,
+                allow_redirects=False,
+            )
             if resp.status_code != 200:
                 print(f"[comfyui_utils] Retry also failed: {resp.status_code}: {resp.text[:300]}", file=sys.stderr)
                 return None
@@ -1157,7 +1184,11 @@ def generate_image(
         MAX_EMPTY_OUTPUT_POLLS = 2
         while time.time() - start_time < timeout:
             try:
-                history_resp = requests.get(f"{base}/history/{prompt_id}", timeout=5)
+                history_resp = requests.get(
+                    f"{base}/history/{prompt_id}",
+                    timeout=5,
+                    allow_redirects=False,
+                )
                 if history_resp.status_code == 200:
                     history = history_resp.json()
                     if prompt_id in history:

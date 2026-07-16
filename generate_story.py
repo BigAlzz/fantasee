@@ -27,6 +27,9 @@ from pathlib import Path
 from typing import Optional
 
 from story_storage import STORIES_ROOT, ensure_story_layout
+from fantasee_server.security import validate_provider_url
+from story_pipeline import initialize_pipeline, update_stage
+from story_quality import outline_feedback, review_scene_outline
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -85,6 +88,11 @@ def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str
     if not MIIMO_API_KEY:
         emit("error", "XIAOMI_API_KEY not set — cannot call LLM")
         return None
+    try:
+        base_url = validate_provider_url(MIIMO_BASE_URL, kind="llm")
+    except ValueError as exc:
+        emit("error", f"Unsafe LLM provider URL: {exc}")
+        return None
 
     payload = {
         "model": MIIMO_MODEL,
@@ -98,13 +106,14 @@ def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str
     for attempt in range(3):
         try:
             resp = requests.post(
-                f"{MIIMO_BASE_URL}/chat/completions",
+                f"{base_url}/chat/completions",
                 json=payload,
                 headers={
                     "Authorization": f"Bearer {MIIMO_API_KEY}",
                     "Content-Type": "application/json",
                 },
                 timeout=600,
+                allow_redirects=False,
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
@@ -567,7 +576,35 @@ Narrative: <what happens — 40-80 words>
 Narration: <voiceover text — 80-150 words, dramatic, present tense>
 
 Scene transitions must feel natural — each scene should flow from the previous one.
-Maintain consistent character appearances across ALL scenes."""
+STORY ARC: Shape the sequence like a finished production script:
+- Scene 1 must hook the listener with a specific question, danger, or promise.
+- Early scenes establish the world and characters without dumping background.
+- Middle scenes escalate through consequences, discoveries, or reversals.
+- The second-to-last scene should contain the climax or decisive choice.
+- The final scene must land the emotional payoff and resolve the central question.
+Every scene must change the situation, and every transition must flow from the
+previous scene. Maintain consistent character appearances across ALL scenes."""
+
+
+STORY_STYLE_PATH = Path(__file__).parent / "skills" / "style.md"
+
+
+def load_story_style_prompt() -> str:
+    """Load the canonical narration style used by generation and repairs."""
+    try:
+        return STORY_STYLE_PATH.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError):
+        return ""
+
+
+_STYLE_OVERRIDE = (
+    "\n\nMANDATORY NARRATION STYLE OVERRIDE:\n"
+    "For all narration and dialogue, follow the canonical style below. "
+    "It overrides earlier tone-specific or manhwa narration guidance. "
+    "Use third person. Never use first-person internal monologue.\n\n"
+    + load_story_style_prompt()
+)
+STORY_OUTLINE_SYSTEM += _STYLE_OVERRIDE
 
 
 def generate_story_outline(concept: str, num_scenes: int, style: str,
@@ -600,6 +637,7 @@ block in the system prompt for details and keywords."""
 
     scenes = []
     response = ""
+    last_review = None
     for attempt in range(3):
         prompt = user_prompt
         if attempt:
@@ -608,15 +646,23 @@ block in the system prompt for details and keywords."""
                 f"{num_scenes} complete scenes. Return exactly {num_scenes} scenes, "
                 "using the specified labels exactly: Title, Visual Prompt, Narrative, Narration."
             )
+        if attempt and last_review:
+            prompt += "\nFix these quality issues before returning the outline:\n" + outline_feedback(last_review)
         response = call_llm(STORY_OUTLINE_SYSTEM, prompt)
         if not response:
             continue
         scenes = parse_scene_response(response, expected_scenes=num_scenes)
-        if len(scenes) == num_scenes:
+        last_review = review_scene_outline(
+            scenes,
+            num_scenes,
+            characters=characters,
+            tone=tone,
+        )
+        if last_review["valid"] and last_review["score"] >= 0.65:
             break
         emit(
             "running",
-            f"Scene parser found {len(scenes)}/{num_scenes} complete scenes; retrying outline...",
+            f"Outline review scored {last_review['score']:.2f}; retrying for stronger scenes...",
             0.12,
         )
 
@@ -627,6 +673,14 @@ block in the system prompt for details and keywords."""
         )
         return None
 
+    if last_review and not last_review["valid"]:
+        emit("error", "Outline quality gate failed: required scene fields are missing.")
+        return None
+    if last_review and last_review.get("issues"):
+        emit(
+            "warning",
+            f"Outline accepted with {len(last_review['issues'])} review note(s).",
+        )
     emit("running", f"Generated {len(scenes)} scenes with narration.", 0.15)
     return scenes
 
@@ -876,6 +930,8 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
     story_id = unique_story_id(story_title, OUTPUTS, concept=concept)
     story_dir = OUTPUTS / story_id
     layout = ensure_story_layout(story_dir)
+    initialize_pipeline(story_dir, story_id)
+    update_stage(story_dir, "story", "running", message="Creating title and story metadata")
 
     emit("running", f"Story: \"{story_title}\" (id: {story_id})", 0.03)
     emit("running", "Generating title slide first...", 0.035)
@@ -936,11 +992,14 @@ Be evocative but concise."""
         "You write compelling story descriptions. 2-3 sentences only.", desc_prompt)
     description = description or concept[:200]
     (layout["drafts"] / "description.txt").write_text(description, encoding="utf-8")
+    update_stage(story_dir, "story", "complete", message="Title and story metadata created")
 
     # ── Step 3: Generate scene outline + narration ─────────────────────
     emit("running", "Step 3/6: Generating scenes and narration...", 0.08)
+    update_stage(story_dir, "outline", "running", message="Generating and reviewing the scene outline")
     scenes = generate_story_outline(concept, num_scenes, style, characters, tone)
     if not scenes:
+        update_stage(story_dir, "outline", "failed", message="Outline generation or quality review failed")
         emit("error", "Failed to generate scene outline.")
         return None
 
@@ -951,9 +1010,23 @@ Be evocative but concise."""
         json.dumps(scenes, indent=2),
         encoding="utf-8",
     )
+    outline_review = review_scene_outline(
+        scenes, num_scenes, characters=characters, tone=tone,
+    )
+    (layout["critic"] / "outline_review.json").write_text(
+        json.dumps(outline_review, indent=2), encoding="utf-8",
+    )
+    update_stage(
+        story_dir,
+        "outline",
+        "complete",
+        message="Scene outline passed structural quality review",
+        details={"score": outline_review.get("score"), "issues": len(outline_review.get("issues", []))},
+    )
 
     # ── Step 4: Generate images via ComfyUI ────────────────────────────
     emit("running", f"Step 4/6: Generating {len(scenes)} scene images...", 0.15)
+    update_stage(story_dir, "images", "running", message="Generating scene images")
     comfyui_status = comfyui_running()
     use_comfyui = comfyui_status.get("running", False) and not skip_images
 
@@ -1048,8 +1121,17 @@ Be evocative but concise."""
             img_progress = 0.15 + (i * 0.35 / max(len(scenes), 1))
             emit("running", f"Scene {i + 1}/{len(scenes)}: Image skipped.", img_progress)
 
+    images_complete = all(s.get("image_filenames") for s in output_scenes) if not skip_images else False
+    update_stage(
+        story_dir,
+        "images",
+        "complete" if images_complete else "pending",
+        message="Scene images generated" if images_complete else "Some scene images still need generation",
+    )
+
     # ── Step 5: Generate TTS audio for each scene ──────────────────────
     emit("running", f"Step 5/6: Generating narration audio ({voice_preset})...", 0.55)
+    update_stage(story_dir, "audio", "running", message="Generating narration audio")
     for i, s in enumerate(output_scenes):
         scene_num = i + 1
         padded = s["scene"]
@@ -1073,8 +1155,17 @@ Be evocative but concise."""
         else:
             emit("warning", f"Scene {scene_num}: TTS generation failed.")
 
+    audio_complete = all(s.get("audio_filename") for s in output_scenes)
+    update_stage(
+        story_dir,
+        "audio",
+        "complete" if audio_complete else "pending",
+        message="Narration audio generated" if audio_complete else "Some narration audio still needs generation",
+    )
+
     # ── Step 5b: Generate subtitles via Whisper ────────────────────────
     emit("running", "Step 5b: Aligning subtitles with Whisper...", 0.78)
+    update_stage(story_dir, "subtitles", "running", message="Aligning narration with Whisper")
     whisper_model = None
     whisper_missing = False
     subtitle_failures = []
@@ -1125,6 +1216,13 @@ Be evocative but concise."""
         emit("running", f"  Generated subtitles for {subtitles_generated} scenes")
     if subtitle_failures:
         emit("warning", f"  {len(subtitle_failures)} scene(s) had subtitle errors")
+    subtitles_complete = all(s.get("subtitle_file") for s in output_scenes)
+    update_stage(
+        story_dir,
+        "subtitles",
+        "complete" if subtitles_complete else "pending",
+        message="Subtitles aligned to narration" if subtitles_complete else "Some subtitles still need alignment",
+    )
 
     # ── Step 6: Save manifest ──────────────────────────────────────────
     emit("running", "Step 6/6: Saving manifest...", 0.95)
@@ -1157,7 +1255,7 @@ Be evocative but concise."""
         "tone": tone,           # explicit top-level field for TTS lookups
         "voice_preset": voice_preset,
         "generated": True,
-        "status": "complete",
+        "status": "draft",
         "hero_image": title_slide,
         "title_image": title_slide,    # canonical: image-backed PNG
         "title_slide": title_slide,    # legacy alias
@@ -1170,6 +1268,11 @@ Be evocative but concise."""
         "chapters": chapters,
         "storage_root": "stories",
         "scenes": output_scenes,
+        "pipeline": {
+            "status": "draft",
+            "outline_review": outline_review,
+            "next_stage": "render",
+        },
     }
     manifest_path = story_dir / f"{story_id}.json"
     tmp = manifest_path.with_suffix(".json.tmp")
@@ -1183,7 +1286,7 @@ Be evocative but concise."""
         "id": story_id,
         "title": story_title,
         "scene_count": len(output_scenes),
-        "status": "complete",
+        "status": "draft",
     }
     print(f"__RESULT__:{json.dumps(result)}")
 

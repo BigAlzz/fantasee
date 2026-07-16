@@ -624,7 +624,7 @@ def _regen_scene_narration(story_id: str, scene_obj: dict, manifest: dict) -> No
     if not _has_scene_text_for_narration(scene_obj):
         raise RuntimeError("Scene has no prompt or narrative to regenerate narration from")
 
-    from generate_story import _clean_narration_field, call_llm
+    from generate_story import _clean_narration_field, call_llm, load_story_style_prompt
 
     tags = manifest.get("tags") or []
     style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
@@ -636,7 +636,9 @@ def _regen_scene_narration(story_id: str, scene_obj: dict, manifest: dict) -> No
 
     system = (
         "You repair missing voiceover narration for an illustrated story. "
-        "Return only the narration text, with no labels, markdown headings, or notes."
+        "Return only the narration text, with no labels, markdown headings, or notes.\n\n"
+        "Follow this mandatory narration style:\n"
+        f"{load_story_style_prompt()}"
     )
     user_prompt = f"""Story ID: {story_id}
 Story concept: {concept or "Unknown"}
@@ -650,9 +652,9 @@ Visual prompt:
 Narrative beat:
 {narrative or "(missing)"}
 
-Write one spoken narration passage for this scene, 80-150 words, present tense,
-matching the story tone and preserving the action described above. Return only
-the narration text."""
+Write one spoken narration passage for this scene, 80-150 words, in third person,
+matching the canonical narration style and preserving the action described above.
+Return only the narration text."""
 
     raw = call_llm(system, user_prompt, temperature=0.7)
     raw_text = re.sub(r"^\s*(?:\*\*)?\s*narration\s*:\s*", "", raw or "", flags=re.IGNORECASE).strip()

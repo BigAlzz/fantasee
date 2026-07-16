@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from fantasee_server.security import require_websocket_operator
 from fantasee_server.state import _websocket_clients
 
 
@@ -18,6 +19,11 @@ router = APIRouter(tags=["websocket"])
 
 @router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    try:
+        require_websocket_operator(websocket)
+    except Exception:
+        await websocket.close(code=1008, reason="Operator authentication required")
+        return
     await websocket.accept()
     _websocket_clients.append(websocket)
     try:

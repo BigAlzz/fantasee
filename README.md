@@ -156,6 +156,24 @@ python -m pytest tests/test_story_actions.py
 
 The tests cover story repair/extend/regenerate planning, background music selection, Plex export helpers, seed suggestions, subtitles, and title images.
 
+## Security Configuration
+
+Fantasee is local-first. Loopback requests remain usable without a token by
+default, but requests from another host are rejected unless the server has an
+operator token. Set the FANTASEE_API_TOKEN environment variable to a long,
+random value before using a LAN or public bind.
+
+Set FANTASEE_REQUIRE_AUTH=1 when running behind a reverse proxy, container, or
+LAN/public bind so loopback requests also require the token. Configure
+additional trusted provider hosts explicitly with
+FANTASEE_ALLOWED_PROVIDER_HOSTS; arbitrary URLs, private destinations, and
+redirects are rejected. Set FANTASEE_CORS_ORIGINS to a comma-separated list of
+exact browser origins that should be allowed.
+
+Never commit fantasee_settings.json or provider credentials. If a credential
+has ever been committed, revoke it and rotate it before publishing the
+repository; deleting the file from the latest commit is not sufficient.
+
 ## Documentation
 
 - `docs/SYSTEM.md` — current system architecture and operations guide.
