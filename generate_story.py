@@ -93,7 +93,7 @@ def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str
             {"role": "user", "content": prompt},
         ],
         "temperature": temperature,
-        "max_completion_tokens": 4096,
+        "max_completion_tokens": 16384,
     }
     for attempt in range(3):
         try:
@@ -600,7 +600,7 @@ block in the system prompt for details and keywords."""
 
     scenes = []
     response = ""
-    for attempt in range(2):
+    for attempt in range(3):
         prompt = user_prompt
         if attempt:
             prompt += (
