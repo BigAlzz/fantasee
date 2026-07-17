@@ -66,6 +66,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [playerOpen, setPlayerOpen] = useState(false);
   const [editorStory, setEditorStory] = useState<StoryDetail>();
   const [editorScene, setEditorScene] = useState(0);
   const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic fantasy realism", num_scenes: 8, images_per_scene: 5, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean" });
@@ -149,7 +150,7 @@ export function App() {
           <div className="eyebrow"><span>Featured story</span><span>Newest first</span></div>
           {selectedStory ? <article className="feature">
             <div className="cover">{hasUsableCover(selectedStory) ? <img src={selectedStory.cover_image_url || selectedStory.hero_image} alt=""/> : <Sparkles size={34}/>}</div>
-            <div><h1>{selectedStory.title}</h1><p>{selectedStory.description || "A new production, ready for its editorial pass."}</p><div className="story-meta">{selectedStory.scene_count || 0} scenes <span/> updated {timestamp(selectedStory.updated_at || selectedStory.created_at)}</div><button className="outline-button" onClick={() => void openEditor()}>Open in editor <ChevronRight size={16}/></button></div>
+            <div><h1>{selectedStory.title}</h1><p>{selectedStory.description || "A new production, ready for its editorial pass."}</p><div className="story-meta">{selectedStory.scene_count || 0} scenes <span/> updated {timestamp(selectedStory.updated_at || selectedStory.created_at)}</div><div className="feature-actions"><button className="outline-button" onClick={() => void openEditor()}>Open in editor <ChevronRight size={16}/></button><button className="outline-button" disabled={!selectedStory.completion?.full_video_ok} onClick={() => setPlayerOpen(true)}><Play size={15}/> Play release</button></div></div>
           </article> : <div className="empty-state"><Sparkles size={28}/><h1>No stories yet</h1><p>Create a story to establish the first production run.</p></div>}
           <div className="section-heading"><h2>Story library</h2><span>{visibleStories.length} title{visibleStories.length === 1 ? "" : "s"}</span></div>
           <div className="story-list">{visibleStories.map((story) => <button key={story.id} className={story.id === selectedStoryId ? "story-row selected" : "story-row"} onClick={() => setSelectedStoryId(story.id)}>
@@ -179,8 +180,13 @@ export function App() {
         <div className="modal-actions"><button type="button" className="outline-button" onClick={() => setCreateOpen(false)}>Cancel</button><button className="create" disabled={busy} type="submit"><Plus size={17}/> Queue production</button></div>
       </form></div>}
       {editorOpen && <StoryEditor story={editorStory} sceneIndex={editorScene} busy={busy} onClose={() => setEditorOpen(false)} onSelectScene={setEditorScene} onAction={(action, message) => void runAction(action, message)} />}
+      {playerOpen && selectedStory && <ReleasePlayer story={selectedStory} onClose={() => setPlayerOpen(false)} />}
     </section>
   </main>;
+}
+
+function ReleasePlayer({ story, onClose }: { story: Story; onClose: () => void }) {
+  return <div className="modal-scrim player-scrim"><section className="release-player metal-panel"><header className="editor-header"><div><span className="eyebrow-label">Canonical release</span><h1>{story.title}</h1><small>MP4 + timeline subtitles</small></div><button className="icon-button" onClick={onClose} aria-label="Close player"><X size={19}/></button></header><video controls autoPlay preload="metadata"><source src={`/generated/${story.id}/${story.id}_full.mp4`} type="video/mp4"/><track kind="subtitles" src={`/generated/${story.id}/${story.id}_full.vtt`} srcLang="en" label="English" default /></video><p className="player-note">Playback uses the rendered release and its canonical subtitle timeline. If the release is stale, return to the editor and rebuild the approved timeline.</p></section></div>;
 }
 
 function StoryEditor({ story, sceneIndex, busy, onClose, onSelectScene, onAction }: { story?: StoryDetail; sceneIndex: number; busy: boolean; onClose: () => void; onSelectScene: (index: number) => void; onAction: (action: () => Promise<unknown>, message: string) => void }) {
