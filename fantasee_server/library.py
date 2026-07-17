@@ -100,7 +100,30 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
         "scenes_with_audio": 0,
         "scenes_with_subtitles": 0,
         "scene_videos": 0,
+        "planned_shots": 0,
+        "approved_shots": 0,
     }
+
+    # New editor-managed stories must pass the approved-shot gate. Legacy
+    # stories have no semantic plan yet, so they continue using their
+    # manifest-backed image contract during migration.
+    with ProductionStore(production_database_path()) as production:
+        planned_shots = {}
+        for scene_index in range(1, len(scenes) + 1):
+            scene_id = f"scene-{scene_index:02d}"
+            shots = production.list_shots(story_id, scene_id)
+            if shots:
+                planned_shots[scene_id] = shots
+        counts["planned_shots"] = sum(len(shots) for shots in planned_shots.values())
+        approved_shots = {
+            shot.id: production.get_current_asset(story_id, shot.id, "image")
+            for shots in planned_shots.values()
+            for shot in shots
+        }
+        counts["approved_shots"] = sum(
+            1 for asset in approved_shots.values()
+            if asset is not None and Path(asset.path).is_file() and Path(asset.path).stat().st_size > 0
+        )
 
     def add_issue(kind: str, message: str, *, scene: Optional[str] = None) -> None:
         issue = {"kind": kind, "message": message}
@@ -198,6 +221,29 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
         else:
             add_issue("scene_video", "Scene MP4 has not been rendered", scene=scene_key)
 
+        semantic_shots = planned_shots.get(f"scene-{int(scene_key):02d}", []) if scene_key.isdigit() else []
+        for shot in semantic_shots:
+            asset = approved_shots.get(shot.id)
+            if asset is None or not Path(asset.path).is_file() or Path(asset.path).stat().st_size <= 0:
+                add_issue("shot_image", f"Shot {shot.id} has no approved usable image", scene=scene_key)
+
+    if planned_shots:
+        shot_timeline_path = story_dir / "working" / "shot_timeline.json"
+        if not shot_timeline_path.is_file():
+            add_issue("shot_timeline", "Approved shot timeline has not been built")
+        else:
+            try:
+                shot_timeline = json.loads(shot_timeline_path.read_text(encoding="utf-8"))
+                segment_ids = {segment.get("shot_id") for segment in shot_timeline.get("segments", [])}
+                missing_timeline_shots = {
+                    shot.id for shots in planned_shots.values() for shot in shots
+                    if shot.id not in segment_ids
+                }
+                if missing_timeline_shots:
+                    add_issue("shot_timeline", "Shot timeline is missing planned shots")
+            except (OSError, json.JSONDecodeError, AttributeError):
+                add_issue("shot_timeline", "Approved shot timeline is unreadable")
+
     full_mp4_candidates = [
         story_dir / f"{story_id}_full.mp4",
         story_dir / "final" / f"{story_id}_full.mp4",
@@ -213,8 +259,8 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
     if not plex_video_ok:
         add_issue("plex", "Plex-ready MP4 package is missing")
 
-    stage_order = ["story", "status", "story_text", "image", "audio", "subtitles",
-                   "scene_video", "full_video", "plex"]
+    stage_order = ["story", "status", "story_text", "image", "shot_image", "shot_timeline",
+                   "audio", "subtitles", "scene_video", "full_video", "plex"]
     missing = []
     for kind in stage_order:
         if any(issue["kind"] == kind for issue in issues):

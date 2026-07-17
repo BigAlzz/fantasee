@@ -141,9 +141,18 @@ def write_shot_timeline(
     target = story_dir / "working" / "shot_timeline.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(".json.tmp")
-    temporary.write_text(
-        json.dumps({"story_id": story_id, "segments": [asdict(item) for item in segments]}, indent=2),
-        encoding="utf-8",
-    )
+    payload: dict[str, Any] = {"story_id": story_id, "segments": [asdict(item) for item in segments]}
+    try:
+        canonical = json.loads((story_dir / "working" / "timeline.json").read_text(encoding="utf-8"))
+        if isinstance(canonical, dict):
+            canonical["shot_segments"] = payload["segments"]
+            payload = canonical
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        pass
+    temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     os.replace(temporary, target)
+    canonical_target = story_dir / "working" / "timeline.json"
+    canonical_tmp = canonical_target.with_suffix(".json.tmp")
+    canonical_tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    os.replace(canonical_tmp, canonical_target)
     return target

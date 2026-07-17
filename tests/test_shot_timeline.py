@@ -1,6 +1,8 @@
 import pytest
 
-from fantasee_server.media_timeline import build_shot_timeline
+import json
+
+from fantasee_server.media_timeline import build_shot_timeline, write_shot_timeline
 from fantasee_server.shot_planning import ShotSpec
 
 
@@ -39,3 +41,24 @@ def test_shot_timeline_rejects_unapproved_visual_assets():
             shots=[shot],
             approved_assets={},
         )
+
+
+def test_writing_shot_timeline_merges_into_canonical_timeline(tmp_path):
+    working = tmp_path / "working"
+    working.mkdir()
+    (working / "timeline.json").write_text(json.dumps({
+        "story_id": "demo",
+        "segments": [{"scene_id": "01", "text": "hello", "start": 0, "end": 1}],
+    }), encoding="utf-8")
+    shot = ShotSpec("scene-01-shot-01", "scene-01", 1, "establish", "wide", 4.0, "road")
+    segment = build_shot_timeline(
+        scene_id="scene-01", scene_start=0, scene_duration=4,
+        shots=[shot], approved_assets={shot.id: "approved.png"},
+    )[0]
+
+    target = write_shot_timeline("demo", tmp_path, [segment])
+
+    assert target.exists()
+    canonical = json.loads((working / "timeline.json").read_text(encoding="utf-8"))
+    assert canonical["segments"][0]["text"] == "hello"
+    assert canonical["shot_segments"][0]["shot_id"] == shot.id
