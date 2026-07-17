@@ -142,6 +142,17 @@ class ProductionStore:
         ).fetchone()
         return self._run_from_row(row) if row else None
 
+    def list_runs(self, *, limit: int = 50) -> list[ProductionRun]:
+        rows = self.connection.execute(
+            """
+            SELECT * FROM production_runs
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (max(1, min(200, int(limit))),),
+        ).fetchall()
+        return [self._run_from_row(row) for row in rows]
+
     def update_run(self, run_id: str, *, status: str) -> ProductionRun:
         now = time.time()
         with self.connection:

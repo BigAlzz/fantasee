@@ -2,10 +2,15 @@
 
 from fastapi import APIRouter, HTTPException
 
-from fantasee_server.production_runtime import get_persisted_task
+from fantasee_server.production_runtime import get_persisted_task, list_persisted_tasks
 
 
 router = APIRouter(tags=["production"])
+
+
+@router.get("/api/production/runs")
+def list_production_runs(limit: int = 50):
+    return {"runs": list_persisted_tasks(limit=limit)}
 
 
 @router.get("/api/production/runs/{run_id}")

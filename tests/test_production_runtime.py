@@ -2,6 +2,7 @@ from fantasee_server.production_runtime import (
     enqueue_task_job,
     finish_task,
     get_persisted_task,
+    list_persisted_tasks,
     start_task,
     update_task,
 )
@@ -28,3 +29,6 @@ def test_task_progress_is_persisted_for_restart_recovery(tmp_path, monkeypatch):
 
     finish_task("task-1", status="succeeded", message="Complete")
     assert get_persisted_task("task-1")["run"]["status"] == "succeeded"
+    summary = next(task for task in list_persisted_tasks() if task["id"] == "task-1")
+    assert summary["status"] == "done"
+    assert summary["progress"] == 1

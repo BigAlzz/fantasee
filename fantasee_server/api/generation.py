@@ -37,6 +37,7 @@ from fantasee_server.production_runtime import (
     update_task,
     production_database_path,
     finalize_run_from_jobs,
+    list_persisted_tasks,
 )
 from fantasee_server.production_store import ProductionStore
 from fantasee_server.production_worker import ProductionWorker
@@ -663,7 +664,10 @@ async def start_generation_queue(req: QueueRequest):
 @router.get("/api/generate/tasks")
 def list_tasks():
     """List all generation tasks."""
-    return {"tasks": list(_generation_tasks.values())}
+    tasks = {task["id"]: task for task in list(_generation_tasks.values())}
+    for task in list_persisted_tasks():
+        tasks.setdefault(task["id"], task)
+    return {"tasks": list(tasks.values())}
 
 
 @router.get("/api/generate/tasks/{task_id}")

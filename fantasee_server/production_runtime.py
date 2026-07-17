@@ -190,3 +190,52 @@ def get_persisted_task(task_id: str) -> dict[str, Any] | None:
             for job in jobs
         ],
     }
+
+
+def list_persisted_tasks(*, limit: int = 50) -> list[dict[str, Any]]:
+    """Return persisted runs in the shape expected by the task panel."""
+    with ProductionStore(_database_path()) as store:
+        runs = store.list_runs(limit=limit)
+        result = []
+        for run in runs:
+            events = store.list_events(run.id)
+            jobs = store.list_jobs(run.id)
+            last = events[-1].payload if events else {}
+            started = events[0].payload if events else {}
+            status = {
+                "queued": "queued",
+                "running": "running",
+                "succeeded": "done",
+                "failed": "error",
+                "cancelled": "error",
+            }.get(run.status, run.status)
+            task = {
+                "id": run.id,
+                "kind": run.command,
+                "story_id": run.story_id,
+                "status": status,
+                "progress": last.get("progress", 0 if status != "done" else 1),
+                "stage": last.get("stage", "complete" if status == "done" else "queued"),
+                "message": last.get("message", run.status),
+                "created_at": run.created_at,
+                "updated_at": run.updated_at,
+                "item_count": len(jobs) or started.get("metadata", {}).get("item_count"),
+            }
+            metadata = started.get("metadata") or {}
+            if metadata.get("parent"):
+                task["parent"] = metadata["parent"]
+            result.append(task)
+            if jobs and run.command in {"generation_queue", "library_maintenance"}:
+                for job in jobs:
+                    child = {
+                        "id": job.id,
+                        "parent": run.id,
+                        "kind": "library_story" if job.job_type == "library.complete" else "generate",
+                        "status": {"succeeded": "done", "failed": "error"}.get(job.status, job.status),
+                        "progress": job.progress,
+                        "message": job.message or job.status,
+                        "story_id": job.payload.get("story_id") or job.payload.get("story_concept"),
+                        "created_at": run.created_at,
+                    }
+                    result.append(child)
+    return result
