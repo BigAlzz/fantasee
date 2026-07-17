@@ -189,18 +189,19 @@ function StoryEditor({ story, sceneIndex, busy, onClose, onSelectScene, onAction
   const [shotContext, setShotContext] = useState("");
   const [shotAssets, setShotAssets] = useState<ShotAsset[]>([]);
   const [shotRevisions, setShotRevisions] = useState<number[]>([]);
+  const [shotLocked, setShotLocked] = useState(false);
   const [timelineStatus, setTimelineStatus] = useState<string>();
   const [timelineShots, setTimelineShots] = useState<TimelineShot[]>([]);
   useEffect(() => {
     if (!story) { setShots([]); setSelectedShot(undefined); setShotAssets([]); setShotRevisions([]); setTimelineStatus(undefined); setTimelineShots([]); return; }
-    setSelectedShot(undefined); setShotAssets([]); setShotRevisions([]); setTimelineStatus(undefined); setTimelineShots([]);
+    setSelectedShot(undefined); setShotAssets([]); setShotRevisions([]); setTimelineStatus(undefined); setTimelineShots([]); setShotLocked(false);
     void api.sceneShots(story.id, sceneIndex).then((result) => setShots(result.shots)).catch(() => setShots([]));
     void api.shotRevisions(story.id, sceneIndex).then((result) => setShotRevisions(result.revisions)).catch(() => setShotRevisions([]));
     void api.storyTimeline(story.id).then((result) => setTimelineShots(result.shot_segments)).catch(() => setTimelineShots([]));
   }, [story, sceneIndex]);
   const scene = story?.scenes[sceneIndex];
   const narration = scene?.narration || scene?.narration_text || scene?.narrative || "";
-  const selectShot = (shot: SemanticShot) => { setSelectedShot(shot); setShotContext(shot.visual_context); void api.shotAssets(story!.id, sceneIndex, shot.id).then((result) => setShotAssets(result.assets)).catch(() => setShotAssets([])); };
+  const selectShot = (shot: SemanticShot) => { setSelectedShot(shot); setShotLocked(false); setShotContext(shot.visual_context); void api.shotAssets(story!.id, sceneIndex, shot.id).then((result) => setShotAssets(result.assets)).catch(() => setShotAssets([])); };
   return <div className="editor-scrim"><section className="story-editor metal-panel">{story && scene ? <>
     <header className="editor-header"><div><span className="eyebrow-label">Story editor</span><h1>{story.title}</h1><small>Scene {String(sceneIndex + 1).padStart(2, "0")} of {story.scenes.length}</small></div><button className="icon-button" onClick={onClose} aria-label="Close editor"><X size={19}/></button></header>
     <div className="editor-body"><aside className="scene-strip"><h3>Scenes</h3>{story.scenes.map((item, index) => <button key={`${item.title}-${index}`} className={index === sceneIndex ? "scene-chip active" : "scene-chip"} onClick={() => onSelectScene(index)}><span>{String(index + 1).padStart(2, "0")}</span><strong>{item.title || `Scene ${index + 1}`}</strong><small>{item.image_filenames?.length || 0} images</small></button>)}</aside>
