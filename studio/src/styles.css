@@ -49,7 +49,16 @@ nav { display:grid; gap:8px; } .nav-item { position:relative; border:1px solid t
  .desk-row div { flex:1; display:grid; gap:4px; }
  .desk-row strong { color:#e0d4bf; font-family:"Iowan Old Style",Georgia,serif; font-size:17px; }
  .desk-row small,.desk-row b { color:#9d9587; font-size:11px; }
- .asset-ledger,.settings-ledger { max-width:620px; margin-top:28px; }
+.asset-ledger,.settings-ledger { max-width:620px; margin-top:28px; }
+.release-ledger { max-width:780px; margin-top:36px; padding-top:22px; border-top:1px solid #4b4639; }
+.release-ledger h2 { margin:0; font-size:18px; }
+.release-list { margin-top:14px; border-top:1px solid #4b4639; }
+.release-row { display:flex; gap:12px; align-items:flex-start; padding:13px 0; border-bottom:1px solid #292923; }
+.release-row strong { display:block; color:#f2eadc; font-size:13px; }
+.release-row em { margin-left:8px; color:#b97935; font-size:10px; font-style:normal; text-transform:uppercase; letter-spacing:.08em; }
+.release-row small { display:block; margin-top:4px; color:#aaa294; font-size:11px; }
+.release-path { max-width:700px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.release-note { max-width:700px; color:#827b6e; font-size:11px; line-height:1.5; }
  .asset-row,.settings-ledger div { display:flex; align-items:center; gap:10px; border-bottom:1px solid #373931; padding:14px 0; }
  .asset-row strong,.settings-ledger dt { color:#ddd1bc; flex:1; }
  .asset-row small,.settings-ledger dd { margin:0; color:#b7985f; font-size:11px; }

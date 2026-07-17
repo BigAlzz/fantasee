@@ -70,6 +70,16 @@ export type ProductionEvent = {
   created_at: number;
 };
 
+export type ProductionRelease = {
+  id: string;
+  story_id: string;
+  release_type: string;
+  fingerprint: string;
+  status: string;
+  path: string;
+  created_at: number;
+};
+
 export type Worker = {
   id: string;
   capabilities: string[];
@@ -127,6 +137,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 export const api = {
   stories: () => request<{ stories: Story[] }>("/api/stories"),
   story: (id: string) => request<StoryDetail>(`/api/stories/${id}`),
+  releases: (storyId: string) => request<{ releases: ProductionRelease[] }>(`/api/stories/${storyId}/releases`),
   updateScene: (storyId: string, sceneIndex: number, input: { title?: string; prompt?: string; narration?: string }) => request<{ status: string; scene: Scene; stale_outputs: string[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
   runs: () => request<{ runs: ProductionRun[] }>("/api/production/runs"),
   run: (id: string) => request<{ run: ProductionRun; jobs: ProductionJob[] }>(`/api/production/runs/${id}`),
