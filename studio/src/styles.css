@@ -77,6 +77,8 @@ nav { display:grid; gap:8px; } .nav-item { position:relative; border:1px solid t
 .settings-form label.wide,.settings-actions { grid-column:1 / -1; }
 .settings-form input,.settings-form select { border:1px solid #5d523f; background:#090b0b; color:#e3d7c2; padding:10px; font:13px Bahnschrift,"DIN Alternate",sans-serif; }
 .settings-actions { display:flex; gap:9px; justify-content:flex-end; margin-top:4px; }
+.desk-row-button { width:100%; cursor:pointer; text-align:left; font:inherit; color:inherit; }
+.desk-row-button:hover,.desk-row-button:focus { border-color:#b47f3c; background:#211b13; }
 @media (max-width:720px) { .seed-grid { grid-template-columns:1fr; } }
 .worker-console { width:min(920px,100%); padding:22px; }
 .worker-console-body { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(250px,.8fr); gap:18px; margin-top:18px; }
