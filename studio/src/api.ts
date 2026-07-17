@@ -10,6 +10,18 @@ export type Story = {
   completion?: Record<string, unknown>;
 };
 
+export type Scene = {
+  title?: string;
+  narrative?: string;
+  narration?: string;
+  narration_text?: string;
+  prompt?: string;
+  image_filenames?: string[];
+  audio_duration?: number;
+};
+
+export type StoryDetail = Story & { scenes: Scene[] };
+
 export type ProductionJob = {
   id: string;
   job_type: string;
@@ -68,6 +80,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   stories: () => request<{ stories: Story[] }>("/api/stories"),
+  story: (id: string) => request<StoryDetail>(`/api/stories/${id}`),
   runs: () => request<{ runs: ProductionRun[] }>("/api/production/runs"),
   run: (id: string) => request<{ run: ProductionRun; jobs: ProductionJob[] }>(`/api/production/runs/${id}`),
   workers: () => request<{ workers: Worker[] }>("/api/production/workers"),
@@ -77,4 +90,6 @@ export const api = {
   spawn: (kind: "cpu" | "gpu") => request(`/api/comfyui/workers/spawn-${kind}`, { method: "POST" }),
   killComfy: (url: string) => request("/api/comfyui/workers/kill", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) }),
   generate: (input: GenerateInput) => request<{ task_id: string; message: string }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  regenerateScene: (storyId: string, sceneIndex: number) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/regenerate`, { method: "POST" }),
+  addSceneImage: (storyId: string, sceneIndex: number) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/add-image`, { method: "POST" }),
 };

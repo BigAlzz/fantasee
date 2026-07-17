@@ -5,7 +5,7 @@ import {
   Search, Settings, SlidersHorizontal, Sparkles, Square, UserRoundCog,
   Volume2, X,
 } from "lucide-react";
-import { api, type ComfyWorker, type GenerateInput, type ProductionJob, type ProductionRun, type Story, type Worker } from "./api";
+import { api, type ComfyWorker, type GenerateInput, type ProductionJob, type ProductionRun, type Story, type StoryDetail, type Worker } from "./api";
 
 const nav = [
   [Library, "Library"], [Clapperboard, "Productions"], [Archive, "Assets"], [UserRoundCog, "Workers"], [Settings, "Settings"],
@@ -65,6 +65,9 @@ export function App() {
   const [notice, setNotice] = useState("Connecting to the production ledger...");
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorStory, setEditorStory] = useState<StoryDetail>();
+  const [editorScene, setEditorScene] = useState(0);
   const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic fantasy realism", num_scenes: 8, images_per_scene: 5, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean" });
 
   const refresh = async () => {
@@ -122,6 +125,14 @@ export function App() {
     finally { setBusy(false); }
   };
 
+  const openEditor = async () => {
+    if (!selectedStory) return;
+    setEditorOpen(true);
+    setEditorScene(0);
+    try { setEditorStory(await api.story(selectedStory.id)); }
+    catch (error) { setNotice(error instanceof Error ? error.message : "Could not load the story editor."); }
+  };
+
   return <main className="studio-shell">
     <aside className="rail">
       <div className="brand"><span>FantaSee</span><small>Studio</small></div>
@@ -138,7 +149,7 @@ export function App() {
           <div className="eyebrow"><span>Featured story</span><span>Newest first</span></div>
           {selectedStory ? <article className="feature">
             <div className="cover">{hasUsableCover(selectedStory) ? <img src={selectedStory.cover_image_url || selectedStory.hero_image} alt=""/> : <Sparkles size={34}/>}</div>
-            <div><h1>{selectedStory.title}</h1><p>{selectedStory.description || "A new production, ready for its editorial pass."}</p><div className="story-meta">{selectedStory.scene_count || 0} scenes <span/> updated {timestamp(selectedStory.updated_at || selectedStory.created_at)}</div><button className="outline-button">Open in editor <ChevronRight size={16}/></button></div>
+            <div><h1>{selectedStory.title}</h1><p>{selectedStory.description || "A new production, ready for its editorial pass."}</p><div className="story-meta">{selectedStory.scene_count || 0} scenes <span/> updated {timestamp(selectedStory.updated_at || selectedStory.created_at)}</div><button className="outline-button" onClick={() => void openEditor()}>Open in editor <ChevronRight size={16}/></button></div>
           </article> : <div className="empty-state"><Sparkles size={28}/><h1>No stories yet</h1><p>Create a story to establish the first production run.</p></div>}
           <div className="section-heading"><h2>Story library</h2><span>{visibleStories.length} title{visibleStories.length === 1 ? "" : "s"}</span></div>
           <div className="story-list">{visibleStories.map((story) => <button key={story.id} className={story.id === selectedStoryId ? "story-row selected" : "story-row"} onClick={() => setSelectedStoryId(story.id)}>
@@ -167,8 +178,15 @@ export function App() {
         <label className="brief-field wide">Narrator<input value={brief.voice_preset} onChange={(event) => setBrief({ ...brief, voice_preset: event.target.value })}/></label>
         <div className="modal-actions"><button type="button" className="outline-button" onClick={() => setCreateOpen(false)}>Cancel</button><button className="create" disabled={busy} type="submit"><Plus size={17}/> Queue production</button></div>
       </form></div>}
+      {editorOpen && <StoryEditor story={editorStory} sceneIndex={editorScene} busy={busy} onClose={() => setEditorOpen(false)} onSelectScene={setEditorScene} onAction={(action, message) => void runAction(action, message)} />}
     </section>
   </main>;
+}
+
+function StoryEditor({ story, sceneIndex, busy, onClose, onSelectScene, onAction }: { story?: StoryDetail; sceneIndex: number; busy: boolean; onClose: () => void; onSelectScene: (index: number) => void; onAction: (action: () => Promise<unknown>, message: string) => void }) {
+  const scene = story?.scenes[sceneIndex];
+  const narration = scene?.narration || scene?.narration_text || scene?.narrative || "";
+  return <div className="editor-scrim"><section className="story-editor metal-panel">{story && scene ? <><header className="editor-header"><div><span className="eyebrow-label">Story editor</span><h1>{story.title}</h1><small>Scene {String(sceneIndex + 1).padStart(2, "0")} of {story.scenes.length}</small></div><button className="icon-button" onClick={onClose} aria-label="Close editor"><X size={19}/></button></header><div className="editor-body"><aside className="scene-strip"><h3>Scenes</h3>{story.scenes.map((item, index) => <button key={`${item.title}-${index}`} className={index === sceneIndex ? "scene-chip active" : "scene-chip"} onClick={() => onSelectScene(index)}><span>{String(index + 1).padStart(2, "0")}</span><strong>{item.title || `Scene ${index + 1}`}</strong><small>{item.image_filenames?.length || 0} images</small></button>)}</aside><main className="scene-workbench"><div className="scene-kicker">{scene.title || `Scene ${sceneIndex + 1}`}</div><div className="shot-canvas">{scene.image_filenames?.[0] ? <img src={`/generated/${story.id}/${scene.image_filenames[0]}`} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }}/> : <div><Image size={34}/><p>No approved scene artwork</p></div>}<span className="canvas-label">Primary visual beat</span></div><div className="editor-columns"><section><h3>Narration</h3><p className="narration-copy">{narration || "Narration has not been commissioned for this scene."}</p></section><section><h3>Visual direction</h3><p className="prompt-copy">{scene.prompt || "No visual direction recorded yet."}</p></section></div><div className="editor-actions"><button className="outline-button" disabled={busy} onClick={() => onAction(() => api.regenerateScene(story.id, sceneIndex), `Scene ${sceneIndex + 1} is regenerating its artwork and narration.`)}><RefreshCw size={15}/> Regenerate scene</button><button className="outline-button" disabled={busy} onClick={() => onAction(() => api.addSceneImage(story.id, sceneIndex), `One additional image has been requested for scene ${sceneIndex + 1}.`)}><Plus size={15}/> Add visual beat</button></div></main><aside className="scene-inspector"><h3>Shot plan</h3><div className="shot-card"><span className="led amber"/><strong>Primary beat</strong><small>Scene plan will be stored here as semantic shots in the next migration slice.</small></div><h3>Continuity</h3><p>Changes stay contained to this scene. The release is marked stale until its media evidence is rebuilt.</p><h3>Evidence</h3><dl><div><dt>Images</dt><dd>{scene.image_filenames?.length || 0}</dd></div><div><dt>Duration</dt><dd>{scene.audio_duration ? `${scene.audio_duration.toFixed(1)}s` : "pending"}</dd></div></dl></aside></div></> : <div className="empty-state"><LoaderCircle className="spin" size={30}/><p>Loading story workstation...</p><button className="outline-button" onClick={onClose}>Close</button></div>}</section></div>;
 }
 
 function WorkerLane({ worker, jobs, busy, empty, onSpawn, onKill }: { worker?: Worker | ComfyWorker; jobs: ProductionJob[]; busy: boolean; empty?: boolean; onSpawn: () => void; onKill?: () => void }) {
