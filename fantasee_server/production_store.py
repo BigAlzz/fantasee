@@ -523,6 +523,41 @@ class ProductionStore:
         ]
         return self.save_shot_plan(story_id, scene_id, revised)
 
+    def restore_shot_plan_revision(
+        self, story_id: str, scene_id: str, *, revision: int
+    ) -> int:
+        """Make an earlier immutable plan current by copying it to a new revision."""
+        previous = self.list_shots(story_id, scene_id, revision=revision)
+        if not previous:
+            raise ValueError(f"shot plan revision not found: {revision}")
+        return self.save_shot_plan(
+            story_id,
+            scene_id,
+            [
+                ShotSpec(
+                    id=shot.id,
+                    scene_id=shot.scene_id,
+                    order=shot.order,
+                    purpose=shot.purpose,
+                    shot_type=shot.shot_type,
+                    duration_seconds=shot.duration_seconds,
+                    visual_context=shot.visual_context,
+                )
+                for shot in previous
+            ],
+        )
+
+    def list_shot_plan_revisions(self, story_id: str, scene_id: str) -> list[int]:
+        rows = self.connection.execute(
+            """
+            SELECT DISTINCT revision FROM production_shots
+            WHERE story_id = ? AND scene_id = ?
+            ORDER BY revision DESC
+            """,
+            (story_id, scene_id),
+        ).fetchall()
+        return [row["revision"] for row in rows]
+
     def get_current_asset(
         self, story_id: str, scene_id: str, asset_type: str
     ) -> ProductionAsset | None:

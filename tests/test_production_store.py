@@ -186,3 +186,17 @@ def test_worker_can_lease_only_its_declared_job_type(tmp_path):
     assert lease is not None
     assert lease.id == shot_job.id
     store.close()
+
+
+def test_restoring_a_shot_plan_revision_creates_a_new_current_revision(tmp_path):
+    store = ProductionStore(tmp_path / "production.db")
+    original = [ShotSpec("scene-01-shot-01", "scene-01", 1, "establish (1)", "wide", 5.0, "Original context")]
+    store.save_shot_plan("story-1", "scene-01", original)
+    store.revise_shot("story-1", "scene-01", "scene-01-shot-01", visual_context="Unwanted revision")
+
+    restored_revision = store.restore_shot_plan_revision("story-1", "scene-01", revision=1)
+
+    assert restored_revision == 3
+    assert store.list_shots("story-1", "scene-01")[0].visual_context == "Original context"
+    assert store.list_shots("story-1", "scene-01", revision=2)[0].visual_context == "Unwanted revision"
+    store.close()

@@ -173,6 +173,26 @@ async def generate_scene_shot(story_id: str, scene_idx: int, shot_id: str):
     return {"run_id": run_id, "status": "queued", "shot_id": shot_id}
 
 
+@router.get("/api/stories/{story_id}/scenes/{scene_idx}/shots/revisions")
+def list_scene_shot_revisions(story_id: str, scene_idx: int):
+    _, scene_id = _scene_for(story_id, scene_idx)
+    with ProductionStore(production_database_path()) as store:
+        revisions = store.list_shot_plan_revisions(story_id, scene_id)
+    return {"revisions": revisions}
+
+
+@router.post("/api/stories/{story_id}/scenes/{scene_idx}/shots/revisions/{revision}/restore")
+def restore_scene_shot_revision(story_id: str, scene_idx: int, revision: int):
+    _, scene_id = _scene_for(story_id, scene_idx)
+    try:
+        with ProductionStore(production_database_path()) as store:
+            restored = store.restore_shot_plan_revision(story_id, scene_id, revision=revision)
+            shots = store.list_shots(story_id, scene_id, revision=restored)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"revision": restored, "shots": [shot.__dict__ for shot in shots]}
+
+
 @router.get("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}/assets")
 def list_shot_assets(story_id: str, scene_idx: int, shot_id: str):
     _, scene_id = _scene_for(story_id, scene_idx)

@@ -110,4 +110,6 @@ export const api = {
   generateSceneShot: (storyId: string, sceneIndex: number, shotId: string) => request<{ run_id: string }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/${shotId}/generate`, { method: "POST" }),
   shotAssets: (storyId: string, sceneIndex: number, shotId: string) => request<{ assets: ShotAsset[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/${shotId}/assets`),
   approveShotAsset: (storyId: string, sceneIndex: number, shotId: string, assetId: string) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/${shotId}/assets/${assetId}/approve`, { method: "POST" }),
+  shotRevisions: (storyId: string, sceneIndex: number) => request<{ revisions: number[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/revisions`),
+  restoreShotRevision: (storyId: string, sceneIndex: number, revision: number) => request<{ revision: number; shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/revisions/${revision}/restore`, { method: "POST" }),
 };
