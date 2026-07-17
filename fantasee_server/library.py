@@ -57,6 +57,7 @@ from fantasee_server.production_runtime import production_database_path, enqueue
 from fantasee_server.production_store import ProductionStore
 from fantasee_server.production_worker import ProductionWorker
 from fantasee_server.asset_registry import AssetRegistry
+from fantasee_server.media_timeline import write_story_timeline
 from story_pipeline import sync_from_completion, update_stage
 from image_quality import is_usable_story_image, requested_images_per_scene
 
@@ -354,10 +355,17 @@ def _complete_story_for_library(story_id: str, progress) -> dict:
         sync_from_completion(story_dir, final_report)
         missing_final = ", ".join(final_report.get("missing") or ["unknown"])
         raise RuntimeError(f"Story still incomplete after maintenance: {missing_final}")
+    manifest_path = story_dir / f"{story_id}.json"
+    manifest_for_timeline = json.loads(manifest_path.read_text(encoding="utf-8"))
+    timeline_path = write_story_timeline(
+        story_id,
+        story_dir,
+        manifest_for_timeline.get("scenes", []),
+    )
+    result["timeline"] = str(timeline_path)
     with AssetRegistry(production_database_path()) as registry:
         registered_assets = registry.sync_story_directory(story_id, story_dir, approve=True)
     result["assets_registered"] = len(registered_assets)
-    manifest_path = story_dir / f"{story_id}.json"
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest["status"] = "complete"
