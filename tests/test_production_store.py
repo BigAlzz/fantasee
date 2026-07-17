@@ -109,3 +109,24 @@ def test_worker_capabilities_route_gpu_jobs(tmp_path):
     assert lease is not None
     assert lease.id == job.id
     store.close()
+
+
+def test_cancel_and_retry_job_are_explicit_state_transitions(tmp_path):
+    store = ProductionStore(tmp_path / "production.db")
+    run = store.create_run(
+        story_id="story-1", command="repair", input_fingerprint="fingerprint-1"
+    )
+    job = store.enqueue_job(
+        run.id,
+        job_id="job-1",
+        job_type="repair",
+        payload={},
+        idempotency_key="job-1",
+    )
+
+    cancelled = store.cancel_job(job.id)
+    assert cancelled.status == "cancelled"
+    retried = store.retry_job(job.id)
+    assert retried.status == "queued"
+    assert retried.lease_token is None
+    store.close()

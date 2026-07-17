@@ -78,20 +78,28 @@ class ProductionWorker:
             heartbeat_task.cancel()
             await self._finish_heartbeat(heartbeat_task)
             with self._store() as store:
-                store.fail_job(
-                    job.id,
-                    token,
-                    message=str(exc),
-                    retryable=job.attempts < self.max_attempts,
-                    retry_delay=min(60, 2 ** max(0, job.attempts - 1)),
-                )
+                try:
+                    store.fail_job(
+                        job.id,
+                        token,
+                        message=str(exc),
+                        retryable=job.attempts < self.max_attempts,
+                        retry_delay=min(60, 2 ** max(0, job.attempts - 1)),
+                    )
+                except ValueError:
+                    pass
                 store.update_worker(self.worker_id, status="idle")
             return True
 
         heartbeat_task.cancel()
         await self._finish_heartbeat(heartbeat_task)
         with self._store() as store:
-            store.complete_job(job.id, token, output=result if isinstance(result, dict) else None)
+            try:
+                store.complete_job(job.id, token, output=result if isinstance(result, dict) else None)
+            except ValueError:
+                # The operator may have cancelled or another worker may have
+                # reclaimed this job. A stale worker must not resurrect it.
+                pass
             store.update_worker(self.worker_id, status="idle")
         return True
 

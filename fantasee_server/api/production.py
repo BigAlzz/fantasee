@@ -45,3 +45,23 @@ def get_production_run(run_id: str):
     if task is None:
         raise HTTPException(status_code=404, detail="Production run not found")
     return task
+
+
+@router.post("/api/production/jobs/{job_id}/retry")
+def retry_production_job(job_id: str):
+    try:
+        with ProductionStore(production_database_path()) as store:
+            job = store.retry_job(job_id)
+        return {"job_id": job.id, "status": job.status}
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/api/production/jobs/{job_id}/cancel")
+def cancel_production_job(job_id: str):
+    try:
+        with ProductionStore(production_database_path()) as store:
+            job = store.cancel_job(job_id)
+        return {"job_id": job.id, "status": job.status}
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc

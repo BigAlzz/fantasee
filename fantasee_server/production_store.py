@@ -629,6 +629,40 @@ class ProductionStore:
             raise ValueError(f"production job not found: {job_id}")
         return self.get_job(job_id)
 
+    def cancel_job(self, job_id: str) -> ProductionJob:
+        now = time.time()
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_jobs
+                SET status = 'cancelled', message = 'Cancelled by operator',
+                    lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
+                    updated_at = ?
+                WHERE id = ? AND status IN ('queued', 'retryable', 'leased', 'running')
+                """,
+                (now, job_id),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError(f"job cannot be cancelled: {job_id}")
+        return self.get_job(job_id)
+
+    def retry_job(self, job_id: str) -> ProductionJob:
+        now = time.time()
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_jobs
+                SET status = 'queued', message = 'Queued for retry', available_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
+                    updated_at = ?
+                WHERE id = ? AND status IN ('failed', 'cancelled', 'retryable')
+                """,
+                (now, now, job_id),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError(f"job cannot be retried: {job_id}")
+        return self.get_job(job_id)
+
     @staticmethod
     def _run_from_row(row: sqlite3.Row) -> ProductionRun:
         return ProductionRun(
