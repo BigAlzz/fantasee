@@ -126,7 +126,8 @@ async def _run_generation(task_id: str, req: GenerateRequest, job_progress=None)
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env={**os.environ, "XIAOMI_API_KEY": _resolve_env_var("XIAOMI_API_KEY"),
-             "XIAOMI_BASE_URL": _resolve_env_var("XIAOMI_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1")},
+             "XIAOMI_BASE_URL": _resolve_env_var("XIAOMI_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1"),
+             "FANTASEE_PRODUCTION_RUN_ID": task_id},
     )
 
     # Read stdout line by line, parse progress markers

@@ -32,6 +32,18 @@ from story_pipeline import initialize_pipeline, update_stage
 from story_quality import outline_feedback, review_scene_outline
 from fantasee_server.llm_adapter import GranularLLMAdapter, TokenBudget
 
+
+def _llm_usage_sink(result) -> None:
+    """Record generation calls when launched under a durable production run."""
+    run_id = os.environ.get("FANTASEE_PRODUCTION_RUN_ID", "").strip()
+    if not run_id:
+        return
+    try:
+        from fantasee_server.production_runtime import record_llm_usage
+        record_llm_usage(run_id, result)
+    except Exception as exc:
+        print(f"[llm] token ledger update failed: {exc}", file=sys.stderr)
+
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     import requests
@@ -646,7 +658,7 @@ block in the system prompt for details and keywords."""
     response = ""
     last_review = None
     budget = TokenBudget(limit=max(4096, num_scenes * 2200))
-    adapter = GranularLLMAdapter(call_llm, budget=budget)
+    adapter = GranularLLMAdapter(call_llm, budget=budget, usage_sink=_llm_usage_sink)
     outline_max_tokens = min(16384, max(2048, num_scenes * 900))
     for attempt in range(3):
         prompt = user_prompt

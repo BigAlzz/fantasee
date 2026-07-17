@@ -105,6 +105,18 @@ class ProductionRelease:
     created_at: float
 
 
+@dataclass(frozen=True)
+class ProductionTokenUsage:
+    id: str
+    run_id: str
+    call_name: str
+    estimated_tokens: int
+    reserved_tokens: int
+    actual_tokens: int
+    retries: int
+    created_at: float
+
+
 class ProductionStore:
     """SQLite implementation of the durable production state seam."""
 
@@ -211,6 +223,18 @@ class ProductionStore:
             );
             CREATE INDEX IF NOT EXISTS idx_production_releases_current
                 ON production_releases(story_id, release_type, status, created_at);
+            CREATE TABLE IF NOT EXISTS production_token_usage (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL REFERENCES production_runs(id) ON DELETE CASCADE,
+                call_name TEXT NOT NULL,
+                estimated_tokens INTEGER NOT NULL,
+                reserved_tokens INTEGER NOT NULL,
+                actual_tokens INTEGER NOT NULL,
+                retries INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_production_token_usage_run
+                ON production_token_usage(run_id, created_at);
             """
         )
         self.connection.commit()
@@ -515,6 +539,54 @@ class ProductionStore:
             (story_id,),
         ).fetchall()
         return [self._release_from_row(row) for row in rows]
+
+    def record_token_usage(
+        self,
+        run_id: str,
+        *,
+        call_name: str,
+        estimated_tokens: int,
+        reserved_tokens: int,
+        actual_tokens: int,
+        retries: int = 0,
+    ) -> ProductionTokenUsage:
+        now = time.time()
+        usage_id = uuid.uuid4().hex
+        with self.connection:
+            self.connection.execute(
+                """INSERT INTO production_token_usage
+                    (id, run_id, call_name, estimated_tokens, reserved_tokens,
+                     actual_tokens, retries, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (usage_id, run_id, call_name, max(0, int(estimated_tokens)),
+                 max(0, int(reserved_tokens)), max(0, int(actual_tokens)),
+                 max(0, int(retries)), now),
+            )
+        return self.get_token_usage(usage_id)
+
+    def get_token_usage(self, usage_id: str) -> ProductionTokenUsage | None:
+        row = self.connection.execute(
+            "SELECT * FROM production_token_usage WHERE id = ?", (usage_id,)
+        ).fetchone()
+        return self._token_usage_from_row(row) if row else None
+
+    def list_token_usage(self, run_id: str) -> list[ProductionTokenUsage]:
+        rows = self.connection.execute(
+            "SELECT * FROM production_token_usage WHERE run_id = ? ORDER BY created_at, id",
+            (run_id,),
+        ).fetchall()
+        return [self._token_usage_from_row(row) for row in rows]
+
+    def token_usage_totals(self, run_id: str) -> dict[str, int]:
+        row = self.connection.execute(
+            """SELECT COALESCE(SUM(estimated_tokens), 0) AS estimated,
+                      COALESCE(SUM(reserved_tokens), 0) AS reserved,
+                      COALESCE(SUM(actual_tokens), 0) AS actual,
+                      COALESCE(SUM(retries), 0) AS retries
+               FROM production_token_usage WHERE run_id = ?""",
+            (run_id,),
+        ).fetchone()
+        return {key: int(row[key]) for key in ("estimated", "reserved", "actual", "retries")}
 
     def save_shot_plan(
         self, story_id: str, scene_id: str, shots: list[ShotSpec]
@@ -958,6 +1030,15 @@ class ProductionStore:
         return ProductionRelease(
             id=row["id"], story_id=row["story_id"], release_type=row["release_type"],
             fingerprint=row["fingerprint"], status=row["status"], path=row["path"],
+            created_at=row["created_at"],
+        )
+
+    @staticmethod
+    def _token_usage_from_row(row: sqlite3.Row) -> ProductionTokenUsage:
+        return ProductionTokenUsage(
+            id=row["id"], run_id=row["run_id"], call_name=row["call_name"],
+            estimated_tokens=row["estimated_tokens"], reserved_tokens=row["reserved_tokens"],
+            actual_tokens=row["actual_tokens"], retries=row["retries"],
             created_at=row["created_at"],
         )
 

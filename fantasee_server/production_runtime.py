@@ -29,6 +29,19 @@ def production_database_path() -> Path:
     return _database_path()
 
 
+def record_llm_usage(run_id: str, result: Any) -> None:
+    """Persist one bounded creative commission's token evidence."""
+    with ProductionStore(_database_path()) as store:
+        store.record_token_usage(
+            run_id,
+            call_name=str(result.name),
+            estimated_tokens=int(result.estimated_tokens),
+            reserved_tokens=int(result.reserved_tokens),
+            actual_tokens=int(result.actual_tokens),
+            retries=int(result.retries),
+        )
+
+
 def _fingerprint(payload: Any) -> str:
     encoded = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()

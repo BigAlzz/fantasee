@@ -36,6 +36,7 @@ class LLMResult:
     text: str
     estimated_tokens: int
     actual_tokens: int
+    reserved_tokens: int = 0
     retries: int = 0
 
 
@@ -48,10 +49,12 @@ class GranularLLMAdapter:
         *,
         budget: TokenBudget,
         temperature: float = 0.7,
+        usage_sink: Callable[[LLMResult], None] | None = None,
     ):
         self.call = call
         self.budget = budget
         self.temperature = temperature
+        self.usage_sink = usage_sink
 
     def complete(
         self,
@@ -78,13 +81,17 @@ class GranularLLMAdapter:
             if not text:
                 raise RuntimeError(f"LLM returned no content for {name}")
             actual = estimate_tokens(text)
-            return LLMResult(
+            result = LLMResult(
                 name=name,
                 text=text,
                 estimated_tokens=estimate_tokens(system) + estimate_tokens(prompt),
                 actual_tokens=actual,
+                reserved_tokens=reserved,
                 retries=retries,
             )
+            return result
         finally:
             actual = estimate_tokens(text) if "text" in locals() and text else 0
             self.budget.settle(reserved, actual)
+            if "result" in locals() and self.usage_sink is not None:
+                self.usage_sink(result)

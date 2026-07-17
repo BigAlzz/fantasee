@@ -47,6 +47,18 @@ def get_production_run(run_id: str):
     return task
 
 
+@router.get("/api/production/runs/{run_id}/token-usage")
+def get_production_token_usage(run_id: str):
+    with ProductionStore(production_database_path()) as store:
+        if store.get_run(run_id) is None:
+            raise HTTPException(status_code=404, detail="Production run not found")
+        return {
+            "run_id": run_id,
+            "totals": store.token_usage_totals(run_id),
+            "calls": [usage.__dict__ for usage in store.list_token_usage(run_id)],
+        }
+
+
 @router.get("/api/stories/{story_id}/releases")
 def list_story_releases(story_id: str):
     with ProductionStore(production_database_path()) as store:
