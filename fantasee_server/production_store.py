@@ -282,7 +282,7 @@ class ProductionStore:
             candidates = self.connection.execute(
                 """
                 SELECT * FROM production_jobs
-                WHERE status = 'queued' AND available_at <= ?
+                WHERE status IN ('queued', 'retryable') AND available_at <= ?
                 ORDER BY created_at, id
                 """,
                 (now,),
@@ -306,7 +306,7 @@ class ProductionStore:
                 UPDATE production_jobs
                 SET status = 'leased', lease_owner = ?, lease_token = ?,
                     lease_expires_at = ?, attempts = attempts + 1, updated_at = ?
-                WHERE id = ? AND status = 'queued'
+                WHERE id = ? AND status IN ('queued', 'retryable')
                 """,
                 (worker_id, lease_token, now + lease_seconds, now, row["id"]),
             )
@@ -427,10 +427,10 @@ class ProductionStore:
             cursor = self.connection.execute(
                 """
                 UPDATE production_jobs
-                SET status = ?, progress = ?, message = ?, updated_at = ?
+                SET status = ?, progress = ?, message = ?, available_at = ?, updated_at = ?
                 WHERE id = ?
                 """,
-                (status, progress, message, now, job_id),
+                (status, progress, message, now, now, job_id),
             )
         if cursor.rowcount != 1:
             raise ValueError(f"production job not found: {job_id}")

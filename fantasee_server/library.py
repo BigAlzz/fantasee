@@ -53,6 +53,9 @@ from fantasee_server.state import (
     now,
 )
 from fantasee_server.production_runtime import finish_task, start_task, update_task
+from fantasee_server.production_runtime import production_database_path, enqueue_task_job, finalize_run_from_jobs
+from fantasee_server.production_store import ProductionStore
+from fantasee_server.production_worker import ProductionWorker
 from story_pipeline import sync_from_completion, update_stage
 from image_quality import is_usable_story_image, requested_images_per_scene
 
@@ -449,6 +452,16 @@ async def _run_library_maintenance_queue(task_id: str, stories: list[dict]) -> N
     total = len(stories)
     completed: list[str] = []
     failed: list[dict] = []
+    capabilities = tuple(
+        value.strip()
+        for value in os.environ.get("FANTASEE_WORKER_CAPABILITIES", "cpu,gpu").split(",")
+        if value.strip()
+    )
+    worker = ProductionWorker(
+        production_database_path(),
+        worker_id=f"maintenance-{os.getpid()}",
+        capabilities=capabilities,
+    )
 
     try:
         for idx, story in enumerate(stories):
@@ -465,6 +478,21 @@ async def _run_library_maintenance_queue(task_id: str, stories: list[dict]) -> N
                 "message": f"Starting {story_id}",
                 "created_at": now(),
             }
+            try:
+                start_task(
+                    sub_id,
+                    story_id=story_id,
+                    kind="library_story",
+                    metadata={"parent": task_id},
+                )
+                enqueue_task_job(
+                    task_id,
+                    job_id=sub_id,
+                    job_type="library.complete",
+                    payload={"story_id": story_id},
+                )
+            except Exception as exc:
+                print(f"[library] durable child start failed: {exc}", file=sys.stderr)
             await _broadcast_ws_json({
                 "type": "task_update",
                 "task_id": sub_id,
@@ -524,10 +552,19 @@ async def _run_library_maintenance_queue(task_id: str, stories: list[dict]) -> N
                 })
 
             try:
-                result = await loop.run_in_executor(
-                    None,
-                    lambda: _complete_story_for_library(story_id, progress),
-                )
+                def complete_library_job(_job, job_progress):
+                    def combined_progress(stage: str, msg: str, pct: float) -> None:
+                        progress(stage, msg, pct)
+                        job_progress(stage, msg, pct)
+
+                    return _complete_story_for_library(story_id, combined_progress)
+
+                await worker.run_once(complete_library_job)
+                with ProductionStore(production_database_path()) as store:
+                    job_state = store.get_job(sub_id)
+                if not job_state or job_state.status != "succeeded":
+                    raise RuntimeError(job_state.message if job_state else "Maintenance job was not completed")
+                result = {"status": "complete", "story_id": story_id}
                 completed.append(story_id)
                 _library_agent_failures.pop(story_id, None)
                 _generation_tasks[sub_id].update({
@@ -549,6 +586,7 @@ async def _run_library_maintenance_queue(task_id: str, stories: list[dict]) -> N
                     "message": f"{story_id} complete",
                     "result": result,
                 })
+                finalize_run_from_jobs(task_id)
             except Exception as e:
                 _library_agent_failures[story_id] = _library_agent_failures.get(story_id, 0) + 1
                 failed.append({"story_id": story_id, "error": str(e)})
@@ -604,6 +642,77 @@ async def _run_library_maintenance_queue(task_id: str, stories: list[dict]) -> N
 
 
 # ── Library agent loop ─────────────────────────────────────────────
+
+async def recover_library_jobs() -> None:
+    """Resume durable repair jobs left by a previous server process."""
+    await asyncio.sleep(float(os.environ.get("FANTASEE_GENERATION_RECOVERY_DELAY", "5") or "5"))
+    capabilities = tuple(
+        value.strip()
+        for value in os.environ.get("FANTASEE_WORKER_CAPABILITIES", "cpu,gpu").split(",")
+        if value.strip()
+    )
+    worker = ProductionWorker(
+        production_database_path(),
+        worker_id=f"maintenance-recovery-{os.getpid()}",
+        capabilities=capabilities,
+    )
+
+    while True:
+        with ProductionStore(production_database_path()) as store:
+            job = next(
+                (item for item in store.list_runnable_jobs() if item.job_type == "library.complete"),
+                None,
+            )
+        if job is None:
+            return
+        story_id = job.payload["story_id"]
+        _generation_tasks.setdefault(job.run_id, {
+            "id": job.run_id,
+            "kind": "library_maintenance",
+            "status": "running",
+            "progress": 0,
+            "message": "Recovered library maintenance",
+            "created_at": now(),
+        })
+        _generation_tasks.setdefault(job.id, {
+            "id": job.id,
+            "parent": job.run_id,
+            "kind": "library_story",
+            "story_id": story_id,
+            "status": "running",
+            "progress": 0,
+            "message": f"Recovering {story_id}",
+            "created_at": now(),
+        })
+
+        def complete_recovered_job(_job, job_progress):
+            def progress(stage: str, message: str, pct: float) -> None:
+                _generation_tasks[job.id].update({
+                    "stage": stage,
+                    "progress": pct,
+                    "message": message,
+                    "status": "running",
+                })
+                _generation_tasks[job.run_id].update({
+                    "stage": stage,
+                    "progress": pct,
+                    "message": message,
+                    "status": "running",
+                })
+                job_progress(stage, message, pct)
+
+            return _complete_story_for_library(story_id, progress)
+
+        await worker.run_once(complete_recovered_job)
+        with ProductionStore(production_database_path()) as store:
+            finished = store.get_job(job.id)
+        _generation_tasks[job.id].update({
+            "status": "done" if finished and finished.status == "succeeded" else "error",
+            "progress": 1.0,
+            "message": finished.message if finished and finished.message else story_id,
+        })
+        finalize_run_from_jobs(job.run_id)
+
 
 async def _library_agent_loop() -> None:
     """Periodically queue incomplete stories while the server is running."""

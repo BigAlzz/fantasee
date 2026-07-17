@@ -41,7 +41,7 @@ from fantasee_server.api import (
     tts,
     ws,
 )
-from fantasee_server.library import _library_agent_loop
+from fantasee_server.library import _library_agent_loop, recover_library_jobs
 from fantasee_server.paths import STATIC_DIR, load_stories
 from fantasee_server.security import require_operator
 from fantasee_server.startup import startup_ensure_workers
@@ -60,6 +60,7 @@ async def lifespan(app: FastAPI):
 
     # Resume durable generation jobs after ComfyUI has had a chance to start.
     asyncio.create_task(generation.recover_generation_jobs())
+    asyncio.create_task(recover_library_jobs())
 
     # On startup, check whether a ComfyUI worker is already running. If
     # not (e.g. user just ran `start.bat server` with no ComfyUI), auto-spawn

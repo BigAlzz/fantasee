@@ -96,3 +96,35 @@ def test_worker_failure_is_recorded_without_losing_the_job(tmp_path):
         job = store.get_job("job-1")
         assert job.status == "retryable"
         assert job.message == "render failed"
+
+
+def test_retryable_job_can_be_claimed_again(tmp_path):
+    database_path = tmp_path / "production.db"
+    with ProductionStore(database_path) as store:
+        run = store.create_run(
+            story_id="story-1",
+            command="generate",
+            input_fingerprint="fingerprint-1",
+        )
+        store.enqueue_job(
+            run.id,
+            job_id="job-1",
+            job_type="story.generate",
+            payload={},
+            idempotency_key="job-1",
+        )
+
+    attempts = []
+
+    def handler(job, _progress):
+        attempts.append(job.attempts)
+        if len(attempts) == 1:
+            raise RuntimeError("temporary failure")
+
+    worker = ProductionWorker(database_path, worker_id="cpu-1", capabilities=("cpu",))
+    assert asyncio.run(worker.run_once(handler)) is True
+    with ProductionStore(database_path) as store:
+        store.set_job_status("job-1", status="retryable", message="temporary failure")
+    assert asyncio.run(worker.run_once(handler)) is True
+
+    assert attempts == [1, 2]

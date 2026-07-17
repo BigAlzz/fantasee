@@ -65,7 +65,10 @@ class ProductionWorker:
                 pass
 
         try:
-            result = handler(job, progress)
+            if inspect.iscoroutinefunction(handler):
+                result = handler(job, progress)
+            else:
+                result = await asyncio.to_thread(handler, job, progress)
             if inspect.isawaitable(result):
                 result = await result
         except Exception as exc:
