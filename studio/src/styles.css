@@ -79,6 +79,10 @@ nav { display:grid; gap:8px; } .nav-item { position:relative; border:1px solid t
 .settings-actions { display:flex; gap:9px; justify-content:flex-end; margin-top:4px; }
 .desk-row-button { width:100%; cursor:pointer; text-align:left; font:inherit; color:inherit; }
 .desk-row-button:hover,.desk-row-button:focus { border-color:#b47f3c; background:#211b13; }
+.story-row { grid-template-columns:22px 58px minmax(140px,1fr) minmax(90px,1.1fr) 70px 120px 24px; }
+.story-health { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.story-health.ready { color:#90c57b; }
+.story-health.attention { color:#d2a85e; }
 @media (max-width:720px) { .seed-grid { grid-template-columns:1fr; } }
 .worker-console { width:min(920px,100%); padding:22px; }
 .worker-console-body { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(250px,.8fr); gap:18px; margin-top:18px; }

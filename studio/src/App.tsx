@@ -45,6 +45,14 @@ function hasUsableCover(story: Story) {
   return Boolean(story.cover_image_url || story.hero_image) && (counts.scenes === undefined || counts.scenes_with_images > 0);
 }
 
+function storyHealth(story: Story) {
+  const completion = story.completion ?? {};
+  if (completion.complete) return { text: "Ready", tone: "ready" };
+  const names: Record<string, string> = { story_text: "script", image: "images", shot_image: "shot art", audio: "audio", subtitles: "subtitles", shot_timeline: "timeline", scene_video: "scene MP4", full_video: "master MP4", plex: "Plex" };
+  const missing = Array.isArray(completion.missing) ? completion.missing.map((value) => names[String(value)] || String(value)).slice(0, 3) : [];
+  return { text: missing.length ? `Needs ${missing.join(" · ")}` : "Needs completion", tone: "attention" };
+}
+
 function workerLabel(worker: Worker | ComfyWorker) {
   const comfy = worker as ComfyWorker;
   const production = worker as Worker;
@@ -194,7 +202,7 @@ export function App() {
           </article> : <div className="empty-state"><Sparkles size={28}/><h1>No stories yet</h1><p>Create a story to establish the first production run.</p></div>}
           <div className="section-heading"><h2>Story library</h2><span>{visibleStories.length} title{visibleStories.length === 1 ? "" : "s"}</span></div>
           <div className="story-list">{visibleStories.map((story) => <button key={story.id} className={story.id === selectedStoryId ? "story-row selected" : "story-row"} onClick={() => setSelectedStoryId(story.id)}>
-            <span className="star">{story.id === selectedStoryId ? "+" : "o"}</span><span className="thumb">{hasUsableCover(story) ? <img src={story.cover_image_url || story.hero_image} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }}/> : null}<Image className="fallback-icon" size={15}/></span><strong>{story.title}</strong><span>{story.scene_count || 0} scenes</span><span>{timestamp(story.updated_at || story.created_at)}</span><ChevronRight size={17}/>
+            <span className="star">{story.id === selectedStoryId ? "+" : "o"}</span><span className="thumb">{hasUsableCover(story) ? <img src={story.cover_image_url || story.hero_image} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }}/> : null}<Image className="fallback-icon" size={15}/></span><strong>{story.title}</strong><span className={`story-health ${storyHealth(story).tone}`}>{storyHealth(story).text}</span><span>{story.scene_count || 0} scenes</span><span>{timestamp(story.updated_at || story.created_at)}</span><ChevronRight size={17}/>
           </button>)}</div>
         </section>
 
