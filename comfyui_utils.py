@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import requests
 
 from fantasee_server.security import validate_provider_url
+from image_quality import inspect_story_image
 
 # ── Config ──────────────────────────────────────────────────────────────
 COMFYUI_HOST = "127.0.0.1"
@@ -147,33 +148,11 @@ DEFAULT_NEGATIVE = (
 )
 
 
-# Positive-prompt guard suffix appended to every visual prompt before submission.
-# Pulls the model toward a sharp, well-framed, well-lit human face. The
-# previous version was tuned only for the close-up "pig snout" failure mode
-# and left medium shots looking flat and un-detailed — the new block adds
-# eye/iris detail, catchlights, framing cues, and quality boosters that
-# SD 1.5 needs to keep the face the focal point at medium framing.
+# Keep the guard compact and scene-neutral. A large face/portrait suffix
+# consumes the CLIP budget and can override the scene's action.
 DEFAULT_POSITIVE_GUARD_SUFFIX = (
-    # Face structure and skin
-    "beautiful detailed human face, well-defined human nose, "
-    "natural human facial features, sharp facial structure, "
-    "symmetric face, clear skin, natural skin texture, "
-    # Eye detail (the single biggest quality win on SD 1.5)
-    "detailed eyes, detailed iris, detailed pupils, detailed eyelashes, "
-    "defined eyebrows, catchlights in eyes, expressive eyes, "
-    # Lips and teeth
-    "detailed lips, natural lip color, visible teeth detail, "
-    # Hair (kept on face-side of the framing)
-    "detailed hair, individual hair strands, hair shading, "
-    # Lighting and focus — explicitly direct the model to keep the face sharp
-    "rim lighting, soft directional lighting on face, "
-    "sharp focus on face, subject in focus, shallow depth of field, "
-    "cinematic portrait lighting, "
-    # Framing cues so the model keeps the face the focal point at medium shots
-    "portrait framing, head and shoulders composition, medium close-up, "
-    "looking at viewer, eye contact, "
-    # Quality boosters
-    "masterpiece, best quality, highly detailed, sharp focus, 8k uhd"
+    "cinematic digital illustration, dynamic composition, clear subject and action, "
+    "detailed environment, coherent anatomy, sharp focus, high detail"
 )
 
 # ── Health Check ────────────────────────────────────────────────────────
@@ -826,7 +805,7 @@ def _approx_token_count(text: str) -> int:
     return max(1, int(words / 0.6) + punct // 4)
 
 
-def _clip_truncate(text: str, max_tokens: int = 77) -> str:
+def _clip_truncate(text: str, max_tokens: int = 77, *, preserve_tail: bool = False) -> str:
     """Truncate a prompt to fit SD 1.5's 77-token CLIP limit.
 
     Strategy: keep the beginning of the prompt (subject, framing,
@@ -841,13 +820,18 @@ def _clip_truncate(text: str, max_tokens: int = 77) -> str:
         return text
     # Rough word budget. Use a smaller multiplier than 0.6 to leave
     # headroom for tokenization edge cases.
-    word_budget = int(max_tokens * 0.55)
+    # Use most of the CLIP budget. The old 55% budget plus a large portrait
+    # suffix left too little room for the scene action and setting.
+    word_budget = max(1, int(max_tokens * 0.58))
     words = text.split()
     if len(words) <= word_budget:
         return text
-    # Keep first 60% and last 30% of the budget, drop the middle 10%.
-    head_count = int(word_budget * 0.60)
-    tail_count = int(word_budget * 0.30)
+    if not preserve_tail:
+        return " ".join(words[:word_budget])
+
+    # Keep first 70% and last 30% for unordered negative terms.
+    head_count = int(word_budget * 0.70)
+    tail_count = word_budget - head_count
     head = " ".join(words[:head_count])
     tail = " ".join(words[-tail_count:]) if tail_count else ""
     if tail:
@@ -883,15 +867,19 @@ def inject_prompt(
     """
     q = {**QUALITY_SETTINGS, **(quality or {})}
 
-    # SD 1.5's CLIP encoder has a 77-token limit. ComfyUI's CLIPTextEncode
-    # node silently truncates anything longer. We pre-truncate intelligently
-    # so the most important parts of the prompt survive. Approximate
-    # token count: 1 token ≈ 0.75 words for English natural language, but
-    # we also count commas/periods which inflate the BPE count. Use a
-    # conservative 0.6 multiplier so we never overflow the 77-token limit.
-    MAX_TOKENS = 77
-    positive_prompt = _clip_truncate(positive_prompt, MAX_TOKENS)
-    negative_prompt = _clip_truncate(negative_prompt, MAX_TOKENS)
+    # ComfyUI silently truncates text beyond the selected encoder limit.
+    # The workflow-aware limit below preserves the scene action for both
+    # standard SD 1.5 CLIP and SeaArt Long-CLIP.
+    # Standard SD 1.5 CLIP accepts 77 tokens. SeaArtLongClip expands the
+    # same encoder to 248 tokens, so detect it from the selected workflow.
+    long_clip_nodes = {"SeaArtLongClip", "LongCLIPTextEncodeFlux"}
+    has_long_clip = any(
+        isinstance(node, dict) and node.get("class_type") in long_clip_nodes
+        for node in workflow.values()
+    )
+    MAX_TOKENS = 248 if has_long_clip else 77
+    positive_prompt = _clip_truncate(positive_prompt, MAX_TOKENS, preserve_tail=False)
+    negative_prompt = _clip_truncate(negative_prompt, MAX_TOKENS, preserve_tail=True)
 
     for node_id, node in workflow.items():
         if not isinstance(node, dict):
@@ -1223,16 +1211,25 @@ def generate_image(
                             # Copy from ComfyUI output to our output dir
                             comfyui_out = Path.home() / "Documents/comfy/ComfyUI/output"
                             src = comfyui_out / found_image
+                            validated_path = src
                             if src.exists():
                                 dest_dir = Path(output_dir) if output_dir else Path(".")
                                 dest_dir.mkdir(parents=True, exist_ok=True)
                                 import shutil
                                 dest = dest_dir / found_image
                                 shutil.copy2(str(src), str(dest))
+                                validated_path = dest
                                 print(
                                     f"[comfyui_utils] Copied to: {dest}",
                                     file=sys.stderr,
                                 )
+                            usable, reason = inspect_story_image(validated_path)
+                            if not usable:
+                                print(
+                                    f"[comfyui_utils] Rejected invalid image {validated_path}: {reason}",
+                                    file=sys.stderr,
+                                )
+                                return None
                             return found_image
 
                         # Prompt finished but produced no images — this is a real error

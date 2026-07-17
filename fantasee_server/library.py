@@ -5,7 +5,7 @@ disk. A story is "incomplete" when one of these pieces is missing:
 
 * the manifest itself or its ``status`` field
 * scene text (prompt / narration)
-* scene images (PNGs over 1KB)
+* the requested number of usable, non-blank scene images
 * scene audio (WAVs over 1KB)
 * scene subtitles (Whisper-aligned JSON)
 * per-scene MP4 (rendered by ``render_video.py``)
@@ -53,6 +53,7 @@ from fantasee_server.state import (
     now,
 )
 from story_pipeline import sync_from_completion, update_stage
+from image_quality import is_usable_story_image, requested_images_per_scene
 
 
 # ── Per-story completion report ────────────────────────────────────
@@ -84,6 +85,7 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
             }
 
     scenes = story.get("scenes") or []
+    target_images = requested_images_per_scene(story)
     issues: list[dict] = []
     counts = {
         "scenes": len(scenes),
@@ -117,10 +119,15 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
             add_issue("story_text", "Scene is missing prompt or narration", scene=scene_key)
 
         image_files = [story_dir / f for f in (scene.get("image_filenames") or []) if f]
-        if image_files and all(p.exists() and p.stat().st_size > 1000 for p in image_files):
+        usable_images = [path for path in image_files if is_usable_story_image(path)]
+        if len(usable_images) >= target_images:
             counts["scenes_with_images"] += 1
         else:
-            add_issue("image", "Scene is missing generated image files", scene=scene_key)
+            add_issue(
+                "image",
+                f"Scene has {len(usable_images)} of {target_images} usable generated images",
+                scene=scene_key,
+            )
 
         audio_name = scene.get("audio_filename") or ""
         audio_path = story_dir / audio_name if audio_name else None

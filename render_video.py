@@ -25,6 +25,7 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 from story_storage import STORIES_ROOT, existing_story_dir, ensure_story_layout
+from image_quality import is_usable_story_image
 
 # ── Defaults ────────────────────────────────────────────────────────────
 OUTPUTS = STORIES_ROOT
@@ -45,6 +46,7 @@ def get_scene_assets(story_dir: Path, slug: str, scene_num: int) -> dict:
     images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*_00001_.png"))
     if not images:
         images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*.png"))
+    images = [path for path in images if is_usable_story_image(path)]
     
     # Find audio
     audio = None
