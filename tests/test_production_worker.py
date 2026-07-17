@@ -128,3 +128,21 @@ def test_retryable_job_can_be_claimed_again(tmp_path):
     assert asyncio.run(worker.run_once(handler)) is True
 
     assert attempts == [1, 2]
+
+
+def test_worker_registry_records_capabilities_and_heartbeat(tmp_path):
+    database_path = tmp_path / "production.db"
+    worker = ProductionWorker(
+        database_path,
+        worker_id="gpu-1",
+        capabilities=("gpu", "image-generation"),
+    )
+
+    assert asyncio.run(worker.run_once(lambda _job, _progress: None)) is False
+
+    with ProductionStore(database_path) as store:
+        workers = store.list_workers()
+        assert len(workers) == 1
+        assert workers[0].id == "gpu-1"
+        assert workers[0].status == "idle"
+        assert workers[0].capabilities == ("gpu", "image-generation")

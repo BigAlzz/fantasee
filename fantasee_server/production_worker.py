@@ -38,15 +38,18 @@ class ProductionWorker:
         handler: Callable[[ProductionJob, Callable[[str, str, float], None]], Any],
     ) -> bool:
         with self._store() as store:
+            store.register_worker(self.worker_id, self.capabilities)
             job = store.lease_next_job(
                 self.worker_id,
                 lease_seconds=self.lease_seconds,
                 capabilities=self.capabilities,
             )
             if job is None:
+                store.update_worker(self.worker_id, status="idle")
                 return False
             token = job.lease_token
             store.start_job(job.id, token)
+            store.update_worker(self.worker_id, status="running", current_job_id=job.id)
 
         heartbeat_task = asyncio.create_task(self._heartbeat(job.id, token))
 
@@ -82,12 +85,14 @@ class ProductionWorker:
                     retryable=job.attempts < self.max_attempts,
                     retry_delay=min(60, 2 ** max(0, job.attempts - 1)),
                 )
+                store.update_worker(self.worker_id, status="idle")
             return True
 
         heartbeat_task.cancel()
         await self._finish_heartbeat(heartbeat_task)
         with self._store() as store:
             store.complete_job(job.id, token, output=result if isinstance(result, dict) else None)
+            store.update_worker(self.worker_id, status="idle")
         return True
 
     async def _heartbeat(self, job_id: str, token: str | None) -> None:
@@ -96,6 +101,7 @@ class ProductionWorker:
             try:
                 with self._store() as store:
                     store.heartbeat(job_id, token, lease_seconds=self.lease_seconds)
+                    store.update_worker(self.worker_id, status="running", current_job_id=job_id)
             except ValueError:
                 return
 

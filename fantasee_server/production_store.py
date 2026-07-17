@@ -53,6 +53,16 @@ class ProductionJob:
     lease_expires_at: float | None
 
 
+@dataclass(frozen=True)
+class ProductionWorkerRecord:
+    id: str
+    capabilities: tuple[str, ...]
+    status: str
+    current_job_id: str | None
+    last_seen: float
+    created_at: float
+
+
 class ProductionStore:
     """SQLite implementation of the durable production state seam."""
 
@@ -109,6 +119,14 @@ class ProductionStore:
             );
             CREATE INDEX IF NOT EXISTS idx_production_jobs_available
                 ON production_jobs(status, available_at);
+            CREATE TABLE IF NOT EXISTS production_workers (
+                id TEXT PRIMARY KEY,
+                capabilities_json TEXT NOT NULL,
+                status TEXT NOT NULL,
+                current_job_id TEXT,
+                last_seen REAL NOT NULL,
+                created_at REAL NOT NULL
+            );
             """
         )
         self.connection.commit()
@@ -266,6 +284,55 @@ class ProductionStore:
             (time.time(),),
         ).fetchall()
         return [self._job_from_row(row) for row in rows]
+
+    def register_worker(self, worker_id: str, capabilities: tuple[str, ...]) -> ProductionWorkerRecord:
+        now = time.time()
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO production_workers
+                    (id, capabilities_json, status, last_seen, created_at)
+                VALUES (?, ?, 'idle', ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    capabilities_json = excluded.capabilities_json,
+                    status = 'idle', current_job_id = NULL, last_seen = excluded.last_seen
+                """,
+                (worker_id, json.dumps(sorted(set(capabilities))), now, now),
+            )
+        return self.get_worker(worker_id)
+
+    def get_worker(self, worker_id: str) -> ProductionWorkerRecord | None:
+        row = self.connection.execute(
+            "SELECT * FROM production_workers WHERE id = ?", (worker_id,)
+        ).fetchone()
+        return self._worker_from_row(row) if row else None
+
+    def list_workers(self) -> list[ProductionWorkerRecord]:
+        rows = self.connection.execute(
+            "SELECT * FROM production_workers ORDER BY id"
+        ).fetchall()
+        return [self._worker_from_row(row) for row in rows]
+
+    def update_worker(
+        self,
+        worker_id: str,
+        *,
+        status: str,
+        current_job_id: str | None = None,
+    ) -> ProductionWorkerRecord:
+        now = time.time()
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_workers
+                SET status = ?, current_job_id = ?, last_seen = ?
+                WHERE id = ?
+                """,
+                (status, current_job_id, now, worker_id),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError(f"production worker not found: {worker_id}")
+        return self.get_worker(worker_id)
 
     def lease_next_job(
         self,
@@ -475,6 +542,17 @@ class ProductionStore:
             lease_owner=row["lease_owner"],
             lease_token=row["lease_token"],
             lease_expires_at=row["lease_expires_at"],
+        )
+
+    @staticmethod
+    def _worker_from_row(row: sqlite3.Row) -> ProductionWorkerRecord:
+        return ProductionWorkerRecord(
+            id=row["id"],
+            capabilities=tuple(json.loads(row["capabilities_json"])),
+            status=row["status"],
+            current_job_id=row["current_job_id"],
+            last_seen=row["last_seen"],
+            created_at=row["created_at"],
         )
 
     def close(self) -> None:
