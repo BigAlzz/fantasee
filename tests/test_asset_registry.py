@@ -50,3 +50,28 @@ def test_approving_replacement_preserves_previous_asset(tmp_path):
     assert assets[old.id].status == "superseded"
     assert assets[replacement.id].status == "approved"
     registry.close()
+
+
+def test_sync_story_directory_records_verified_media(tmp_path):
+    story_id = "story-1"
+    story_dir = tmp_path / story_id
+    (story_dir / "final" / "plex").mkdir(parents=True)
+    (story_dir / "scene.png").write_bytes(b"image")
+    (story_dir / "audio.wav").write_bytes(b"audio")
+    (story_dir / "subs.json").write_text("[]", encoding="utf-8")
+    (story_dir / "story-1_full.mp4").write_bytes(b"video")
+    (story_dir / "final" / "plex" / "story-1.mp4").write_bytes(b"plex")
+    (story_dir / "story-1.json").write_text(
+        '{"scenes":[{"image_filenames":["scene.png"],'
+        '"audio_filename":"audio.wav","subtitle_file":"subs.json"}]}',
+        encoding="utf-8",
+    )
+
+    registry = AssetRegistry(tmp_path / "production.db")
+    records = registry.sync_story_directory(story_id, story_dir, approve=True)
+
+    assert {record.asset_type for record in records} == {
+        "image", "audio", "subtitles", "full_video", "plex"
+    }
+    assert all(record.status == "approved" for record in records)
+    registry.close()
