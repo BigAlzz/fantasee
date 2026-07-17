@@ -53,6 +53,10 @@ function workerLabel(worker: Worker | ComfyWorker) {
   return "CPU worker";
 }
 
+function workerIdentity(worker: Worker | ComfyWorker) {
+  return (worker as ComfyWorker).url || (worker as Worker).id || "ComfyUI worker";
+}
+
 export function App() {
   const [stories, setStories] = useState<Story[]>([]);
   const [runs, setRuns] = useState<ProductionRun[]>([]);
@@ -67,6 +71,7 @@ export function App() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [playerOpen, setPlayerOpen] = useState(false);
+  const [activeView, setActiveView] = useState("Library");
   const [editorStory, setEditorStory] = useState<StoryDetail>();
   const [editorScene, setEditorScene] = useState(0);
   const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic fantasy realism", num_scenes: 8, images_per_scene: 5, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean" });
@@ -137,7 +142,7 @@ export function App() {
   return <main className="studio-shell">
     <aside className="rail">
       <div className="brand"><span>FantaSee</span><small>Studio</small></div>
-      <nav>{nav.map(([Icon, label], index) => <button className={index === 0 ? "nav-item active" : "nav-item"} key={label}><Icon size={19}/><span>{label}</span><i>{index === 0 ? "" : undefined}</i></button>)}</nav>
+      <nav>{nav.map(([Icon, label], index) => <button className={label === activeView ? "nav-item active" : "nav-item"} key={label} onClick={() => { setActiveView(label); setNotice(`${label} desk selected.`); }} aria-current={label === activeView ? "page" : undefined}><Icon size={19}/><span>{label}</span><i>{label === activeView ? "" : undefined}</i></button>)}</nav>
       <section className="vu-panel" aria-label="System activity"><div className="vu-heading"><span>L</span><span>R</span></div><div className="needles"><i/><i/></div><b>VU</b></section>
       <section className="system-panel"><div><span className="led green"/> System <em>online</em></div><div className="transport"><button aria-label="previous">◀◀</button><button aria-label="play"><Play size={13}/></button><button aria-label="stop"><Square size={12}/></button><button className="record" aria-label="record">●</button></div></section>
     </aside>
@@ -145,7 +150,7 @@ export function App() {
     <section className="workspace">
       <header className="command-bar"><label><Search size={19}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search stories..." /></label><div><button className="icon-button" onClick={() => void refresh()} aria-label="Refresh"><RefreshCw size={18}/></button><button className="create" onClick={() => setCreateOpen(true)}><Plus size={17}/> Create story</button><button className="icon-button" aria-label="Studio controls"><SlidersHorizontal size={18}/></button></div></header>
       <div className="status-strip"><span className="led green"/> {notice} <span>•</span> {activeWorkers.length} active worker{activeWorkers.length === 1 ? "" : "s"}</div>
-      <div className="content-grid">
+      {activeView === "Library" ? <><div className="content-grid">
         <section className="library-module metal-panel">
           <div className="eyebrow"><span>Featured story</span><span>Newest first</span></div>
           {selectedStory ? <article className="feature">
@@ -169,7 +174,7 @@ export function App() {
       <section className="worker-deck">{activeWorkers.length ? activeWorkers.slice(0, 2).map((worker, index) => {
         const comfyUrl = (worker as ComfyWorker).url;
         return <WorkerLane key={index} worker={worker} jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn(index ? "cpu" : "gpu"), `${index ? "CPU" : "GPU"} ComfyUI worker started.`)} onKill={comfyUrl ? () => void runAction(() => api.killComfy(comfyUrl), "Selected ComfyUI worker stopped.") : undefined}/>;
-      }) : <WorkerLane empty jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")}/>}</section>
+      }) : <WorkerLane empty jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")}/>}</section></> : <StudioDesk view={activeView} stories={stories} runs={runs} workers={activeWorkers} selectedStory={selectedStory} jobs={jobs} busy={busy} onSpawn={(kind) => void runAction(() => api.spawn(kind), `${kind.toUpperCase()} ComfyUI worker started.`)} onRefresh={() => void refresh()} />}
       {createOpen && <div className="modal-scrim" role="presentation"><form className="brief-modal metal-panel" onSubmit={submitBrief}>
         <div className="eyebrow"><span>New production brief</span><button type="button" className="icon-button" onClick={() => setCreateOpen(false)} aria-label="Close"><X size={17}/></button></div>
         <h2>Set the story in motion.</h2><p>The director will break this brief into granular scene commissions and complete every media requirement before release.</p>
@@ -183,6 +188,16 @@ export function App() {
       {playerOpen && selectedStory && <ReleasePlayer story={selectedStory} onClose={() => setPlayerOpen(false)} />}
     </section>
   </main>;
+}
+
+function StudioDesk({ view, stories, runs, workers, selectedStory, jobs, busy, onSpawn, onRefresh }: { view: string; stories: Story[]; runs: ProductionRun[]; workers: Array<Worker | ComfyWorker>; selectedStory?: Story; jobs: ProductionJob[]; busy: boolean; onSpawn: (kind: "cpu" | "gpu") => void; onRefresh: () => void }) {
+  const title = view === "Productions" ? "Production desk" : view === "Assets" ? "Asset library" : view === "Workers" ? "Worker control" : "Studio settings";
+  return <section className="desk-panel metal-panel"><div className="eyebrow"><span>{title}</span><span>{view === "Productions" ? `${runs.length} durable runs` : view === "Workers" ? `${workers.length} active signals` : "Operator view"}</span></div>
+    {view === "Productions" && <><h1>Every run leaves a trail.</h1><p className="desk-intro">Durable production records survive refreshes and restarts. Select a run from the library inspector to inspect its jobs and evidence.</p><div className="desk-list">{runs.length ? runs.map((run) => <article className="desk-row" key={run.id}><span className={`led ${run.status === "succeeded" ? "green" : run.status === "failed" ? "red" : "amber"}`}/><div><strong>{run.story_id || run.kind}</strong><small>{run.stage}: {run.message}</small></div><b>{Math.round((run.progress || 0) * 100)}%</b></article>) : <p className="ledger-empty">No durable runs are recorded yet.</p>}</div></>}
+    {view === "Assets" && <><h1>Approved inputs only.</h1><p className="desk-intro">Candidates remain reversible until explicitly approved. Current story evidence is the release gate.</p>{selectedStory ? <div className="asset-ledger">{completionRows(selectedStory).map(([, label, complete, detail]) => <div className="asset-row" key={label}><span className={`led ${complete ? "green" : "amber"}`}/><strong>{label}</strong><small>{detail}</small></div>)}</div> : <p className="ledger-empty">Select a story to inspect its assets.</p>}</>}
+    {view === "Workers" && <><h1>Hardware, with a signal.</h1><p className="desk-intro">The next compatible job is assigned by capability. Stop a worker safely and its lease can recover.</p><div className="desk-list">{workers.length ? workers.map((worker, index) => <article className="desk-row" key={`${workerIdentity(worker)}-${index}`}><span className="led green"/><div><strong>{workerLabel(worker)}</strong><small>{workerIdentity(worker)}</small></div><button className="micro-button" disabled={busy} onClick={() => onSpawn(workerLabel(worker).startsWith("GPU") ? "gpu" : "cpu")}>Spawn peer</button></article>) : <p className="ledger-empty">No workers are currently reporting.</p>}</div><div className="desk-actions"><button className="outline-button" disabled={busy} onClick={() => onSpawn("gpu")}>Start GPU</button><button className="outline-button" disabled={busy} onClick={() => onSpawn("cpu")}>Start CPU</button></div></>}
+    {view === "Settings" && <><h1>Keep the chain honest.</h1><p className="desk-intro">Narration style, speed, worker admission, and release rules belong here. The current runtime keeps approval gates enabled.</p><dl className="settings-ledger"><div><dt>Default narration speed</dt><dd>1.3x</dd></div><div><dt>Release policy</dt><dd>Evidence required</dd></div><div><dt>Library order</dt><dd>Newest first</dd></div><div><dt>Storage</dt><dd>Local SQLite + files</dd></div></dl><button className="outline-button" onClick={onRefresh}>Refresh settings projection</button></>}
+  </section>;
 }
 
 function ReleasePlayer({ story, onClose }: { story: Story; onClose: () => void }) {

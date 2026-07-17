@@ -39,3 +39,17 @@ nav { display:grid; gap:8px; } .nav-item { position:relative; border:1px solid t
  .audio-review { display:grid; gap:5px; margin-top:9px; }
  .audio-review audio { width:100%; height:30px; accent-color:#b97935; }
  .audio-review small { color:#918a7d; font:10px Bahnschrift,"DIN Alternate",sans-serif; }
+ .desk-panel { min-height:520px; padding:28px; margin-top:18px; }
+ .desk-panel h1 { font-family:"Iowan Old Style",Georgia,serif; font-size:42px; font-weight:500; color:#e9deca; margin:28px 0 8px; }
+ .desk-intro { max-width:620px; color:#a9a293; line-height:1.6; }
+ .desk-list { margin-top:28px; max-width:780px; border-top:1px solid #4b4639; }
+ .desk-row { display:flex; align-items:center; gap:12px; min-height:64px; border-bottom:1px solid #373931; }
+ .desk-row div { flex:1; display:grid; gap:4px; }
+ .desk-row strong { color:#e0d4bf; font-family:"Iowan Old Style",Georgia,serif; font-size:17px; }
+ .desk-row small,.desk-row b { color:#9d9587; font-size:11px; }
+ .asset-ledger,.settings-ledger { max-width:620px; margin-top:28px; }
+ .asset-row,.settings-ledger div { display:flex; align-items:center; gap:10px; border-bottom:1px solid #373931; padding:14px 0; }
+ .asset-row strong,.settings-ledger dt { color:#ddd1bc; flex:1; }
+ .asset-row small,.settings-ledger dd { margin:0; color:#b7985f; font-size:11px; }
+ .settings-ledger { display:grid; }
+ .desk-actions { display:flex; gap:9px; margin-top:22px; }
