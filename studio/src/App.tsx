@@ -5,7 +5,7 @@ import {
   Search, Settings, SlidersHorizontal, Sparkles, Square, UserRoundCog,
   Volume2, X,
 } from "lucide-react";
-import { api, type ComfyWorker, type GenerateInput, type ProductionEvent, type ProductionJob, type ProductionRun, type Scene, type SemanticShot, type ShotAsset, type Story, type StoryDetail, type SubtitleCue, type TimelineShot, type Worker } from "./api";
+import { api, type ComfyWorker, type GenerateInput, type ProductionEvent, type ProductionJob, type ProductionRun, type Scene, type SeedSuggestion, type SemanticShot, type ShotAsset, type Story, type StoryDetail, type SubtitleCue, type TimelineShot, type Worker } from "./api";
 
 const nav = [
   [Library, "Library"], [Clapperboard, "Productions"], [Archive, "Assets"], [UserRoundCog, "Workers"], [Settings, "Settings"],
@@ -79,6 +79,8 @@ export function App() {
   const [editorStory, setEditorStory] = useState<StoryDetail>();
   const [editorScene, setEditorScene] = useState(0);
   const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic fantasy realism", num_scenes: 8, images_per_scene: 5, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean" });
+  const [seeds, setSeeds] = useState<SeedSuggestion[]>([]);
+  const [seedBusy, setSeedBusy] = useState(false);
 
   const refresh = async () => {
     try {
@@ -156,6 +158,14 @@ export function App() {
     finally { setBusy(false); }
   };
 
+  const suggestSeeds = async () => {
+    if (brief.story_concept.trim().length < 10) { setNotice("Give the seed picker at least a sentence of story intent."); return; }
+    setSeedBusy(true);
+    try { const result = await api.seedSuggestions(brief); setSeeds(result.seeds); setNotice("The director returned three small story directions."); }
+    catch (error) { setNotice(error instanceof Error ? error.message : "Seed suggestions could not be generated."); }
+    finally { setSeedBusy(false); }
+  };
+
   const openEditor = async () => {
     if (!selectedStory) return;
     setEditorOpen(true);
@@ -203,7 +213,7 @@ export function App() {
       {createOpen && <div className="modal-scrim" role="presentation"><form className="brief-modal metal-panel" onSubmit={submitBrief}>
         <div className="eyebrow"><span>New production brief</span><button type="button" className="icon-button" onClick={() => setCreateOpen(false)} aria-label="Close"><X size={17}/></button></div>
         <h2>Set the story in motion.</h2><p>The director will break this brief into granular scene commissions and complete every media requirement before release.</p>
-        <label className="brief-field wide">Story intent<textarea autoFocus value={brief.story_concept} onChange={(event) => setBrief({ ...brief, story_concept: event.target.value })} placeholder="A medic from Johannesburg wakes in a cold mountain village where every wound carries a memory..." /></label>
+        <label className="brief-field wide">Story intent<textarea autoFocus value={brief.story_concept} onChange={(event) => setBrief({ ...brief, story_concept: event.target.value })} placeholder="A medic from Johannesburg wakes in a cold mountain village where every wound carries a memory..." /><button type="button" className="outline-button seed-button" disabled={seedBusy} onClick={() => void suggestSeeds()}>{seedBusy ? "Consulting director..." : "Suggest three directions"}</button></label>{seeds.length > 0 && <div className="seed-grid">{seeds.map((seed) => <button type="button" className="seed-card" key={`${seed.title}-${seed.description}`} onClick={() => { setBrief({ ...brief, story_concept: `${seed.title}\n${seed.description}`, style: seed.style || brief.style, tone: seed.tone || brief.tone, characters: seed.characters || brief.characters }); setSeeds([]); }}><strong>{seed.title}</strong><small>{seed.description}</small><em>{seed.style || brief.style} · {seed.tone || brief.tone}</em></button>)}</div>}
         <div className="brief-grid"><label className="brief-field">Scenes<input type="number" min="3" max="20" value={brief.num_scenes} onChange={(event) => setBrief({ ...brief, num_scenes: Number(event.target.value) })}/></label><label className="brief-field">Images per scene<input type="number" min="1" max="10" value={brief.images_per_scene} onChange={(event) => setBrief({ ...brief, images_per_scene: Number(event.target.value) })}/></label><label className="brief-field">Style<input value={brief.style} onChange={(event) => setBrief({ ...brief, style: event.target.value })}/></label><label className="brief-field">Tone<input value={brief.tone} onChange={(event) => setBrief({ ...brief, tone: event.target.value })}/></label></div>
         <label className="brief-field wide">Characters and continuity<textarea value={brief.characters} onChange={(event) => setBrief({ ...brief, characters: event.target.value })} placeholder="Optional character, setting, or visual continuity notes." /></label>
         <label className="brief-field wide">Narrator<input value={brief.voice_preset} onChange={(event) => setBrief({ ...brief, voice_preset: event.target.value })}/></label>

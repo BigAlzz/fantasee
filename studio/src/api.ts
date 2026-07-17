@@ -98,6 +98,8 @@ export type GenerateInput = {
   voice_preset: string;
 };
 
+export type SeedSuggestion = { title: string; description: string; style?: string; tone?: string; characters?: string };
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
@@ -118,6 +120,7 @@ export const api = {
   spawn: (kind: "cpu" | "gpu") => request(`/api/comfyui/workers/spawn-${kind}`, { method: "POST" }),
   killComfy: (url: string) => request("/api/comfyui/workers/kill", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) }),
   generate: (input: GenerateInput) => request<{ task_id: string; message: string }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  seedSuggestions: (input: Pick<GenerateInput, "story_concept" | "style" | "tone" | "characters">) => request<{ seeds: SeedSuggestion[] }>("/api/seed-suggestions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ concept: input.story_concept, style: input.style, tone: input.tone, characters: input.characters, count: 3 }) }),
   regenerateScene: (storyId: string, sceneIndex: number) => request<{ status: string; scene: Scene }>(`/api/stories/${storyId}/scenes/${sceneIndex}/regenerate`, { method: "POST" }),
   addSceneImage: (storyId: string, sceneIndex: number) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/add-image`, { method: "POST" }),
   sceneShots: (storyId: string, sceneIndex: number) => request<{ shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`),
