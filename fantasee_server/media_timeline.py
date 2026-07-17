@@ -8,11 +8,22 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from fantasee_server.shot_planning import ShotSpec
+
 
 @dataclass(frozen=True)
 class TimelineSegment:
     scene_id: str
     text: str
+    start: float
+    end: float
+
+
+@dataclass(frozen=True)
+class ShotTimelineSegment:
+    scene_id: str
+    shot_id: str
+    asset_path: str
     start: float
     end: float
 
@@ -69,6 +80,69 @@ def write_story_timeline(
             },
             indent=2,
         ),
+        encoding="utf-8",
+    )
+    os.replace(temporary, target)
+    return target
+
+
+def build_shot_timeline(
+    *,
+    scene_id: str,
+    scene_start: float,
+    scene_duration: float,
+    shots: list[ShotSpec],
+    approved_assets: dict[str, str],
+) -> list[ShotTimelineSegment]:
+    """Project approved semantic shots into the scene's canonical time range."""
+    if scene_duration <= 0:
+        raise ValueError("Scene duration must be positive")
+    if not shots:
+        raise ValueError("Scene has no semantic shots")
+    if any(shot.id not in approved_assets for shot in shots):
+        raise ValueError("Every shot needs an approved image before timeline construction")
+    total = sum(float(shot.duration_seconds) for shot in shots)
+    if total <= 0:
+        raise ValueError("Shot durations must be positive")
+    scale = scene_duration / total
+    offset = float(scene_start)
+    timeline: list[ShotTimelineSegment] = []
+    for shot in sorted(shots, key=lambda item: (item.order, item.id)):
+        duration = float(shot.duration_seconds) * scale
+        timeline.append(
+            ShotTimelineSegment(
+                scene_id=scene_id,
+                shot_id=shot.id,
+                asset_path=approved_assets[shot.id],
+                start=round(offset, 6),
+                end=round(offset + duration, 6),
+            )
+        )
+        offset += duration
+    # Avoid accumulated floating point drift at the scene boundary.
+    last = timeline[-1]
+    timeline[-1] = ShotTimelineSegment(
+        scene_id=last.scene_id,
+        shot_id=last.shot_id,
+        asset_path=last.asset_path,
+        start=last.start,
+        end=round(scene_start + scene_duration, 6),
+    )
+    return timeline
+
+
+def write_shot_timeline(
+    story_id: str,
+    story_dir: str | Path,
+    segments: list[ShotTimelineSegment],
+) -> Path:
+    """Persist the approved visual timeline as an atomic working artifact."""
+    story_dir = Path(story_dir)
+    target = story_dir / "working" / "shot_timeline.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".json.tmp")
+    temporary.write_text(
+        json.dumps({"story_id": story_id, "segments": [asdict(item) for item in segments]}, indent=2),
         encoding="utf-8",
     )
     os.replace(temporary, target)

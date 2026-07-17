@@ -19,8 +19,9 @@ from fantasee_server.production_runtime import (
 from fantasee_server.production_store import ProductionStore
 from fantasee_server.production_worker import ProductionWorker
 from fantasee_server.paths import STORY_VIEWER_DIR, generated_story_dir
-from fantasee_server.shot_planning import plan_semantic_shots, validate_shot_plan
+from fantasee_server.shot_planning import ShotSpec, plan_semantic_shots, validate_shot_plan
 from fantasee_server.state import atomic_write_json
+from fantasee_server.media_timeline import build_shot_timeline, write_shot_timeline
 
 
 router = APIRouter(tags=["shots"])
@@ -191,6 +192,52 @@ def restore_scene_shot_revision(story_id: str, scene_idx: int, revision: int):
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"revision": restored, "shots": [shot.__dict__ for shot in shots]}
+
+
+def _scene_shot_timeline(story_id: str, scene_idx: int):
+    scene, scene_id = _scene_for(story_id, scene_idx)
+    with ProductionStore(production_database_path()) as store:
+        stored_shots = store.list_shots(story_id, scene_id)
+        approved_assets = {}
+        for shot in stored_shots:
+            asset = store.get_current_asset(story_id, shot.id, "image")
+            if asset is not None:
+                approved_assets[shot.id] = asset.path
+    shots = [
+        ShotSpec(
+            id=shot.id, scene_id=shot.scene_id, order=shot.order, purpose=shot.purpose,
+            shot_type=shot.shot_type, duration_seconds=shot.duration_seconds,
+            visual_context=shot.visual_context,
+        )
+        for shot in stored_shots
+    ]
+    segments = build_shot_timeline(
+        scene_id=scene_id,
+        scene_start=0,
+        scene_duration=float(scene.get("audio_duration") or 0),
+        shots=shots,
+        approved_assets=approved_assets,
+    )
+    return scene_id, segments
+
+
+@router.get("/api/stories/{story_id}/scenes/{scene_idx}/shots/timeline")
+def preview_scene_shot_timeline(story_id: str, scene_idx: int):
+    try:
+        scene_id, segments = _scene_shot_timeline(story_id, scene_idx)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {"scene_id": scene_id, "segments": [segment.__dict__ for segment in segments]}
+
+
+@router.post("/api/stories/{story_id}/scenes/{scene_idx}/shots/timeline")
+def build_scene_shot_timeline(story_id: str, scene_idx: int):
+    try:
+        scene_id, segments = _scene_shot_timeline(story_id, scene_idx)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    target = write_shot_timeline(story_id, generated_story_dir(story_id), segments)
+    return {"scene_id": scene_id, "path": str(target), "segments": [segment.__dict__ for segment in segments]}
 
 
 @router.get("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}/assets")
