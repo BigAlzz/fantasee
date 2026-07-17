@@ -34,6 +34,14 @@ from fantasee_server.security import validate_provider_url
 TTS_API_URL = "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions"
 DEFAULT_TTS_SPEED = float(os.environ.get("FANTASEE_TTS_SPEED", "1.3"))
 
+
+def configured_tts_speed() -> float:
+    """Read the current narration speed without requiring a module reload."""
+    try:
+        return max(0.5, min(3.0, float(os.environ.get("FANTASEE_TTS_SPEED", DEFAULT_TTS_SPEED))))
+    except (TypeError, ValueError):
+        return DEFAULT_TTS_SPEED
+
 # Xiaomi named voices (built-in, per official v2.5 TTS docs)
 XIAOMI_VOICES = {
     # English voices
@@ -402,8 +410,9 @@ def _atempo_filter(speed: float) -> str:
     return ",".join(parts)
 
 
-def _write_tts_audio(audio_bytes: bytes, output_path: Path, speed: float = DEFAULT_TTS_SPEED) -> bool:
+def _write_tts_audio(audio_bytes: bytes, output_path: Path, speed: Optional[float] = None) -> bool:
     """Write synthesized audio, applying the app-wide narration speed."""
+    speed = configured_tts_speed() if speed is None else speed
     raw_wav = output_path.with_name(output_path.stem + ".raw_tts.wav")
     sped_wav = output_path.with_name(output_path.stem + ".speed_tts.wav")
     try:
@@ -454,7 +463,7 @@ def generate_tts(
     style: str = "",
     voice_preset: Optional[str] = None,
     tone: str = "",
-    speed: float = DEFAULT_TTS_SPEED,
+    speed: Optional[float] = None,
 ) -> bool:
     """Generate TTS audio from text.
 
@@ -470,8 +479,8 @@ def generate_tts(
         tone: Story tone (dramatic/dark/epic/mysterious/...). When set,
             TONE_MODIFIERS[tone] is appended to the style prompt so the
             delivery matches the mood.
-        speed: Playback speed baked into the generated file. Defaults to
-            1.3x so player captions align to the faster narration.
+        speed: Playback speed baked into the generated file. When omitted,
+            the current FANTASEE_TTS_SPEED setting is read at call time.
 
     Returns:
         True if successful, False otherwise.

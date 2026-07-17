@@ -17,7 +17,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from fantasee_server.paths import GEN_OUTPUTS, LEGACY_GEN_OUTPUTS
 from fantasee_server.security import validate_provider_url, validate_provider_urls
+from fantasee_server.state import atomic_write_json
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -129,6 +131,43 @@ def _save_settings(data: dict) -> None:
     os.replace(tmp, SETTINGS_FILE)
 
 
+def _invalidate_narration_outputs(previous: dict, current: dict) -> list[str]:
+    """Mark narration-derived media stale when its voice contract changes."""
+    fields = ("tts_voice_preset", "tts_speed")
+    if all(previous.get(field) == current.get(field) for field in fields):
+        return []
+    changed: list[str] = []
+    seen: set[Path] = set()
+    for root in (GEN_OUTPUTS, LEGACY_GEN_OUTPUTS):
+        if not root.exists():
+            continue
+        for story_dir in root.iterdir():
+            if not story_dir.is_dir() or story_dir.resolve() in seen:
+                continue
+            manifest_path = story_dir / f"{story_dir.name}.json"
+            if not manifest_path.is_file():
+                continue
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            scenes = manifest.get("scenes") or []
+            for scene in scenes:
+                stale = set(scene.get("stale_outputs") or [])
+                stale.update({"audio", "subtitles", "shot_timeline", "scene_video", "full_video", "plex"})
+                scene["stale_outputs"] = [kind for kind in ("images", "audio", "subtitles", "shot_timeline", "scene_video", "full_video", "plex") if kind in stale]
+            manifest["voice_preset"] = current.get("tts_voice_preset", manifest.get("voice_preset"))
+            manifest["tts_speed"] = current.get("tts_speed", manifest.get("tts_speed", 1.3))
+            manifest["status"] = "draft"
+            pipeline = manifest.setdefault("pipeline", {})
+            pipeline["status"] = "draft"
+            pipeline["next_stage"] = "audio"
+            atomic_write_json(manifest_path, manifest)
+            changed.append(story_dir.name)
+            seen.add(story_dir.resolve())
+    return changed
+
+
 def apply_settings_to_env(settings: dict) -> None:
     """Push settings into environment variables so existing code picks them up."""
     comfyui_urls = validate_provider_urls(
@@ -203,8 +242,9 @@ def update_settings(body: Settings):
 
     _save_settings(data)
     apply_settings_to_env(data)
+    narration_invalidated = _invalidate_narration_outputs(current, data)
 
-    return {"ok": True, "settings": _mask_settings(data)}
+    return {"ok": True, "settings": _mask_settings(data), "narration_invalidated": narration_invalidated}
 
 
 @router.get("/narration-styles")

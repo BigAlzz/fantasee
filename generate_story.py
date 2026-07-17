@@ -1111,8 +1111,9 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
     emit("queued", "Starting full-pipeline generation...")
 
     # Lazy imports — only load when needed
-    from tts_utils import generate_tts, get_audio_duration
+    from tts_utils import configured_tts_speed, generate_tts, get_audio_duration
     from comfyui_utils import checkpoint_for_style, generate_image, is_running as comfyui_running
+    tts_speed = configured_tts_speed()
 
     # ── Step 1: Generate story title & ID ──────────────────────────────
     emit("running", "Step 1/6: Generating title...", 0.02)
@@ -1156,6 +1157,7 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
         "tags": [style, tone, "generated"],
         "tone": tone,
         "voice_preset": voice_preset,
+        "tts_speed": tts_speed,
         "story_concept": concept,
         "style": style,
         "num_scenes": num_scenes,
@@ -1452,6 +1454,7 @@ Be evocative but concise."""
         "tags": tags,
         "tone": tone,           # explicit top-level field for TTS lookups
         "voice_preset": voice_preset,
+        "tts_speed": tts_speed,
         "story_concept": concept,
         "style": style,
         "num_scenes": num_scenes,
