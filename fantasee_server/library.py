@@ -52,6 +52,7 @@ from fantasee_server.state import (
     new_uuid,
     now,
 )
+from fantasee_server.production_runtime import finish_task, start_task, update_task
 from story_pipeline import sync_from_completion, update_stage
 from image_quality import is_usable_story_image, requested_images_per_scene
 
@@ -413,6 +414,15 @@ async def _start_library_maintenance_queue(*, story_ids: Optional[list[str]] = N
         "auto": auto,
     }
     _library_maintenance_running = True
+    try:
+        start_task(
+            task_id,
+            story_id="library",
+            kind="library_maintenance",
+            metadata={"story_ids": [story["id"] for story in selected], "auto": auto},
+        )
+    except Exception as exc:
+        print(f"[library] durable task start failed: {exc}", file=sys.stderr)
     await _broadcast_ws_json({
         "type": "task_update",
         "task_id": task_id,
@@ -481,6 +491,16 @@ async def _run_library_maintenance_queue(task_id: str, stories: list[dict]) -> N
                     "message": f"{idx + 1}/{total}: {msg}",
                     "status": "running",
                 })
+                try:
+                    update_task(
+                        task_id,
+                        stage=stage,
+                        progress=overall,
+                        message=f"{idx + 1}/{total}: {msg}",
+                        payload={"story_id": story_id, "story_index": idx + 1, "story_count": total},
+                    )
+                except Exception as exc:
+                    print(f"[library] durable progress update failed: {exc}", file=sys.stderr)
                 _broadcast_ws_json_from_thread(loop, {
                     "type": "task_update",
                     "task_id": sub_id,
@@ -570,6 +590,15 @@ async def _run_library_maintenance_queue(task_id: str, stories: list[dict]) -> N
             "completed": completed,
             "failed": failed,
         })
+        try:
+            finish_task(
+                task_id,
+                status="succeeded" if not failed else "failed",
+                message=f"Library maintenance complete: {len(completed)} complete, {len(failed)} failed",
+                payload={"completed": completed, "failed": failed},
+            )
+        except Exception as exc:
+            print(f"[library] durable task finish failed: {exc}", file=sys.stderr)
     finally:
         _library_maintenance_running = False
 
