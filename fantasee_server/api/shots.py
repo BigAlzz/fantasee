@@ -6,6 +6,7 @@ import asyncio
 import json
 import re
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Body, HTTPException
 
@@ -170,3 +171,34 @@ async def generate_scene_shot(story_id: str, scene_idx: int, shot_id: str):
     )
     asyncio.create_task(_run_shot_job(run_id))
     return {"run_id": run_id, "status": "queued", "shot_id": shot_id}
+
+
+@router.get("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}/assets")
+def list_shot_assets(story_id: str, scene_idx: int, shot_id: str):
+    _, scene_id = _scene_for(story_id, scene_idx)
+    if not shot_id.startswith(f"{scene_id}-shot-"):
+        raise HTTPException(status_code=400, detail="Shot does not belong to this scene")
+    with ProductionStore(production_database_path()) as store:
+        assets = [
+            asset for asset in store.list_assets(story_id)
+            if asset.scene_id == shot_id and asset.asset_type == "image"
+        ]
+    return {"assets": [{
+        "id": asset.id,
+        "status": asset.status,
+        "filename": Path(asset.path).name,
+        "revision": asset.metadata.get("revision"),
+    } for asset in assets]}
+
+
+@router.post("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}/assets/{asset_id}/approve")
+def approve_shot_asset(story_id: str, scene_idx: int, shot_id: str, asset_id: str):
+    _, scene_id = _scene_for(story_id, scene_idx)
+    if not shot_id.startswith(f"{scene_id}-shot-"):
+        raise HTTPException(status_code=400, detail="Shot does not belong to this scene")
+    with ProductionStore(production_database_path()) as store:
+        asset = store.get_asset(asset_id)
+        if asset is None or asset.story_id != story_id or asset.scene_id != shot_id or asset.asset_type != "image":
+            raise HTTPException(status_code=404, detail="Shot candidate not found")
+        approved = store.approve_asset(asset_id)
+    return {"id": approved.id, "status": approved.status}

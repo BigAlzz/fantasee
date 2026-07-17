@@ -32,6 +32,8 @@ export type SemanticShot = {
   visual_context: string;
 };
 
+export type ShotAsset = { id: string; status: string; filename: string; revision?: number };
+
 export type ProductionJob = {
   id: string;
   job_type: string;
@@ -106,4 +108,6 @@ export const api = {
   planSceneShots: (storyId: string, sceneIndex: number) => request<{ revision: number; shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pacing: "balanced" }) }),
   reviseSceneShot: (storyId: string, sceneIndex: number, shotId: string, visualContext: string) => request<{ revision: number; shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/${shotId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ visual_context: visualContext }) }),
   generateSceneShot: (storyId: string, sceneIndex: number, shotId: string) => request<{ run_id: string }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/${shotId}/generate`, { method: "POST" }),
+  shotAssets: (storyId: string, sceneIndex: number, shotId: string) => request<{ assets: ShotAsset[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/${shotId}/assets`),
+  approveShotAsset: (storyId: string, sceneIndex: number, shotId: string, assetId: string) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/${shotId}/assets/${assetId}/approve`, { method: "POST" }),
 };
