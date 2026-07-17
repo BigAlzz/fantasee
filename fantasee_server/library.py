@@ -341,6 +341,10 @@ def _complete_story_for_library(story_id: str, progress) -> dict:
         missing = set(report.get("missing") or [])
 
     if "plex" in missing:
+        pre_plex_manifest = json.loads(
+            (story_dir / f"{story_id}.json").read_text(encoding="utf-8")
+        )
+        write_story_timeline(story_id, story_dir, pre_plex_manifest.get("scenes", []))
         emit("plex", f"Exporting Plex package for {story_id}", 0.78)
         update_stage(story_dir, "plex", "running", message="Exporting Plex-ready package")
         plex = export_plex_package(

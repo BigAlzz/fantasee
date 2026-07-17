@@ -384,6 +384,25 @@ def write_combined_subtitles(
     return srt_path, vtt_path
 
 
+def write_timeline_subtitles(
+    timeline_path: Path, slug: str, out_dir: Path
+) -> tuple[Optional[Path], Optional[Path]]:
+    """Write sidecars from the canonical absolute-time timeline."""
+    try:
+        timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+        segments = timeline.get("segments") or []
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    if not segments:
+        return None, None
+    out_dir.mkdir(parents=True, exist_ok=True)
+    srt_path = out_dir / f"{slug}.en.srt"
+    vtt_path = out_dir / f"{slug}.en.vtt"
+    srt_path.write_text(segments_to_srt(segments), encoding="utf-8")
+    vtt_path.write_text(segments_to_vtt(segments), encoding="utf-8")
+    return srt_path, vtt_path
+
+
 # ── Chapter assembly ───────────────────────────────────────────────────
 
 
@@ -767,7 +786,13 @@ def export_plex_package(
 
     # ── 2. Write combined SRT + VTT sidecars ────────────────────────
     _progress("subtitles", "Writing SRT and VTT sidecars...", 0.20)
-    srt_path, vtt_path = write_combined_subtitles(discovered, slug, result.plex_dir)
+    canonical_timeline = story_dir / "working" / "timeline.json"
+    if canonical_timeline.is_file():
+        srt_path, vtt_path = write_timeline_subtitles(
+            canonical_timeline, slug, result.plex_dir
+        )
+    else:
+        srt_path, vtt_path = write_combined_subtitles(discovered, slug, result.plex_dir)
     if srt_path:
         result.srt = srt_path
         result.vtt = vtt_path
@@ -776,7 +801,7 @@ def export_plex_package(
 
     # ── 3. Build chapter metadata ──────────────────────────────────
     _progress("chapters", "Generating chapter metadata...", 0.35)
-    chapters = build_chapters(discovered)
+    chapters = build_chapters(discovered, gap_between_scenes=0 if canonical_timeline.is_file() else 0.5)
     if not chapters:
         raise RuntimeError("No chapters produced (every scene is empty or missing audio).")
     chapters_file = result.plex_dir / "chapters.ffmeta"

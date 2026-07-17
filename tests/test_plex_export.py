@@ -23,6 +23,20 @@ from plex_export import (
     segments_to_srt,
     segments_to_vtt,
 )
+
+
+def test_timeline_sidecars_use_absolute_scene_offsets(tmp_path):
+    from plex_export import write_timeline_subtitles
+
+    timeline = tmp_path / "timeline.json"
+    timeline.write_text(
+        '{"segments":[{"text":"second scene","start":2.2,"end":3.5}]}',
+        encoding="utf-8",
+    )
+    srt, vtt = write_timeline_subtitles(timeline, "story", tmp_path / "plex")
+
+    assert "00:00:02,200 --> 00:00:03,500" in srt.read_text(encoding="utf-8")
+    assert "00:00:02.200 --> 00:00:03.500" in vtt.read_text(encoding="utf-8")
 from tests._helpers import PROJECT_ROOT
 
 
