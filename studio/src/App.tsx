@@ -48,6 +48,8 @@ function hasUsableCover(story: Story) {
 function workerLabel(worker: Worker | ComfyWorker) {
   const comfy = worker as ComfyWorker;
   const production = worker as Worker;
+  if (comfy.kind === "gpu") return "GPU worker";
+  if (comfy.kind === "cpu") return "CPU worker";
   if (comfy.device) return comfy.device.toUpperCase().includes("GPU") ? "GPU worker" : "CPU worker";
   if (production.capabilities?.includes("gpu")) return "GPU worker";
   return "CPU worker";
@@ -71,6 +73,7 @@ export function App() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [playerOpen, setPlayerOpen] = useState(false);
+  const [workersOpen, setWorkersOpen] = useState(false);
   const [activeView, setActiveView] = useState("Library");
   const [editorStory, setEditorStory] = useState<StoryDetail>();
   const [editorScene, setEditorScene] = useState(0);
@@ -148,7 +151,7 @@ export function App() {
     </aside>
 
     <section className="workspace">
-      <header className="command-bar"><label><Search size={19}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search stories..." /></label><div><button className="icon-button" onClick={() => void refresh()} aria-label="Refresh"><RefreshCw size={18}/></button><button className="create" onClick={() => setCreateOpen(true)}><Plus size={17}/> Create story</button><button className="icon-button" aria-label="Studio controls"><SlidersHorizontal size={18}/></button></div></header>
+      <header className="command-bar"><label><Search size={19}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search stories..." /></label><div><button className="icon-button" onClick={() => void refresh()} aria-label="Refresh"><RefreshCw size={18}/></button><button className="create" onClick={() => setCreateOpen(true)}><Plus size={17}/> Create story</button><button className="icon-button" onClick={() => setWorkersOpen(true)} aria-label="Open worker controls"><SlidersHorizontal size={18}/></button></div></header>
       <div className="status-strip"><span className="led green"/> {notice} <span>•</span> {activeWorkers.length} active worker{activeWorkers.length === 1 ? "" : "s"}</div>
       {activeView === "Library" ? <><div className="content-grid">
         <section className="library-module metal-panel">
@@ -186,6 +189,7 @@ export function App() {
       </form></div>}
       {editorOpen && <StoryEditor story={editorStory} sceneIndex={editorScene} busy={busy} onClose={() => setEditorOpen(false)} onSelectScene={setEditorScene} onAction={(action, message) => void runAction(action, message)} />}
       {playerOpen && selectedStory && <ReleasePlayer story={selectedStory} onClose={() => setPlayerOpen(false)} />}
+      {workersOpen && <WorkerConsole workers={comfyWorkers} busy={busy} onClose={() => setWorkersOpen(false)} onRefresh={() => void refresh()} onSpawn={(kind) => void runAction(() => api.spawn(kind), `${kind.toUpperCase()} ComfyUI worker started.`)} onKill={(url) => void runAction(() => api.killComfy(url), "Selected ComfyUI worker stopped.")} />}
     </section>
   </main>;
 }
@@ -202,6 +206,19 @@ function StudioDesk({ view, stories, runs, workers, selectedStory, jobs, busy, o
 
 function ReleasePlayer({ story, onClose }: { story: Story; onClose: () => void }) {
   return <div className="modal-scrim player-scrim"><section className="release-player metal-panel"><header className="editor-header"><div><span className="eyebrow-label">Canonical release</span><h1>{story.title}</h1><small>MP4 + timeline subtitles</small></div><button className="icon-button" onClick={onClose} aria-label="Close player"><X size={19}/></button></header><video controls autoPlay preload="metadata"><source src={`/generated/${story.id}/${story.id}_full.mp4`} type="video/mp4"/><track kind="subtitles" src={`/generated/${story.id}/${story.id}_full.vtt`} srcLang="en" label="English" default /></video><p className="player-note">Playback uses the rendered release and its canonical subtitle timeline. If the release is stale, return to the editor and rebuild the approved timeline.</p></section></div>;
+}
+
+function WorkerConsole({ workers, busy, onClose, onRefresh, onSpawn, onKill }: { workers: ComfyWorker[]; busy: boolean; onClose: () => void; onRefresh: () => void; onSpawn: (kind: "cpu" | "gpu") => void; onKill: (url: string) => void }) {
+  const [selectedUrl, setSelectedUrl] = useState<string>();
+  useEffect(() => {
+    setSelectedUrl((current) => current && workers.some((worker) => worker.url === current) ? current : workers[0]?.url);
+  }, [workers]);
+  const selected = workers.find((worker) => worker.url === selectedUrl);
+  return <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="worker-console-title"><section className="worker-console metal-panel">
+    <header className="editor-header"><div><span className="eyebrow-label">Production hardware</span><h1 id="worker-console-title">ComfyUI workers</h1><small>Select a live instance to inspect or stop it.</small></div><button className="icon-button" onClick={onClose} aria-label="Close worker controls"><X size={19}/></button></header>
+    <div className="worker-console-body"><div className="worker-selector">{workers.length ? workers.map((worker) => <button key={worker.url} className={worker.url === selectedUrl ? "worker-option selected" : "worker-option"} onClick={() => setSelectedUrl(worker.url)}><span className={`led ${worker.running === false ? "red" : "green"}`}/><strong>{workerLabel(worker)}</strong><small>{worker.url}</small><b>{worker.running === false ? "offline" : `${worker.queue_running || 0} running · ${worker.queue_remaining || 0} waiting`}</b></button>) : <p className="ledger-empty">No ComfyUI workers are reporting.</p>}</div><aside className="worker-detail"><div className="eyebrow"><span>Selected instance</span><button className="micro-button" onClick={onRefresh} disabled={busy} aria-label="Refresh workers"><RefreshCw size={13}/></button></div>{selected ? <><h2>{workerLabel(selected)}</h2><p>{selected.url}</p><dl className="settings-ledger"><div><dt>Process</dt><dd>{selected.pid || "unknown"}</dd></div><div><dt>Queue</dt><dd>{selected.queue_running || 0} active / {selected.queue_remaining || 0} waiting</dd></div><div><dt>Device</dt><dd>{selected.device || selected.kind || "unknown"}</dd></div></dl><button className="danger" disabled={busy || selected.running === false || !selected.url} onClick={() => selected.url && onKill(selected.url)}><Square size={15}/> Kill selected worker</button></> : <p>Select a worker to see its process and queue.</p>}</aside></div>
+    <footer className="modal-actions"><button className="outline-button" disabled={busy} onClick={() => onSpawn("cpu")}><Cpu size={15}/> Spawn CPU</button><button className="outline-button" disabled={busy} onClick={() => onSpawn("gpu")}><Sparkles size={15}/> Spawn GPU</button><button className="create" onClick={onClose}>Close</button></footer>
+  </section></div>;
 }
 
 function StoryEditor({ story, sceneIndex, busy, onClose, onSelectScene, onAction }: { story?: StoryDetail; sceneIndex: number; busy: boolean; onClose: () => void; onSelectScene: (index: number) => void; onAction: (action: () => Promise<unknown>, message: string) => void }) {

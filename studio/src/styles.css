@@ -51,5 +51,18 @@ nav { display:grid; gap:8px; } .nav-item { position:relative; border:1px solid t
  .asset-row,.settings-ledger div { display:flex; align-items:center; gap:10px; border-bottom:1px solid #373931; padding:14px 0; }
  .asset-row strong,.settings-ledger dt { color:#ddd1bc; flex:1; }
  .asset-row small,.settings-ledger dd { margin:0; color:#b7985f; font-size:11px; }
- .settings-ledger { display:grid; }
+.settings-ledger { display:grid; }
+.worker-console { width:min(920px,100%); padding:22px; }
+.worker-console-body { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(250px,.8fr); gap:18px; margin-top:18px; }
+.worker-selector { display:grid; gap:8px; align-content:start; }
+.worker-option { display:grid; grid-template-columns:10px 1fr auto; gap:5px 9px; align-items:center; text-align:left; border:1px solid #474536; background:#111412; color:#d9cfbd; padding:12px; }
+.worker-option.selected { border-color:#c18b42; background:#211b13; }
+.worker-option strong { font-size:14px; }
+.worker-option small { grid-column:2; color:#a39a8c; font-size:11px; }
+.worker-option b { grid-column:3; grid-row:1 / span 2; color:#bfa16b; font-size:10px; font-weight:500; text-align:right; }
+.worker-detail { border-left:1px solid #4b4639; padding-left:18px; }
+.worker-detail h2 { font-family:"Iowan Old Style",Georgia,serif; color:#e4d8c3; font-size:28px; font-weight:500; margin:22px 0 4px; }
+.worker-detail p { color:#9f988c; font-size:11px; word-break:break-all; }
+.worker-detail .danger { margin-top:18px; }
+@media (max-width:720px) { .worker-console-body { grid-template-columns:1fr; }.worker-detail { border-left:0; border-top:1px solid #4b4639; padding:15px 0 0; } }
  .desk-actions { display:flex; gap:9px; margin-top:22px; }

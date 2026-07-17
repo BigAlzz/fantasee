@@ -120,6 +120,33 @@ class TestComfyUIStartupReadiness(unittest.TestCase):
         self.assertEqual(results, ["one.png", "two.png", "three.png"])
         self.assertEqual(used_bases, [GPU_1, GPU_1, GPU_1])
 
+    def test_gpu_parallel_jobs_never_dispatch_to_cpu_worker(self):
+        cpu = "http://127.0.0.1:8190"
+        os.environ["COMFYUI_URLS"] = f"{GPU_1},{cpu}"
+        comfyui_utils._worker_kinds.update({GPU_1: "gpu", cpu: "cpu"})
+        used_bases = []
+
+        def generate_to_base(base, prompt, output_prefix, output_dir, **kwargs):
+            used_bases.append(base)
+            return f"{output_prefix}.png"
+
+        jobs = [
+            {"prompt": "gpu one", "output_prefix": "one", "worker_kind": "gpu"},
+            {"prompt": "gpu two", "output_prefix": "two", "worker_kind": "gpu"},
+        ]
+        with patch.object(comfyui_utils, "ensure_workers", return_value=[GPU_1, cpu]), \
+                patch.object(comfyui_utils, "_healthy_bases", return_value=[GPU_1, cpu]), \
+                patch.object(comfyui_utils, "_generate_image_to_base", side_effect=generate_to_base):
+            results = comfyui_utils.generate_images_parallel(jobs, output_dir="unused")
+
+        self.assertEqual(results, ["one.png", "two.png"])
+        self.assertEqual(used_bases, [GPU_1, GPU_1])
+
+    def test_constrained_picker_returns_none_without_matching_worker(self):
+        with patch.object(comfyui_utils, "_healthy_bases", return_value=[GPU_1]):
+            comfyui_utils._worker_kinds[GPU_1] = "gpu"
+            self.assertIsNone(comfyui_utils._pick_healthy_base("cpu"))
+
 
 if __name__ == "__main__":
     unittest.main()

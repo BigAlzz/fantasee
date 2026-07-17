@@ -78,6 +78,8 @@ export type Worker = {
 export type ComfyWorker = {
   url?: string;
   port?: number;
+  kind?: "cpu" | "gpu" | "manual";
+  pid?: number;
   name?: string;
   running?: boolean;
   device?: string;

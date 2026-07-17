@@ -1006,13 +1006,12 @@ def _bases_by_priority(bases: list[str]) -> list[str]:
     return gpus + cpus + manuals
 
 
-def _pick_healthy_base() -> Optional[str]:
+def _pick_healthy_base(worker_kind: Optional[str] = None) -> Optional[str]:
     """Pick a healthy ComfyUI worker.
 
-    Workers are ordered GPU, then CPU, then manual, but selection
-    round-robins across the entire healthy pool. That keeps GPU first
-    after startup while still allowing CPU and GPU workers to process
-    different queued image jobs in parallel.
+    Workers are ordered GPU, then CPU, then manual for unconstrained work.
+    A constrained job is only assigned to a worker with the requested kind;
+    a GPU-only job must never silently fall back to a CPU worker.
 
     Returns None if no configured worker is currently up.
     """
@@ -1020,6 +1019,10 @@ def _pick_healthy_base() -> Optional[str]:
     if not healthy:
         return None
     pool = _bases_by_priority(healthy)
+    if worker_kind:
+        pool = [base for base in pool if _worker_kind(base) == worker_kind]
+    if not pool:
+        return None
 
     global _rr_counter
     with _rr_lock:
@@ -1041,6 +1044,7 @@ def generate_image(
     workflow_path: Optional[str] = None,
     append_positive_guard: bool = True,
     base_url: Optional[str] = None,
+    worker_kind: Optional[str] = None,
 ) -> Optional[str]:
     """
     Generate a single image via ComfyUI.
@@ -1066,6 +1070,7 @@ def generate_image(
             well-defined-human-nose cue. Disable only when an external caller
             has already baked the guard into its prompt.
         base_url: Optional explicit ComfyUI worker URL for queue fan-out.
+        worker_kind: Optional required worker kind (``gpu`` or ``cpu``).
 
     Returns:
         Output filename on success, None on failure.
@@ -1086,6 +1091,10 @@ def generate_image(
     # fail. ~5s total wait is enough for the spawn loop to finish and
     # the /system_stats endpoint to come up.
     base = base_url.rstrip("/") if base_url else None
+    if base and worker_kind and _worker_kind(base) != worker_kind:
+        raise ValueError(
+            f"Worker {base} is {_worker_kind(base)}, but this job requires {worker_kind}"
+        )
     for wait_attempt in range(5):
         if base:
             if is_running_at(base, timeout=2.0)["running"]:
@@ -1094,7 +1103,7 @@ def generate_image(
             if base_url:
                 time.sleep(1.0)
                 continue
-        base = _pick_healthy_base()
+        base = _pick_healthy_base(worker_kind)
         if base:
             break
         time.sleep(1.0)
@@ -1296,7 +1305,10 @@ def generate_image(
 
     except ComfyGenerationError:
         if base_url is None:
-            alternatives = [worker for worker in _healthy_bases() if worker != base]
+            alternatives = [
+                worker for worker in _healthy_bases()
+                if worker != base and (not worker_kind or _worker_kind(worker) == worker_kind)
+            ]
             if alternatives:
                 fallback = alternatives[0]
                 print(
@@ -1316,6 +1328,7 @@ def generate_image(
                     workflow_path=workflow_path,
                     append_positive_guard=append_positive_guard,
                     base_url=fallback,
+                    worker_kind=worker_kind,
                 )
         raise
     except requests.ConnectionError:
@@ -1331,7 +1344,8 @@ def _generate_image_to_base(base_url: str, prompt: str, output_prefix: str,
                             seed: Optional[int] = None, checkpoint: Optional[str] = None,
                             width: Optional[int] = None, height: Optional[int] = None,
                             timeout: int = 600,
-                            workflow_path: Optional[str] = None) -> Optional[str]:
+                            workflow_path: Optional[str] = None,
+                            worker_kind: Optional[str] = None) -> Optional[str]:
     """Generate a single image on a specific ComfyUI base URL.
 
     Same as generate_image() but accepts an explicit base URL, which lets us
@@ -1349,6 +1363,7 @@ def _generate_image_to_base(base_url: str, prompt: str, output_prefix: str,
         timeout=timeout,
         workflow_path=workflow_path,
         base_url=base_url,
+        worker_kind=worker_kind,
     )
 
 
@@ -1395,13 +1410,22 @@ def generate_images_parallel(
             width=job.get("width"),
             height=job.get("height"),
             timeout=timeout,
+            worker_kind=job.get("worker_kind"),
         )
 
     # Round-robin assign jobs to available bases so load is spread evenly
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = []
         for i, job in enumerate(jobs):
-            base = bases[i % len(bases)]
+            requested_kind = job.get("worker_kind")
+            eligible = [base for base in bases if not requested_kind or _worker_kind(base) == requested_kind]
+            if not eligible:
+                print(
+                    f"[comfyui_utils] No healthy {requested_kind} worker for parallel job {i}",
+                    file=sys.stderr,
+                )
+                continue
+            base = eligible[i % len(eligible)]
             futures.append(ex.submit(_run_one, i, base, job))
         for fut in as_completed(futures):
             try:

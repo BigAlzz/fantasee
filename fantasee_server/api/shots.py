@@ -132,6 +132,7 @@ async def _run_shot_job(run_id: str) -> None:
             output_dir=str(story_dir),
             seed=hash(f"{story_id}:{shot_id}:{payload['revision']}") % (2**32 - 1),
             timeout=900,
+            worker_kind="gpu",
         )
         if not filename:
             raise RuntimeError("ComfyUI did not return a shot image")
