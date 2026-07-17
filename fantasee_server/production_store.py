@@ -63,6 +63,21 @@ class ProductionWorkerRecord:
     created_at: float
 
 
+@dataclass(frozen=True)
+class ProductionAsset:
+    id: str
+    story_id: str
+    scene_id: str
+    asset_type: str
+    path: str
+    content_hash: str | None
+    generation_fingerprint: str
+    status: str
+    metadata: dict[str, Any]
+    supersedes: str | None
+    created_at: float
+
+
 class ProductionStore:
     """SQLite implementation of the durable production state seam."""
 
@@ -127,6 +142,22 @@ class ProductionStore:
                 last_seen REAL NOT NULL,
                 created_at REAL NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS production_assets (
+                id TEXT PRIMARY KEY,
+                story_id TEXT NOT NULL,
+                scene_id TEXT NOT NULL,
+                asset_type TEXT NOT NULL,
+                path TEXT NOT NULL,
+                content_hash TEXT,
+                generation_fingerprint TEXT NOT NULL,
+                status TEXT NOT NULL,
+                metadata_json TEXT NOT NULL,
+                supersedes TEXT,
+                created_at REAL NOT NULL,
+                UNIQUE (story_id, scene_id, asset_type, generation_fingerprint)
+            );
+            CREATE INDEX IF NOT EXISTS idx_production_assets_current
+                ON production_assets(story_id, scene_id, asset_type, status);
             """
         )
         self.connection.commit()
@@ -333,6 +364,90 @@ class ProductionStore:
         if cursor.rowcount != 1:
             raise ValueError(f"production worker not found: {worker_id}")
         return self.get_worker(worker_id)
+
+    def register_asset(
+        self,
+        *,
+        story_id: str,
+        scene_id: str,
+        asset_type: str,
+        path: str,
+        generation_fingerprint: str,
+        content_hash: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        supersedes: str | None = None,
+        asset_id: str | None = None,
+    ) -> ProductionAsset:
+        now = time.time()
+        asset_id = asset_id or uuid.uuid4().hex
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO production_assets
+                    (id, story_id, scene_id, asset_type, path, content_hash,
+                     generation_fingerprint, status, metadata_json, supersedes, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'candidate', ?, ?, ?)
+                ON CONFLICT (story_id, scene_id, asset_type, generation_fingerprint) DO NOTHING
+                """,
+                (asset_id, story_id, scene_id, asset_type, path, content_hash,
+                 generation_fingerprint, json.dumps(metadata or {}), supersedes, now),
+            )
+        row = self.connection.execute(
+            """
+            SELECT * FROM production_assets
+            WHERE story_id = ? AND scene_id = ? AND asset_type = ?
+              AND generation_fingerprint = ?
+            """,
+            (story_id, scene_id, asset_type, generation_fingerprint),
+        ).fetchone()
+        return self._asset_from_row(row)
+
+    def get_asset(self, asset_id: str) -> ProductionAsset | None:
+        row = self.connection.execute(
+            "SELECT * FROM production_assets WHERE id = ?", (asset_id,)
+        ).fetchone()
+        return self._asset_from_row(row) if row else None
+
+    def list_assets(self, story_id: str) -> list[ProductionAsset]:
+        rows = self.connection.execute(
+            "SELECT * FROM production_assets WHERE story_id = ? ORDER BY created_at, id",
+            (story_id,),
+        ).fetchall()
+        return [self._asset_from_row(row) for row in rows]
+
+    def get_current_asset(
+        self, story_id: str, scene_id: str, asset_type: str
+    ) -> ProductionAsset | None:
+        row = self.connection.execute(
+            """
+            SELECT * FROM production_assets
+            WHERE story_id = ? AND scene_id = ? AND asset_type = ? AND status = 'approved'
+            ORDER BY created_at DESC, id DESC LIMIT 1
+            """,
+            (story_id, scene_id, asset_type),
+        ).fetchone()
+        return self._asset_from_row(row) if row else None
+
+    def approve_asset(self, asset_id: str) -> ProductionAsset:
+        with self.connection:
+            candidate = self.connection.execute(
+                "SELECT * FROM production_assets WHERE id = ?", (asset_id,)
+            ).fetchone()
+            if candidate is None:
+                raise ValueError(f"production asset not found: {asset_id}")
+            self.connection.execute(
+                """
+                UPDATE production_assets SET status = 'superseded'
+                WHERE story_id = ? AND scene_id = ? AND asset_type = ?
+                  AND status = 'approved' AND id != ?
+                """,
+                (candidate["story_id"], candidate["scene_id"], candidate["asset_type"], asset_id),
+            )
+            self.connection.execute(
+                "UPDATE production_assets SET status = 'approved' WHERE id = ?",
+                (asset_id,),
+            )
+        return self.get_asset(asset_id)
 
     def lease_next_job(
         self,
@@ -552,6 +667,22 @@ class ProductionStore:
             status=row["status"],
             current_job_id=row["current_job_id"],
             last_seen=row["last_seen"],
+            created_at=row["created_at"],
+        )
+
+    @staticmethod
+    def _asset_from_row(row: sqlite3.Row) -> ProductionAsset:
+        return ProductionAsset(
+            id=row["id"],
+            story_id=row["story_id"],
+            scene_id=row["scene_id"],
+            asset_type=row["asset_type"],
+            path=row["path"],
+            content_hash=row["content_hash"],
+            generation_fingerprint=row["generation_fingerprint"],
+            status=row["status"],
+            metadata=json.loads(row["metadata_json"]),
+            supersedes=row["supersedes"],
             created_at=row["created_at"],
         )
 
