@@ -26,16 +26,18 @@ function completionRows(story?: Story) {
   const counts = (completion.counts as Record<string, number> | undefined) ?? {};
   const scenes = counts.scenes ?? story?.scene_count ?? 0;
   const ready = (key: string) => scenes > 0 && counts[key] === scenes;
+  const issues = Array.isArray(completion.issues) ? completion.issues as Array<{ kind?: string; message?: string }> : [];
+  const finding = (...kinds: string[]) => issues.find((issue) => kinds.includes(String(issue.kind)))?.message;
   const imageReady = ready("scenes_with_images");
   const narrationReady = ready("scenes_with_audio");
   const subtitleReady = ready("scenes_with_subtitles");
   const media = [
-    [Image, "Images", imageReady, `${counts.scenes_with_images ?? 0}/${scenes || "--"} scenes`],
-    [Volume2, "Narration", narrationReady, `${counts.scenes_with_audio ?? 0}/${scenes || "--"} tracks`],
-    [Archive, "Subtitles", subtitleReady, `${counts.scenes_with_subtitles ?? 0}/${scenes || "--"} timed`],
-    [Gauge, "Timeline", Boolean(completion.complete), completion.complete ? "canonical" : "final pass pending"],
-    [Clapperboard, "MP4", Boolean(completion.full_video_ok), completion.full_video_ok ? "master verified" : "master pending"],
-    [ChevronRight, "Plex", Boolean(completion.plex_video_ok), completion.plex_video_ok ? "export verified" : "export pending"],
+    [Image, "Images", imageReady, imageReady ? `${counts.scenes_with_images ?? 0}/${scenes || "--"} scenes` : finding("image", "shot_image") || `${counts.scenes_with_images ?? 0}/${scenes || "--"} scenes`],
+    [Volume2, "Narration", narrationReady, narrationReady ? `${counts.scenes_with_audio ?? 0}/${scenes || "--"} tracks` : finding("audio") || `${counts.scenes_with_audio ?? 0}/${scenes || "--"} tracks`],
+    [Archive, "Subtitles", subtitleReady, subtitleReady ? `${counts.scenes_with_subtitles ?? 0}/${scenes || "--"} timed` : finding("subtitles") || `${counts.scenes_with_subtitles ?? 0}/${scenes || "--"} timed`],
+    [Gauge, "Timeline", Boolean(completion.complete), completion.complete ? "canonical" : finding("shot_timeline") || "final pass pending"],
+    [Clapperboard, "MP4", Boolean(completion.full_video_ok), completion.full_video_ok ? "master verified" : finding("scene_video", "full_video") || "master pending"],
+    [ChevronRight, "Plex", Boolean(completion.plex_video_ok), completion.plex_video_ok ? "export verified" : finding("plex") || "export pending"],
   ] as const;
   return media;
 }
