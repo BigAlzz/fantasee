@@ -152,3 +152,24 @@ def test_semantic_shot_plan_survives_store_restart(tmp_path):
     assert persisted[1].purpose == "reveal detail (2)"
     assert persisted[0].revision == 1
     reopened.close()
+
+
+def test_revising_one_shot_preserves_the_previous_plan_revision(tmp_path):
+    store = ProductionStore(tmp_path / "production.db")
+    original = [
+        ShotSpec("scene-01-shot-01", "scene-01", 1, "establish (1)", "wide", 5.0, "Old road"),
+        ShotSpec("scene-01-shot-02", "scene-01", 2, "reveal detail (2)", "close", 5.0, "Old road"),
+    ]
+    store.save_shot_plan("story-1", "scene-01", original)
+
+    revision = store.revise_shot(
+        "story-1", "scene-01", "scene-01-shot-02", visual_context="A cracked brass compass in rain"
+    )
+
+    previous = store.list_shots("story-1", "scene-01", revision=1)
+    latest = store.list_shots("story-1", "scene-01")
+    assert revision == 2
+    assert previous[1].visual_context == "Old road"
+    assert latest[0].visual_context == "Old road"
+    assert latest[1].visual_context == "A cracked brass compass in rain"
+    store.close()

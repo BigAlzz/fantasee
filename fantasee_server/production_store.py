@@ -497,6 +497,32 @@ class ProductionStore:
         ).fetchall()
         return [self._shot_from_row(row) for row in rows]
 
+    def revise_shot(
+        self,
+        story_id: str,
+        scene_id: str,
+        shot_id: str,
+        *,
+        visual_context: str,
+    ) -> int:
+        """Copy the current plan into a new revision with one revised shot."""
+        current = self.list_shots(story_id, scene_id)
+        if not current or not any(shot.id == shot_id for shot in current):
+            raise ValueError(f"shot not found: {shot_id}")
+        revised = [
+            ShotSpec(
+                id=shot.id,
+                scene_id=shot.scene_id,
+                order=shot.order,
+                purpose=shot.purpose,
+                shot_type=shot.shot_type,
+                duration_seconds=shot.duration_seconds,
+                visual_context=visual_context if shot.id == shot_id else shot.visual_context,
+            )
+            for shot in current
+        ]
+        return self.save_shot_plan(story_id, scene_id, revised)
+
     def get_current_asset(
         self, story_id: str, scene_id: str, asset_type: str
     ) -> ProductionAsset | None:

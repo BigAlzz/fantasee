@@ -52,3 +52,18 @@ def plan_scene_shots(story_id: str, scene_idx: int, body: dict = Body(default=No
     with ProductionStore(production_database_path()) as store:
         revision = store.save_shot_plan(story_id, scene_id, shots)
     return {"scene_id": scene_id, "revision": revision, "shots": [shot.__dict__ for shot in shots]}
+
+
+@router.patch("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}")
+def revise_scene_shot(story_id: str, scene_idx: int, shot_id: str, body: dict = Body(default=None)):
+    _, scene_id = _scene_for(story_id, scene_idx)
+    visual_context = str((body or {}).get("visual_context") or "").strip()
+    if not visual_context:
+        raise HTTPException(status_code=400, detail="visual_context is required")
+    try:
+        with ProductionStore(production_database_path()) as store:
+            revision = store.revise_shot(story_id, scene_id, shot_id, visual_context=visual_context)
+            shots = store.list_shots(story_id, scene_id, revision=revision)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"scene_id": scene_id, "revision": revision, "shots": [shot.__dict__ for shot in shots]}
