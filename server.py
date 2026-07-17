@@ -58,6 +58,9 @@ async def lifespan(app: FastAPI):
     print(f"Loaded {len(_state._stories_cache)} stories with "
           f"{sum(len(s['scenes']) for s in _state._stories_cache)} total scenes")
 
+    # Resume durable generation jobs after ComfyUI has had a chance to start.
+    asyncio.create_task(generation.recover_generation_jobs())
+
     # On startup, check whether a ComfyUI worker is already running. If
     # not (e.g. user just ran `start.bat server` with no ComfyUI), auto-spawn
     # one DirectML GPU worker so image generation works out of the box. The

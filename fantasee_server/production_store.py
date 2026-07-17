@@ -245,6 +245,17 @@ class ProductionStore:
         ).fetchall()
         return [self._job_from_row(row) for row in rows]
 
+    def list_runnable_jobs(self) -> list[ProductionJob]:
+        rows = self.connection.execute(
+            """
+            SELECT * FROM production_jobs
+            WHERE status IN ('queued', 'retryable') AND available_at <= ?
+            ORDER BY created_at, id
+            """,
+            (time.time(),),
+        ).fetchall()
+        return [self._job_from_row(row) for row in rows]
+
     def lease_next_job(
         self,
         worker_id: str,
@@ -320,6 +331,84 @@ class ProductionStore:
                 WHERE id = ? AND status IN ('leased', 'running') AND lease_token = ?
                 """,
                 (now, job_id, lease_token),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError("job lease is invalid or has expired")
+        return self.get_job(job_id)
+
+    def start_job(self, job_id: str, lease_token: str | None) -> ProductionJob:
+        now = time.time()
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_jobs SET status = 'running', updated_at = ?
+                WHERE id = ? AND status = 'leased' AND lease_token = ?
+                """,
+                (now, job_id, lease_token),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError("job lease is invalid or has expired")
+        return self.get_job(job_id)
+
+    def heartbeat(
+        self, job_id: str, lease_token: str | None, *, lease_seconds: float = 60
+    ) -> ProductionJob:
+        now = time.time()
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_jobs
+                SET status = 'running', lease_expires_at = ?, updated_at = ?
+                WHERE id = ? AND status IN ('leased', 'running') AND lease_token = ?
+                """,
+                (now + lease_seconds, now, job_id, lease_token),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError("job lease is invalid or has expired")
+        return self.get_job(job_id)
+
+    def update_job_progress(
+        self,
+        job_id: str,
+        lease_token: str | None,
+        *,
+        progress: float,
+        message: str | None = None,
+    ) -> ProductionJob:
+        now = time.time()
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_jobs SET progress = ?, message = ?, updated_at = ?
+                WHERE id = ? AND status IN ('leased', 'running') AND lease_token = ?
+                """,
+                (max(0.0, min(1.0, float(progress))), message, now, job_id, lease_token),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError("job lease is invalid or has expired")
+        return self.get_job(job_id)
+
+    def fail_job(
+        self,
+        job_id: str,
+        lease_token: str | None,
+        *,
+        message: str,
+        retryable: bool = True,
+        retry_delay: float = 0,
+    ) -> ProductionJob:
+        now = time.time()
+        status = "retryable" if retryable else "failed"
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_jobs
+                SET status = ?, message = ?, available_at = ?,
+                    lease_owner = NULL, lease_token = NULL, lease_expires_at = NULL,
+                    updated_at = ?
+                WHERE id = ? AND status IN ('leased', 'running') AND lease_token = ?
+                """,
+                (status, message, now + max(0, retry_delay), now, job_id, lease_token),
             )
         if cursor.rowcount != 1:
             raise ValueError("job lease is invalid or has expired")

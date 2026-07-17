@@ -24,6 +24,11 @@ def _database_path() -> Path:
     return Path(configured) if configured else _ROOT / ".fantasee" / "production.db"
 
 
+def production_database_path() -> Path:
+    """Return the configured durable production database path."""
+    return _database_path()
+
+
 def _fingerprint(payload: Any) -> str:
     encoded = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
@@ -127,6 +132,24 @@ def finish_task(
         if payload:
             event_payload.update(payload)
         store.append_event(task_id, "task.finished", event_payload)
+
+
+def finalize_run_from_jobs(run_id: str) -> str | None:
+    """Close a parent run once all of its durable jobs are terminal."""
+    with ProductionStore(_database_path()) as store:
+        run = store.get_run(run_id)
+        jobs = store.list_jobs(run_id) if run else []
+    if run is None or not jobs or any(job.status in {"queued", "leased", "running", "retryable"} for job in jobs):
+        return None
+    status = "succeeded" if all(job.status == "succeeded" for job in jobs) else "failed"
+    finish_task(
+        run_id,
+        status=status,
+        message=f"{run.command} complete: {sum(job.status == 'succeeded' for job in jobs)} succeeded, "
+                f"{sum(job.status != 'succeeded' for job in jobs)} failed",
+        payload={"job_count": len(jobs)},
+    )
+    return status
 
 
 def get_persisted_task(task_id: str) -> dict[str, Any] | None:
