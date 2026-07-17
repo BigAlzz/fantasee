@@ -5,7 +5,7 @@ import {
   Search, Settings, SlidersHorizontal, Sparkles, Square, UserRoundCog,
   Volume2, X,
 } from "lucide-react";
-import { api, type ComfyWorker, type GenerateInput, type ProductionJob, type ProductionRun, type Scene, type SemanticShot, type ShotAsset, type Story, type StoryDetail, type TimelineShot, type Worker } from "./api";
+import { api, type ComfyWorker, type GenerateInput, type ProductionEvent, type ProductionJob, type ProductionRun, type Scene, type SemanticShot, type ShotAsset, type Story, type StoryDetail, type TimelineShot, type Worker } from "./api";
 
 const nav = [
   [Library, "Library"], [Clapperboard, "Productions"], [Archive, "Assets"], [UserRoundCog, "Workers"], [Settings, "Settings"],
@@ -67,6 +67,7 @@ export function App() {
   const [selectedStoryId, setSelectedStoryId] = useState<string>();
   const [selectedRunId, setSelectedRunId] = useState<string>();
   const [jobs, setJobs] = useState<ProductionJob[]>([]);
+  const [events, setEvents] = useState<ProductionEvent[]>([]);
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("Connecting to the production ledger...");
   const [busy, setBusy] = useState(false);
@@ -86,11 +87,12 @@ export function App() {
       ]);
       const sortedStories = [...storyResult.stories].sort((a, b) => Number(b.updated_at || b.created_at || 0) - Number(a.updated_at || a.created_at || 0));
       setStories(sortedStories);
-      setRuns(runResult.runs.filter((run) => !run.kind.includes("library_story")));
+      const visibleRuns = runResult.runs.filter((run) => !run.kind.includes("library_story"));
+      setRuns(visibleRuns);
       setWorkers(workerResult.workers);
       setComfyWorkers(comfyResult.workers || []);
       setSelectedStoryId((current) => current || sortedStories[0]?.id);
-      setSelectedRunId((current) => current || runResult.runs[0]?.id);
+      setSelectedRunId((current) => current && visibleRuns.some((run) => run.id === current) ? current : visibleRuns[0]?.id);
       setNotice("Production ledger is live.");
     } catch (error) {
       setNotice(error instanceof Error ? `Connection issue: ${error.message}` : "Connection issue.");
@@ -104,8 +106,28 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!selectedRunId) return;
+    if (!selectedRunId) { setJobs([]); setEvents([]); return; }
     void api.run(selectedRunId).then((result) => setJobs(result.jobs)).catch(() => setJobs([]));
+    setEvents([]);
+  }, [selectedRunId]);
+
+  useEffect(() => {
+    if (!selectedRunId) return;
+    let cursor = 0;
+    let active = true;
+    const loadEvents = async () => {
+      try {
+        const result = await api.events(selectedRunId, cursor);
+        if (!active) return;
+        cursor = result.next_sequence;
+        if (result.events.length) setEvents((current) => [...current, ...result.events].slice(-80));
+      } catch {
+        // The summary poll remains authoritative while the event stream reconnects.
+      }
+    };
+    void loadEvents();
+    const interval = window.setInterval(() => void loadEvents(), 2500);
+    return () => { active = false; window.clearInterval(interval); };
   }, [selectedRunId]);
 
   const selectedStory = stories.find((story) => story.id === selectedStoryId);
@@ -171,7 +193,7 @@ export function App() {
           {selectedRun ? <><div className="run-summary"><span className="led red"/> <small>{selectedRun.id}</small><h2>{selectedStory?.title || selectedRun.story_id || "Library maintenance"}</h2><p>{selectedRun.stage}: {selectedRun.message}</p><div className="progress-track"><i style={{width: `${Math.round((selectedRun.progress || 0) * 100)}%`}}/></div><b>{Math.round((selectedRun.progress || 0) * 100)}% complete</b></div>
           <div className="completion"><h3>Completion evidence</h3>{completionRows(selectedStory).map(([Icon, label, complete, detail]) => <div className="completion-row" key={label}><Icon size={18}/><span>{label}</span><small>{complete ? "verified" : "pending"} · {detail}</small><i className={complete ? "led green" : "led amber"}/></div>)}</div>
           <div className="run-controls"><h3>Run controls</h3><button disabled={busy || jobs.length === 0} className="danger" onClick={() => jobs[0] && void runAction(() => api.cancelJob(jobs[0].id), "Cancellation requested for the current job.")}><Pause size={17}/> Pause / cancel</button><button disabled={busy || jobs.length === 0} className="outline-button" onClick={() => jobs[0] && void runAction(() => api.retryJob(jobs[0].id), "The current job has been returned to the durable queue.")}><RefreshCw size={16}/> Retry</button></div>
-          <div className="job-ledger"><h3>Job ledger</h3>{jobs.length ? jobs.map((job) => <div className="job-row" key={job.id}><div><span className={`led ${job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "amber"}`}/><strong>{humanStatus(job.job_type)}</strong><small>{job.message || humanStatus(job.status)} · attempt {job.attempts + 1}</small></div><div className="job-controls">{job.status !== "succeeded" && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.retryJob(job.id), `Job ${job.id} queued for retry.`)} title="Retry this job"><RefreshCw size={13}/></button>}{["queued", "running"].includes(job.status) && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.cancelJob(job.id), `Cancellation requested for job ${job.id}.`)} title="Cancel this job"><X size={13}/></button>}</div></div>) : <p className="ledger-empty">No durable jobs have been recorded for this run yet.</p>}</div></> : <div className="empty-state"><Radio size={25}/><p>No production run selected.</p></div>}
+          <div className="job-ledger"><h3>Job ledger</h3>{jobs.length ? jobs.map((job) => <div className="job-row" key={job.id}><div><span className={`led ${job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "amber"}`}/><strong>{humanStatus(job.job_type)}</strong><small>{job.message || humanStatus(job.status)} · attempt {job.attempts + 1}</small></div><div className="job-controls">{job.status !== "succeeded" && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.retryJob(job.id), `Job ${job.id} queued for retry.`)} title="Retry this job"><RefreshCw size={13}/></button>}{["queued", "running"].includes(job.status) && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.cancelJob(job.id), `Cancellation requested for job ${job.id}.`)} title="Cancel this job"><X size={13}/></button>}</div></div>) : <p className="ledger-empty">No durable jobs have been recorded for this run yet.</p>}</div><div className="event-spool"><h3>Live event spool</h3>{events.length ? events.slice().reverse().slice(0, 10).map((event) => <div className="event-row" key={`${event.sequence}-${event.event_type}`}><span className="led green"/><small>#{event.sequence} {event.event_type}</small><strong>{String(event.payload.message || event.payload.stage || "Recorded production event")}</strong></div>) : <p className="ledger-empty">Waiting for durable progress events.</p>}</div></> : <div className="empty-state"><Radio size={25}/><p>No production run selected.</p></div>}
         </aside>
       </div>
       <section className="worker-deck">{activeWorkers.length ? activeWorkers.slice(0, 2).map((worker, index) => {
