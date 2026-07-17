@@ -629,6 +629,15 @@ class ProductionStore:
                     for shot in shots
                 ],
             )
+            shot_ids = [shot.id for shot in shots]
+            if shot_ids:
+                placeholders = ",".join("?" for _ in shot_ids)
+                self.connection.execute(
+                    f"""UPDATE production_assets SET status = 'superseded'
+                        WHERE story_id = ? AND asset_type = 'image' AND status = 'approved'
+                          AND scene_id IN ({placeholders})""",
+                    (story_id, *shot_ids),
+                )
         return revision
 
     def list_shots(

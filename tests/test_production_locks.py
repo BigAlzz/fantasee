@@ -23,3 +23,19 @@ def test_locked_shot_rejects_revision_and_candidate_approval(tmp_path):
 
         store.set_lock("story", "shot", shot.id, False)
         assert store.revise_shot("story", "scene-01", shot.id, visual_context="new road") == 2
+
+
+def test_new_shot_plan_supersedes_previous_approved_artwork(tmp_path):
+    image = tmp_path / "approved.png"
+    image.write_bytes(b"image")
+    with ProductionStore(tmp_path / "production.db") as store:
+        shot = ShotSpec("scene-01-shot-01", "scene-01", 1, "establish", "wide", 3, "road")
+        store.save_shot_plan("story", "scene-01", [shot])
+        candidate = store.register_asset(
+            story_id="story", scene_id=shot.id, asset_type="image", path=str(image),
+            generation_fingerprint="one",
+        )
+        store.approve_asset(candidate.id)
+        store.save_shot_plan("story", "scene-01", [shot])
+
+        assert store.get_current_asset("story", shot.id, "image") is None

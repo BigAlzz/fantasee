@@ -237,9 +237,14 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
                 shot_timeline = json.loads(shot_timeline_path.read_text(encoding="utf-8"))
                 shot_segments = shot_timeline.get("shot_segments") or shot_timeline.get("segments") or []
                 segment_ids = {segment.get("shot_id") for segment in shot_segments}
+                timeline_by_shot = {
+                    segment.get("shot_id"): segment for segment in shot_segments
+                }
                 missing_timeline_shots = {
                     shot.id for shots in planned_shots.values() for shot in shots
                     if shot.id not in segment_ids
+                    or approved_shots.get(shot.id) is None
+                    or timeline_by_shot.get(shot.id, {}).get("asset_path") != approved_shots[shot.id].path
                 }
                 if missing_timeline_shots:
                     add_issue("shot_timeline", "Shot timeline is missing planned shots")
