@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  Archive, ChevronRight, Clapperboard, Cpu, Gauge, Image, Library,
+  Archive, ArrowDown, ArrowUp, ChevronRight, Clapperboard, Cpu, Gauge, Image, Library,
   LoaderCircle, MoreHorizontal, Pause, Play, Plus, Radio, RefreshCw,
   Search, Settings, SlidersHorizontal, Sparkles, Square, UserRoundCog,
   Volume2, X,
@@ -89,11 +89,12 @@ export function App() {
   const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic fantasy realism", num_scenes: 8, images_per_scene: 5, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean" });
   const [seeds, setSeeds] = useState<SeedSuggestion[]>([]);
   const [seedBusy, setSeedBusy] = useState(false);
+  const [admissionPaused, setAdmissionPaused] = useState(false);
 
   const refresh = async () => {
     try {
-      const [storyResult, runResult, workerResult, comfyResult] = await Promise.all([
-        api.stories(), api.runs(), api.workers(), api.comfyWorkers(),
+      const [storyResult, runResult, workerResult, comfyResult, controlResult] = await Promise.all([
+        api.stories(), api.runs(), api.workers(), api.comfyWorkers(), api.productionControl().catch(() => ({ admission_paused: false })),
       ]);
       const sortedStories = [...storyResult.stories].sort((a, b) => Number(b.updated_at || b.created_at || 0) - Number(a.updated_at || a.created_at || 0));
       setStories(sortedStories);
@@ -101,6 +102,7 @@ export function App() {
       setRuns(visibleRuns);
       setWorkers(workerResult.workers);
       setComfyWorkers(comfyResult.workers || []);
+      setAdmissionPaused(controlResult.admission_paused);
       setSelectedStoryId((current) => current || sortedStories[0]?.id);
       setSelectedRunId((current) => current && visibleRuns.some((run) => run.id === current) ? current : visibleRuns[0]?.id);
       setNotice("Production ledger is live.");
@@ -210,7 +212,7 @@ export function App() {
           <div className="eyebrow"><span>Production run</span><span className={`run-state ${selectedRun?.status || "idle"}`}>{humanStatus(selectedRun?.status || "idle")}</span></div>
           {selectedRun ? <><div className="run-summary"><span className="led red"/> <small>{selectedRun.id}</small><h2>{selectedStory?.title || selectedRun.story_id || "Library maintenance"}</h2><p>{selectedRun.stage}: {selectedRun.message}</p><div className="progress-track"><i style={{width: `${Math.round((selectedRun.progress || 0) * 100)}%`}}/></div><b>{Math.round((selectedRun.progress || 0) * 100)}% complete</b></div>
           <div className="completion"><h3>Completion evidence</h3>{completionRows(selectedStory).map(([Icon, label, complete, detail]) => <div className="completion-row" key={label}><Icon size={18}/><span>{label}</span><small>{complete ? "verified" : "pending"} · {detail}</small><i className={complete ? "led green" : "led amber"}/></div>)}</div>
-          <div className="run-controls"><h3>Run controls</h3><button disabled={busy || jobs.length === 0} className="danger" onClick={() => jobs[0] && void runAction(() => api.cancelJob(jobs[0].id), "Cancellation requested for the current job.")}><Pause size={17}/> Pause / cancel</button><button disabled={busy || jobs.length === 0} className="outline-button" onClick={() => jobs[0] && void runAction(() => api.retryJob(jobs[0].id), "The current job has been returned to the durable queue.")}><RefreshCw size={16}/> Retry</button></div>
+          <div className="run-controls"><h3>Run controls</h3><button disabled={busy} className="outline-button" onClick={() => void runAction(async () => { const result = await api.setProductionControl(!admissionPaused); setAdmissionPaused(result.admission_paused); }, admissionPaused ? "Queue admission resumed." : "Queue admission paused.")}>{admissionPaused ? "Resume queue admission" : "Pause queue admission"}</button><div className="queue-priority-panel"><span>Queue priority</span>{jobs.filter((job) => ["queued", "retryable"].includes(job.status)).map((job) => <div key={job.id}><small>{humanStatus(job.job_type)} · {job.priority ?? 0}</small><button className="micro-button" disabled={busy || (job.priority ?? 0) >= 100} onClick={() => void runAction(() => api.priorityJob(job.id, Math.min(100, (job.priority ?? 0) + 1)), `Raised priority for ${job.id}.`)} title="Raise priority"><ArrowUp size={12}/></button><button className="micro-button" disabled={busy || (job.priority ?? 0) <= 0} onClick={() => void runAction(() => api.priorityJob(job.id, Math.max(0, (job.priority ?? 0) - 1)), `Lowered priority for ${job.id}.`)} title="Lower priority"><ArrowDown size={12}/></button></div>)}</div><button disabled={busy || jobs.length === 0} className="danger" onClick={() => jobs[0] && void runAction(() => api.cancelJob(jobs[0].id), "Cancellation requested for the current job.")}><Pause size={17}/> Pause / cancel</button><button disabled={busy || jobs.length === 0} className="outline-button" onClick={() => jobs[0] && void runAction(() => api.retryJob(jobs[0].id), "The current job has been returned to the durable queue.")}><RefreshCw size={16}/> Retry</button></div>
           <div className="job-ledger"><h3>Job ledger</h3>{jobs.length ? jobs.map((job) => <div className="job-row" key={job.id}><div><span className={`led ${job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "amber"}`}/><strong>{humanStatus(job.job_type)}</strong><small>{job.message || humanStatus(job.status)} · attempt {job.attempts + 1}</small></div><div className="job-controls">{job.status !== "succeeded" && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.retryJob(job.id), `Job ${job.id} queued for retry.`)} title="Retry this job"><RefreshCw size={13}/></button>}{["queued", "running"].includes(job.status) && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.cancelJob(job.id), `Cancellation requested for job ${job.id}.`)} title="Cancel this job"><X size={13}/></button>}</div></div>) : <p className="ledger-empty">No durable jobs have been recorded for this run yet.</p>}</div><div className="event-spool"><h3>Live event spool</h3>{events.length ? events.slice().reverse().slice(0, 10).map((event) => <div className="event-row" key={`${event.sequence}-${event.event_type}`}><span className="led green"/><small>#{event.sequence} {event.event_type}</small><strong>{String(event.payload.message || event.payload.stage || "Recorded production event")}</strong></div>) : <p className="ledger-empty">Waiting for durable progress events.</p>}</div></> : <div className="empty-state"><Radio size={25}/><p>No production run selected.</p></div>}
         </aside>
       </div>
@@ -254,7 +256,38 @@ function StudioDesk({ view, stories, runs, workers, selectedStory, jobs, busy, o
 }
 
 function ReleasePlayer({ story, onClose }: { story: Story; onClose: () => void }) {
-  return <div className="modal-scrim player-scrim"><section className="release-player metal-panel"><header className="editor-header"><div><span className="eyebrow-label">Canonical release</span><h1>{story.title}</h1><small>MP4 + timeline subtitles</small></div><button className="icon-button" onClick={onClose} aria-label="Close player"><X size={19}/></button></header><video controls autoPlay preload="metadata"><source src={`/generated/${story.id}/${story.id}_full.mp4`} type="video/mp4"/><track kind="subtitles" src={`/generated/${story.id}/${story.id}_full.vtt`} srcLang="en" label="English" default /></video><p className="player-note">Playback uses the rendered release and its canonical subtitle timeline. If the release is stale, return to the editor and rebuild the approved timeline.</p></section></div>;
+  return <div className="modal-scrim player-scrim"><section className="release-player metal-panel"><header className="editor-header"><div><span className="eyebrow-label">Canonical release</span><h1>{story.title}</h1><small>MP4 + timeline subtitles</small></div><button className="icon-button" onClick={onClose} aria-label="Close player"><X size={19}/></button></header><video controls autoPlay preload="metadata"><source src={`/generated/${story.id}/${story.id}_full.mp4`} type="video/mp4"/><track kind="subtitles" src={`/generated/${story.id}/${story.id}_full.vtt`} srcLang="en" label="English" default /></video><NarrationWaveform src={`/generated/${story.id}/${story.id}_full.mp4`} /><p className="player-note">Playback uses the rendered release and its canonical subtitle timeline. If the release is stale, return to the editor and rebuild the approved timeline.</p></section></div>;
+}
+
+function NarrationWaveform({ src }: { src?: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !src) return;
+    let disposed = false;
+    let context: AudioContext | undefined;
+    const draw = (data: Float32Array) => {
+      const target = canvas.getContext("2d");
+      if (!target) return;
+      const width = canvas.width = Math.max(240, Math.floor(canvas.clientWidth * 2));
+      const height = canvas.height = 64;
+      target.clearRect(0, 0, width, height);
+      target.fillStyle = "#b97935";
+      const step = Math.max(1, Math.floor(data.length / width));
+      for (let x = 0; x < width; x += 1) {
+        let peak = 0;
+        for (let index = x * step; index < Math.min(data.length, (x + 1) * step); index += 1) peak = Math.max(peak, Math.abs(data[index]));
+        const bar = Math.max(1, peak * height * 0.9);
+        target.fillRect(x, (height - bar) / 2, 1, bar);
+      }
+    };
+    void fetch(src).then((response) => response.arrayBuffer()).then((bytes) => {
+      context = new AudioContext();
+      return context.decodeAudioData(bytes);
+    }).then((audio) => { if (!disposed) draw(audio.getChannelData(0)); }).catch(() => undefined);
+    return () => { disposed = true; void context?.close(); };
+  }, [src]);
+  return <canvas className="narration-waveform" ref={canvasRef} aria-label="Narration waveform" />;
 }
 
 function WorkerConsole({ workers, busy, onClose, onRefresh, onSpawn, onKill }: { workers: ComfyWorker[]; busy: boolean; onClose: () => void; onRefresh: () => void; onSpawn: (kind: "cpu" | "gpu") => void; onKill: (url: string) => void }) {

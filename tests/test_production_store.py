@@ -133,6 +133,33 @@ def test_cancel_and_retry_job_are_explicit_state_transitions(tmp_path):
     store.close()
 
 
+def test_queue_admission_pause_and_priority_are_durable(tmp_path):
+    database_path = tmp_path / "production.db"
+    store = ProductionStore(database_path)
+    run = store.create_run(
+        story_id="story-1", command="repair", input_fingerprint="fingerprint-1"
+    )
+    low = store.enqueue_job(
+        run.id, job_type="low", payload={}, idempotency_key="low", priority=1
+    )
+    high = store.enqueue_job(
+        run.id, job_type="high", payload={}, idempotency_key="high", priority=9
+    )
+
+    assert [job.id for job in store.list_runnable_jobs()] == [high.id, low.id]
+    store.set_admission_paused(True)
+    assert store.admission_paused() is True
+    assert store.lease_next_job("worker-1", now=time.time()) is None
+
+    store.set_admission_paused(False)
+    assert store.lease_next_job("worker-1", now=time.time()).id == high.id
+    store.close()
+
+    reopened = ProductionStore(database_path)
+    assert reopened.admission_paused() is False
+    reopened.close()
+
+
 def test_semantic_shot_plan_survives_store_restart(tmp_path):
     database_path = tmp_path / "production.db"
     shots = [

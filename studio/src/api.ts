@@ -47,6 +47,7 @@ export type ProductionJob = {
   progress: number;
   message: string;
   required_capabilities: string[];
+  priority: number;
 };
 
 export type ProductionRun = {
@@ -134,6 +135,9 @@ export const api = {
   comfyWorkers: () => request<{ workers: ComfyWorker[] }>("/api/comfyui/workers"),
   retryJob: (id: string) => request(`/api/production/jobs/${id}/retry`, { method: "POST" }),
   cancelJob: (id: string) => request(`/api/production/jobs/${id}/cancel`, { method: "POST" }),
+  priorityJob: (id: string, priority: number) => request(`/api/production/jobs/${id}/priority`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ priority }) }),
+  productionControl: () => request<{ admission_paused: boolean }>("/api/production/control"),
+  setProductionControl: (admission_paused: boolean) => request<{ admission_paused: boolean }>("/api/production/control", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ admission_paused }) }),
   spawn: (kind: "cpu" | "gpu") => request(`/api/comfyui/workers/spawn-${kind}`, { method: "POST" }),
   killComfy: (url: string) => request("/api/comfyui/workers/kill", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) }),
   generate: (input: GenerateInput) => request<{ task_id: string; message: string }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),

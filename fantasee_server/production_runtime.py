@@ -199,6 +199,7 @@ def get_persisted_task(task_id: str) -> dict[str, Any] | None:
                 "progress": job.progress,
                 "message": job.message,
                 "required_capabilities": list(job.required_capabilities),
+                "priority": job.priority,
             }
             for job in jobs
         ],

@@ -47,6 +47,7 @@ class ProductionJob:
     payload: dict[str, Any]
     idempotency_key: str
     required_capabilities: tuple[str, ...]
+    priority: int
     status: str
     attempts: int
     progress: float
@@ -253,6 +254,18 @@ class ProductionStore:
             );
             """
         )
+        columns = {row["name"] for row in self.connection.execute("PRAGMA table_info(production_jobs)")}
+        if "priority" not in columns:
+            self.connection.execute("ALTER TABLE production_jobs ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS production_controls (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at REAL NOT NULL
+            )
+            """
+        )
         self.connection.commit()
 
     def create_run(
@@ -357,6 +370,7 @@ class ProductionStore:
         payload: dict[str, Any],
         idempotency_key: str,
         required_capabilities: tuple[str, ...] = (),
+        priority: int = 0,
     ) -> ProductionJob:
         now = time.time()
         job_id = job_id or uuid.uuid4().hex
@@ -365,12 +379,12 @@ class ProductionStore:
                 """
                 INSERT INTO production_jobs
                     (id, run_id, job_type, payload_json, idempotency_key,
-                     required_capabilities_json, status, available_at, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)
+                    required_capabilities_json, priority, status, available_at, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?)
                 ON CONFLICT (run_id, idempotency_key) DO NOTHING
                 """,
                 (job_id, run_id, job_type, json.dumps(payload), idempotency_key,
-                 json.dumps(sorted(set(required_capabilities))), now, now, now),
+                 json.dumps(sorted(set(required_capabilities))), max(0, min(100, int(priority))), now, now, now),
             )
         row = self.connection.execute(
             """
@@ -387,12 +401,46 @@ class ProductionStore:
         ).fetchone()
         return self._job_from_row(row) if row else None
 
+    def admission_paused(self) -> bool:
+        row = self.connection.execute(
+            "SELECT value FROM production_controls WHERE key = 'admission_paused'"
+        ).fetchone()
+        return bool(row and row["value"] == "1")
+
+    def set_admission_paused(self, paused: bool) -> bool:
+        now = time.time()
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO production_controls(key, value, updated_at)
+                VALUES ('admission_paused', ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+                """,
+                ("1" if paused else "0", now),
+            )
+        return paused
+
+    def set_job_priority(self, job_id: str, priority: int) -> ProductionJob:
+        now = time.time()
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_jobs
+                SET priority = ?, updated_at = ?
+                WHERE id = ? AND status IN ('queued', 'retryable')
+                """,
+                (max(0, min(100, int(priority))), now, job_id),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError(f"job cannot be reprioritized: {job_id}")
+        return self.get_job(job_id)
+
     def list_jobs(self, run_id: str) -> list[ProductionJob]:
         rows = self.connection.execute(
             """
             SELECT * FROM production_jobs
             WHERE run_id = ?
-            ORDER BY created_at, id
+            ORDER BY priority DESC, created_at, id
             """,
             (run_id,),
         ).fetchall()
@@ -403,7 +451,7 @@ class ProductionStore:
             """
             SELECT * FROM production_jobs
             WHERE status IN ('queued', 'retryable') AND available_at <= ?
-            ORDER BY created_at, id
+            ORDER BY priority DESC, created_at, id
             """,
             (time.time(),),
         ).fetchall()
@@ -845,6 +893,9 @@ class ProductionStore:
         lease_token = uuid.uuid4().hex
         self.connection.execute("BEGIN IMMEDIATE")
         try:
+            if self.admission_paused():
+                self.connection.commit()
+                return None
             self.connection.execute(
                 """
                 UPDATE production_jobs
@@ -864,7 +915,7 @@ class ProductionStore:
             if run_id:
                 query += " AND run_id = ?"
                 params += (run_id,)
-            candidates = self.connection.execute(query + " ORDER BY created_at, id", params).fetchall()
+            candidates = self.connection.execute(query + " ORDER BY priority DESC, created_at, id", params).fetchall()
             worker_capabilities = set(capabilities)
             accepted_job_types = set(job_types)
             row = next(
@@ -1071,6 +1122,7 @@ class ProductionStore:
             payload=json.loads(row["payload_json"]),
             idempotency_key=row["idempotency_key"],
             required_capabilities=tuple(json.loads(row["required_capabilities_json"])),
+            priority=row["priority"],
             status=row["status"],
             attempts=row["attempts"],
             progress=row["progress"],
