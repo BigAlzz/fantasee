@@ -138,6 +138,7 @@ export const api = {
   priorityJob: (id: string, priority: number) => request(`/api/production/jobs/${id}/priority`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ priority }) }),
   productionControl: () => request<{ admission_paused: boolean }>("/api/production/control"),
   setProductionControl: (admission_paused: boolean) => request<{ admission_paused: boolean }>("/api/production/control", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ admission_paused }) }),
+  ttsGenerate: (text: string, voice_preset: string) => request<{ url: string; duration: number }>("/api/tts/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, voice_preset }) }),
   spawn: (kind: "cpu" | "gpu") => request(`/api/comfyui/workers/spawn-${kind}`, { method: "POST" }),
   killComfy: (url: string) => request("/api/comfyui/workers/kill", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) }),
   generate: (input: GenerateInput) => request<{ task_id: string; message: string }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),

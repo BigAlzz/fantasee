@@ -54,6 +54,7 @@ nav { display:grid; gap:8px; } .nav-item { position:relative; border:1px solid t
  .asset-row strong,.settings-ledger dt { color:#ddd1bc; flex:1; }
  .asset-row small,.settings-ledger dd { margin:0; color:#b7985f; font-size:11px; }
 .settings-ledger { display:grid; }
+.voice-audition { display:grid; align-content:end; gap:6px; }.voice-audition .outline-button { margin:0; height:36px; }.voice-audition audio { width:100%; height:28px; }
 .event-spool { margin-top:18px; border-top:1px solid #554d3b; padding-top:12px; }
 .event-spool h3 { color:#cfad6f; letter-spacing:.1em; text-transform:uppercase; font-size:12px; margin:0 0 8px; }
 .event-row { display:grid; grid-template-columns:10px 1fr; gap:3px 8px; padding:8px 0; border-bottom:1px solid #373931; }
