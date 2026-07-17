@@ -55,6 +55,24 @@ def _history_error_message(status: dict) -> str | None:
     return f"ComfyUI reported status {status_text}"
 
 
+def _is_oom_error(message: str) -> bool:
+    """Recognize provider messages that indicate a video-memory allocation failure."""
+    text = str(message or "").lower()
+    return any(token in text for token in ("out of memory", "not enough gpu", "cuda oom", "video memory"))
+
+
+def _degraded_dimensions(width: Optional[int], height: Optional[int]) -> tuple[int, int] | None:
+    """Return one conservative fallback size, preserving the source aspect ratio."""
+    source_width = int(width or QUALITY_SETTINGS["width"])
+    source_height = int(height or QUALITY_SETTINGS["height"])
+    if source_width <= 640 and source_height <= 384:
+        return None
+    scale = min(0.75, 640 / max(1, source_width))
+    fallback_width = max(512, int(source_width * scale) // 8 * 8)
+    fallback_height = max(320, int(source_height * scale) // 8 * 8)
+    return fallback_width, fallback_height
+
+
 def _comfyui_bases() -> list[str]:
     """Return the list of ComfyUI base URLs to use.
 
@@ -1063,6 +1081,7 @@ def generate_image(
     append_positive_guard: bool = True,
     base_url: Optional[str] = None,
     worker_kind: Optional[str] = None,
+    _degraded_retry: bool = False,
 ) -> Optional[str]:
     """
     Generate a single image via ComfyUI.
@@ -1321,7 +1340,7 @@ def generate_image(
         print(f"[comfyui_utils] Timeout after {timeout}s waiting for prompt_id={prompt_id}", file=sys.stderr)
         return None
 
-    except ComfyGenerationError:
+    except ComfyGenerationError as error:
         if base_url is None:
             alternatives = [
                 worker for worker in _healthy_bases()
@@ -1347,6 +1366,33 @@ def generate_image(
                     append_positive_guard=append_positive_guard,
                     base_url=fallback,
                     worker_kind=worker_kind,
+                    _degraded_retry=_degraded_retry,
+                )
+        message = str(error)
+        if not _degraded_retry and _is_oom_error(message):
+            fallback_dimensions = _degraded_dimensions(width, height)
+            if fallback_dimensions:
+                fallback_width, fallback_height = fallback_dimensions
+                print(
+                    f"[comfyui_utils] Retrying OOM prompt at reduced dimensions "
+                    f"{fallback_width}x{fallback_height}",
+                    file=sys.stderr,
+                )
+                return generate_image(
+                    prompt=prompt,
+                    output_prefix=output_prefix,
+                    output_dir=output_dir,
+                    negative_prompt=negative_prompt,
+                    seed=seed,
+                    checkpoint=checkpoint,
+                    width=fallback_width,
+                    height=fallback_height,
+                    timeout=timeout,
+                    workflow_path=workflow_path,
+                    append_positive_guard=append_positive_guard,
+                    base_url=base,
+                    worker_kind=worker_kind,
+                    _degraded_retry=True,
                 )
         raise
     except requests.ConnectionError:
