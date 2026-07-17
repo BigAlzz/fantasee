@@ -72,16 +72,20 @@ def write_story_timeline(
     target = story_dir / "working" / "timeline.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(".json.tmp")
-    temporary.write_text(
-        json.dumps(
-            {
-                "story_id": story_id,
-                "segments": [asdict(segment) for segment in timeline],
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    payload: dict[str, Any] = {
+        "story_id": story_id,
+        "segments": [asdict(segment) for segment in timeline],
+    }
+    # Narration maintenance may rebuild this file after an editorial pass.
+    # Preserve approved visual segments so the canonical timeline remains the
+    # single source for both subtitle timing and shot selection.
+    try:
+        previous = json.loads(target.read_text(encoding="utf-8"))
+        if isinstance(previous, dict) and isinstance(previous.get("shot_segments"), list):
+            payload["shot_segments"] = previous["shot_segments"]
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        pass
+    temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     os.replace(temporary, target)
     return target
 
@@ -131,6 +135,30 @@ def build_shot_timeline(
     return timeline
 
 
+def build_story_shot_timeline(
+    scenes: list[dict[str, Any]],
+    shot_plans: dict[str, list[ShotSpec]],
+    approved_assets: dict[str, str],
+) -> list[ShotTimelineSegment]:
+    """Build approved shot segments at absolute story time offsets."""
+    segments: list[ShotTimelineSegment] = []
+    story_offset = 0.0
+    for index, scene in enumerate(scenes, start=1):
+        scene_id = f"scene-{int(scene.get('scene') or index):02d}"
+        duration = float(scene.get("audio_duration") or 0.0)
+        shots = shot_plans.get(scene_id, [])
+        if shots:
+            segments.extend(build_shot_timeline(
+                scene_id=scene_id,
+                scene_start=story_offset,
+                scene_duration=duration,
+                shots=shots,
+                approved_assets=approved_assets,
+            ))
+        story_offset += duration
+    return segments
+
+
 def write_shot_timeline(
     story_id: str,
     story_dir: str | Path,
@@ -141,18 +169,28 @@ def write_shot_timeline(
     target = story_dir / "working" / "shot_timeline.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(".json.tmp")
-    payload: dict[str, Any] = {"story_id": story_id, "segments": [asdict(item) for item in segments]}
+    new_segments = [asdict(item) for item in segments]
+    previous_segments: list[dict[str, Any]] = []
+    canonical: dict[str, Any] = {"story_id": story_id}
     try:
-        canonical = json.loads((story_dir / "working" / "timeline.json").read_text(encoding="utf-8"))
-        if isinstance(canonical, dict):
-            canonical["shot_segments"] = payload["segments"]
-            payload = canonical
+        loaded = json.loads((story_dir / "working" / "timeline.json").read_text(encoding="utf-8"))
+        if isinstance(loaded, dict):
+            canonical = loaded
+            previous_segments = loaded.get("shot_segments") or []
     except (FileNotFoundError, OSError, json.JSONDecodeError):
         pass
-    temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    scene_ids = {segment.get("scene_id") for segment in new_segments}
+    merged_segments = [
+        segment for segment in previous_segments
+        if segment.get("scene_id") not in scene_ids
+    ] + new_segments
+    shot_payload = {"story_id": story_id, "segments": merged_segments}
+    canonical["story_id"] = story_id
+    canonical["shot_segments"] = merged_segments
+    temporary.write_text(json.dumps(shot_payload, indent=2), encoding="utf-8")
     os.replace(temporary, target)
     canonical_target = story_dir / "working" / "timeline.json"
     canonical_tmp = canonical_target.with_suffix(".json.tmp")
-    canonical_tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    canonical_tmp.write_text(json.dumps(canonical, indent=2), encoding="utf-8")
     os.replace(canonical_tmp, canonical_target)
     return target

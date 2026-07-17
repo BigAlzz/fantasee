@@ -94,6 +94,17 @@ class ProductionShot:
     created_at: float
 
 
+@dataclass(frozen=True)
+class ProductionRelease:
+    id: str
+    story_id: str
+    release_type: str
+    fingerprint: str
+    status: str
+    path: str
+    created_at: float
+
+
 class ProductionStore:
     """SQLite implementation of the durable production state seam."""
 
@@ -189,6 +200,17 @@ class ProductionStore:
             );
             CREATE INDEX IF NOT EXISTS idx_production_shots_current
                 ON production_shots(story_id, scene_id, revision, shot_order);
+            CREATE TABLE IF NOT EXISTS production_releases (
+                id TEXT PRIMARY KEY,
+                story_id TEXT NOT NULL,
+                release_type TEXT NOT NULL,
+                fingerprint TEXT NOT NULL,
+                status TEXT NOT NULL,
+                path TEXT NOT NULL,
+                created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_production_releases_current
+                ON production_releases(story_id, release_type, status, created_at);
             """
         )
         self.connection.commit()
@@ -445,6 +467,54 @@ class ProductionStore:
             (story_id,),
         ).fetchall()
         return [self._asset_from_row(row) for row in rows]
+
+    def record_release(
+        self,
+        story_id: str,
+        *,
+        release_type: str,
+        fingerprint: str,
+        path: str,
+        status: str = "current",
+    ) -> ProductionRelease:
+        now = time.time()
+        release_id = uuid.uuid4().hex
+        with self.connection:
+            if status == "current":
+                self.connection.execute(
+                    "UPDATE production_releases SET status = 'superseded' "
+                    "WHERE story_id = ? AND release_type = ? AND status = 'current'",
+                    (story_id, release_type),
+                )
+            self.connection.execute(
+                """INSERT INTO production_releases
+                    (id, story_id, release_type, fingerprint, status, path, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (release_id, story_id, release_type, fingerprint, status, path, now),
+            )
+        return self.get_release(release_id)
+
+    def get_release(self, release_id: str) -> ProductionRelease | None:
+        row = self.connection.execute(
+            "SELECT * FROM production_releases WHERE id = ?", (release_id,)
+        ).fetchone()
+        return self._release_from_row(row) if row else None
+
+    def get_current_release(self, story_id: str, release_type: str) -> ProductionRelease | None:
+        row = self.connection.execute(
+            """SELECT * FROM production_releases
+               WHERE story_id = ? AND release_type = ? AND status = 'current'
+               ORDER BY created_at DESC, id DESC LIMIT 1""",
+            (story_id, release_type),
+        ).fetchone()
+        return self._release_from_row(row) if row else None
+
+    def list_releases(self, story_id: str) -> list[ProductionRelease]:
+        rows = self.connection.execute(
+            "SELECT * FROM production_releases WHERE story_id = ? ORDER BY created_at DESC, id DESC",
+            (story_id,),
+        ).fetchall()
+        return [self._release_from_row(row) for row in rows]
 
     def save_shot_plan(
         self, story_id: str, scene_id: str, shots: list[ShotSpec]
@@ -880,6 +950,14 @@ class ProductionStore:
             shot_type=row["shot_type"],
             duration_seconds=row["duration_seconds"],
             visual_context=row["visual_context"],
+            created_at=row["created_at"],
+        )
+
+    @staticmethod
+    def _release_from_row(row: sqlite3.Row) -> ProductionRelease:
+        return ProductionRelease(
+            id=row["id"], story_id=row["story_id"], release_type=row["release_type"],
+            fingerprint=row["fingerprint"], status=row["status"], path=row["path"],
             created_at=row["created_at"],
         )
 

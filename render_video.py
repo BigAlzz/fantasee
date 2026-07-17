@@ -41,12 +41,42 @@ VIDEO_CRF = 20                 # quality (lower = better, 18-23 typical)
 def get_scene_assets(story_dir: Path, slug: str, scene_num: int) -> dict:
     """Find all assets for a given scene."""
     scene_key = f"{scene_num:02d}"
-    
-    # Find images (sorted by beat number in filename)
-    images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*_00001_.png"))
-    if not images:
-        images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*.png"))
-    images = [path for path in images if is_usable_story_image(path)]
+    image_durations: list[float] | None = None
+
+    # An approved editorial timeline wins over the legacy manifest glob. This
+    # prevents rejected candidates or unrelated scene artwork from entering
+    # the release render.
+    shot_segments: list[dict] = []
+    for timeline_name in ("timeline.json", "shot_timeline.json"):
+        try:
+            timeline = json.loads((story_dir / "working" / timeline_name).read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, json.JSONDecodeError):
+            continue
+        shot_segments = [
+            segment for segment in (timeline.get("shot_segments") or timeline.get("segments") or [])
+            if segment.get("scene_id") in {f"scene-{scene_key}", scene_key, f"s{scene_key}"}
+            and segment.get("asset_path")
+        ]
+        if shot_segments:
+            break
+
+    if shot_segments:
+        shot_segments.sort(key=lambda segment: (float(segment.get("start", 0)), segment.get("shot_id", "")))
+        images = []
+        image_durations = []
+        for segment in shot_segments:
+            path = Path(str(segment["asset_path"]))
+            if not path.is_absolute():
+                path = story_dir / path
+            if is_usable_story_image(path):
+                images.append(path)
+                image_durations.append(max(0.01, float(segment.get("end", 0)) - float(segment.get("start", 0))))
+    else:
+        # Legacy stories remain supported until their shot plans are migrated.
+        images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*_00001_.png"))
+        if not images:
+            images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*.png"))
+        images = [path for path in images if is_usable_story_image(path)]
     
     # Find audio
     audio = None
@@ -81,6 +111,7 @@ def get_scene_assets(story_dir: Path, slug: str, scene_num: int) -> dict:
         "audio": audio,
         "subs": subs,
         "duration": duration,
+        "image_durations": image_durations,
     }
 
 
@@ -132,13 +163,27 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
     
     n_images = len(images)
     n_crossfades = max(0, n_images - 1)
-    
-    # Each image clip duration (before crossfade overlap)
-    # Total = n*clip_dur - n_crossfades*xfade_dur = duration
-    clip_dur = (duration + n_crossfades * CROSSFADE_DURATION) / n_images
-    
+
+    requested_durations = assets.get("image_durations")
+    if requested_durations and len(requested_durations) == n_images:
+        requested_total = sum(requested_durations)
+        scale = duration / requested_total if requested_total > 0 else 1.0
+        segment_durations = [value * scale for value in requested_durations]
+        clip_durations = [
+            segment + (CROSSFADE_DURATION if index < n_images - 1 else 0.0)
+            for index, segment in enumerate(segment_durations)
+        ]
+        clip_label = "approved shot timing"
+    else:
+        # Legacy behavior: distribute the scene evenly across its images.
+        clip_dur = (duration + n_crossfades * CROSSFADE_DURATION) / n_images
+        segment_durations = [clip_dur - CROSSFADE_DURATION] * n_images
+        segment_durations[-1] += CROSSFADE_DURATION
+        clip_durations = [clip_dur] * n_images
+        clip_label = f"clip={clip_dur:.2f}s"
+
     print(f"  Scene {scene_key}: {n_images} images, {duration:.1f}s, "
-          f"clip={clip_dur:.2f}s")
+          f"{clip_label}")
     
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
@@ -146,14 +191,14 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
         
         # Ken Burns zoom increment per frame
         # Total zoom range: 1.0 → ZOOM_MAX over clip_dur * fps frames
-        total_frames = int(clip_dur * fps)
-        zoom_per_frame = (ZOOM_MAX - 1.0) / max(total_frames, 1)
-        
         # Generate individual image clips with zoompan
         # Alternating directions: zoom-in, pan-right, zoom-out, pan-left
         directions = ["zoom_in", "pan_right", "zoom_out", "pan_left"]
         
         for i, img_path in enumerate(images):
+            clip_dur = clip_durations[i]
+            total_frames = int(clip_dur * fps)
+            zoom_per_frame = (ZOOM_MAX - 1.0) / max(total_frames, 1)
             direction = directions[i % len(directions)]
             clip_path = tmpdir / f"clip_{i:02d}.mp4"
             
@@ -223,12 +268,10 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
             
             prev_label = "v0"
             for i in range(1, n_images):
-                # xfade offset: when does this transition start in the output?
-                # After i-1 crossfades, each reducing by CROSSFADE_DURATION
-                # The output of step i has duration: (i+1)*clip_dur - i*CROSSFADE_DURATION
-                # The xfade starts at: output_dur - clip_dur
-                out_dur = (i + 1) * clip_dur - i * CROSSFADE_DURATION
-                xfade_off = out_dur - clip_dur
+                # With explicit shot timing, each transition starts at the
+                # next approved segment boundary. Legacy clips retain their
+                # equivalent evenly-spaced offsets.
+                xfade_off = sum(segment_durations[:i])
                 
                 if i < n_images - 1:
                     out_label = f"xf{i}"

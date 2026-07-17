@@ -47,6 +47,13 @@ def get_production_run(run_id: str):
     return task
 
 
+@router.get("/api/stories/{story_id}/releases")
+def list_story_releases(story_id: str):
+    with ProductionStore(production_database_path()) as store:
+        releases = store.list_releases(story_id)
+    return {"releases": [release.__dict__ for release in releases]}
+
+
 @router.post("/api/production/jobs/{job_id}/retry")
 def retry_production_job(job_id: str):
     try:

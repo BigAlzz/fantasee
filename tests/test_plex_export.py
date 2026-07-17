@@ -37,6 +37,24 @@ def test_timeline_sidecars_use_absolute_scene_offsets(tmp_path):
 
     assert "00:00:02,200 --> 00:00:03,500" in srt.read_text(encoding="utf-8")
     assert "00:00:02.200 --> 00:00:03.500" in vtt.read_text(encoding="utf-8")
+
+
+def test_timeline_visuals_are_copied_into_plex_package(tmp_path):
+    from plex_export import _copy_timeline_visuals
+
+    story_dir = tmp_path / "story"
+    (story_dir / "working").mkdir(parents=True)
+    image = story_dir / "shot.png"
+    image.write_bytes(b"image")
+    (story_dir / "working" / "timeline.json").write_text(
+        '{"shot_segments":[{"shot_id":"scene-01-shot-01","asset_path":"shot.png"}]}',
+        encoding="utf-8",
+    )
+
+    visuals = _copy_timeline_visuals(story_dir, story_dir / "plex")
+
+    assert visuals is not None
+    assert (visuals / "scene-01-shot-01.png").read_bytes() == b"image"
 from tests._helpers import PROJECT_ROOT
 
 

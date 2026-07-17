@@ -21,7 +21,11 @@ from fantasee_server.production_worker import ProductionWorker
 from fantasee_server.paths import STORY_VIEWER_DIR, generated_story_dir
 from fantasee_server.shot_planning import ShotSpec, plan_semantic_shots, validate_shot_plan
 from fantasee_server.state import atomic_write_json
-from fantasee_server.media_timeline import build_shot_timeline, write_shot_timeline
+from fantasee_server.media_timeline import (
+    build_shot_timeline,
+    build_story_shot_timeline as build_full_story_shot_timeline,
+    write_shot_timeline,
+)
 
 
 router = APIRouter(tags=["shots"])
@@ -238,6 +242,46 @@ def build_scene_shot_timeline(story_id: str, scene_idx: int):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     target = write_shot_timeline(story_id, generated_story_dir(story_id), segments)
     return {"scene_id": scene_id, "path": str(target), "segments": [segment.__dict__ for segment in segments]}
+
+
+def _story_shot_timeline(story_id: str):
+    story_dir = generated_story_dir(story_id)
+    manifest_path = story_dir / f"{story_id}.json"
+    if not manifest_path.is_file():
+        raise HTTPException(status_code=404, detail="Story not found")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    scenes = manifest.get("scenes") or []
+    shot_plans = {}
+    approved_assets = {}
+    with ProductionStore(production_database_path()) as store:
+        for index in range(1, len(scenes) + 1):
+            scene_id = f"scene-{index:02d}"
+            stored = store.list_shots(story_id, scene_id)
+            if not stored:
+                continue
+            shot_plans[scene_id] = [ShotSpec(
+                id=shot.id, scene_id=shot.scene_id, order=shot.order,
+                purpose=shot.purpose, shot_type=shot.shot_type,
+                duration_seconds=shot.duration_seconds,
+                visual_context=shot.visual_context,
+            ) for shot in stored]
+            for shot in stored:
+                asset = store.get_current_asset(story_id, shot.id, "image")
+                if asset is not None:
+                    approved_assets[shot.id] = asset.path
+    if not shot_plans:
+        raise ValueError("Story has no semantic shot plans")
+    return story_dir, scenes, build_full_story_shot_timeline(scenes, shot_plans, approved_assets)
+
+
+@router.post("/api/stories/{story_id}/shots/timeline")
+def build_story_shot_timeline_route(story_id: str):
+    try:
+        story_dir, _, segments = _story_shot_timeline(story_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    target = write_shot_timeline(story_id, story_dir, segments)
+    return {"path": str(target), "segments": [segment.__dict__ for segment in segments]}
 
 
 @router.get("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}/assets")

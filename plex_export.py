@@ -642,9 +642,16 @@ def _copy_to_plex_destination(
         suffix = poster_path.suffix.lower()
         candidates.append((poster_path, f"{file_stem}-poster{suffix}"))
 
+    visuals = plex_dir / "visuals"
+    if visuals.is_dir():
+        for visual in sorted(visuals.iterdir()):
+            if visual.is_file():
+                candidates.append((visual, f"visuals/{visual.name}"))
+
     copied: list[str] = []
     for src, dst_name in candidates:
         dst = target_dir / dst_name
+        dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
         copied.append(dst_name)
 
@@ -666,6 +673,7 @@ class PlexExportResult:
     srt: Optional[Path] = None
     vtt: Optional[Path] = None
     poster: Optional[Path] = None
+    visuals_dir: Optional[Path] = None
     chapters_file: Optional[Path] = None
     background_used: Optional[str] = None
     background_volume: float = DEFAULT_BACKGROUND_VOLUME
@@ -686,6 +694,7 @@ class PlexExportResult:
             "srt": str(self.srt).replace("\\", "/") if self.srt else None,
             "vtt": str(self.vtt).replace("\\", "/") if self.vtt else None,
             "poster": str(self.poster).replace("\\", "/") if self.poster else None,
+            "visuals_dir": str(self.visuals_dir).replace("\\", "/") if self.visuals_dir else None,
             "chapters_file": str(self.chapters_file).replace("\\", "/") if self.chapters_file else None,
             "background_used": self.background_used,
             "background_volume": self.background_volume,
@@ -865,6 +874,7 @@ def export_plex_package(
     _progress("finalize", "Copying poster image...", 0.90)
     poster = _copy_poster(story_dir, slug, result.plex_dir)
     result.poster = poster
+    result.visuals_dir = _copy_timeline_visuals(story_dir, result.plex_dir)
 
     # ── 8. Clean up working files ──────────────────────────────────
     for tmp_name in ("_concat.mp4", "_narration.wav"):
@@ -1060,6 +1070,32 @@ def _copy_poster(story_dir: Path, slug: str, plex_dir: Path) -> Optional[Path]:
     target = plex_dir / f"{slug}-poster{suffix}"
     shutil.copy2(poster, target)
     return target
+
+
+def _copy_timeline_visuals(story_dir: Path, plex_dir: Path) -> Optional[Path]:
+    """Copy approved shot artwork into the export for inspection and reuse."""
+    timeline_path = story_dir / "working" / "timeline.json"
+    try:
+        timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return None
+    segments = timeline.get("shot_segments") or []
+    if not segments:
+        return None
+    visuals = plex_dir / "visuals"
+    visuals.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for segment in segments:
+        source = Path(str(segment.get("asset_path") or ""))
+        if not source.is_absolute():
+            source = story_dir / source
+        if not source.is_file():
+            continue
+        shot_id = _sanitize_for_plex(str(segment.get("shot_id") or f"shot-{copied + 1}"), "shot")
+        target = visuals / f"{shot_id}{source.suffix.lower()}"
+        shutil.copy2(source, target)
+        copied += 1
+    return visuals if copied else None
 
 
 # ── CLI ────────────────────────────────────────────────────────────────

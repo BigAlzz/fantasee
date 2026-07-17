@@ -57,7 +57,8 @@ from fantasee_server.production_runtime import production_database_path, enqueue
 from fantasee_server.production_store import ProductionStore
 from fantasee_server.production_worker import ProductionWorker
 from fantasee_server.asset_registry import AssetRegistry
-from fantasee_server.media_timeline import write_story_timeline
+from fantasee_server.media_timeline import build_story_shot_timeline, write_shot_timeline, write_story_timeline
+from fantasee_server.shot_planning import ShotSpec
 from story_pipeline import sync_from_completion, update_stage
 from image_quality import is_usable_story_image, requested_images_per_scene
 
@@ -234,7 +235,8 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
         else:
             try:
                 shot_timeline = json.loads(shot_timeline_path.read_text(encoding="utf-8"))
-                segment_ids = {segment.get("shot_id") for segment in shot_timeline.get("segments", [])}
+                shot_segments = shot_timeline.get("shot_segments") or shot_timeline.get("segments") or []
+                segment_ids = {segment.get("shot_id") for segment in shot_segments}
                 missing_timeline_shots = {
                     shot.id for shots in planned_shots.values() for shot in shots
                     if shot.id not in segment_ids
@@ -335,6 +337,34 @@ def _run_render_for_library(story_id: str) -> dict:
     }
 
 
+def _build_approved_shot_timeline_for_library(story_id: str, story_dir: Path) -> Optional[Path]:
+    """Build the release timeline when every planned shot is approved."""
+    manifest = json.loads((story_dir / f"{story_id}.json").read_text(encoding="utf-8"))
+    scenes = manifest.get("scenes") or []
+    shot_plans = {}
+    approved_assets = {}
+    with ProductionStore(production_database_path()) as store:
+        for index in range(1, len(scenes) + 1):
+            scene_id = f"scene-{index:02d}"
+            stored = store.list_shots(story_id, scene_id)
+            if not stored:
+                continue
+            shot_plans[scene_id] = [ShotSpec(
+                id=shot.id, scene_id=shot.scene_id, order=shot.order,
+                purpose=shot.purpose, shot_type=shot.shot_type,
+                duration_seconds=shot.duration_seconds,
+                visual_context=shot.visual_context,
+            ) for shot in stored]
+            for shot in stored:
+                asset = store.get_current_asset(story_id, shot.id, "image")
+                if asset is not None and Path(asset.path).is_file():
+                    approved_assets[shot.id] = asset.path
+    if not shot_plans:
+        return None
+    segments = build_story_shot_timeline(scenes, shot_plans, approved_assets)
+    return write_shot_timeline(story_id, story_dir, segments)
+
+
 def _complete_story_for_library(story_id: str, progress) -> dict:
     """Regenerate/repair/render/export one story until it is complete."""
     sys.path.insert(0, str(STORY_VIEWER_DIR))
@@ -376,6 +406,17 @@ def _complete_story_for_library(story_id: str, progress) -> dict:
         report = story_completion_report(story_id)
         sync_from_completion(story_dir, report)
         missing = set(report.get("missing") or [])
+
+    if "shot_timeline" in missing:
+        try:
+            timeline_path = _build_approved_shot_timeline_for_library(story_id, story_dir)
+        except ValueError:
+            timeline_path = None
+        if timeline_path is not None:
+            result["steps"].append({"step": "shot_timeline", "result": str(timeline_path)})
+            report = story_completion_report(story_id)
+            sync_from_completion(story_dir, report)
+            missing = set(report.get("missing") or [])
 
     if missing.intersection({"scene_video", "full_video"}):
         emit("render", f"Rendering MP4 files for {story_id}", 0.62)
