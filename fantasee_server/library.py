@@ -214,6 +214,19 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
         else:
             add_issue("subtitles", subs_error, scene=scene_key)
 
+        stale_messages = {
+            "images": "Scene artwork is stale after an editorial revision",
+            "audio": "Narration audio is stale after an editorial revision",
+            "subtitles": "Subtitles are stale after an editorial revision",
+            "scene_video": "Scene video is stale after an editorial revision",
+            "full_video": "Full story video is stale after an editorial revision",
+            "plex": "Plex package is stale after an editorial revision",
+        }
+        existing_kinds = {issue["kind"] for issue in issues if issue.get("scene") == scene_key}
+        for stale_kind in scene.get("stale_outputs") or []:
+            if stale_kind in stale_messages and stale_kind not in existing_kinds:
+                add_issue(stale_kind, stale_messages[stale_kind], scene=scene_key)
+
         scene_mp4s = [story_dir / f"{story_id}_s{scene_key}.mp4"]
         if padded_key != scene_key:
             scene_mp4s.append(story_dir / f"{story_id}_s{padded_key}.mp4")

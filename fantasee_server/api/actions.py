@@ -52,6 +52,63 @@ from fantasee_server.state import (
 router = APIRouter(tags=["actions"])
 
 
+@router.patch("/api/stories/{story_id}/scenes/{scene_idx}")
+async def update_story_scene(story_id: str, scene_idx: int, body: dict = Body(default=None)):
+    """Persist a scene revision and invalidate its derived media."""
+    story_dir = generated_story_dir(story_id)
+    manifest_path = story_dir / f"{story_id}.json"
+    if not manifest_path.exists():
+        raise HTTPException(status_code=404, detail="Story not found")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    scenes = manifest.get("scenes") or []
+    if scene_idx < 0 or scene_idx >= len(scenes):
+        raise HTTPException(status_code=400, detail="Invalid scene index")
+
+    payload = body or {}
+    allowed = {"title", "prompt", "narration"}
+    unknown = sorted(set(payload) - allowed)
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown scene fields: {', '.join(unknown)}")
+    if not payload:
+        raise HTTPException(status_code=400, detail="At least one scene field is required")
+
+    scene = scenes[scene_idx]
+    stale = set(scene.get("stale_outputs") or [])
+    if "title" in payload:
+        title = str(payload["title"]).strip()
+        if not title:
+            raise HTTPException(status_code=400, detail="Scene title cannot be empty")
+        scene["title"] = title
+    if "prompt" in payload:
+        prompt = str(payload["prompt"]).strip()
+        if not prompt:
+            raise HTTPException(status_code=400, detail="Scene visual direction cannot be empty")
+        if prompt != str(scene.get("prompt") or ""):
+            scene["prompt"] = prompt
+            scene["image_filenames"] = []
+            stale.update({"images", "scene_video", "full_video", "plex"})
+    if "narration" in payload:
+        narration = str(payload["narration"]).strip()
+        if not narration:
+            raise HTTPException(status_code=400, detail="Scene narration cannot be empty")
+        current = str(scene.get("narration") or scene.get("narration_text") or "")
+        if narration != current:
+            scene["narration"] = narration
+            scene["narration_text"] = narration
+            scene["audio_filename"] = ""
+            scene["audio_duration"] = 0
+            scene["subtitle_file"] = ""
+            stale.update({"audio", "subtitles", "scene_video", "full_video", "plex"})
+
+    stale_order = ("images", "audio", "subtitles", "scene_video", "full_video", "plex")
+    scene["stale_outputs"] = [kind for kind in stale_order if kind in stale]
+    scene["editor_revision"] = now()
+    manifest["status"] = "draft"
+    atomic_write_json(manifest_path, manifest)
+    return {"status": "ok", "scene": scene, "stale_outputs": scene["stale_outputs"]}
+
+
 # ── Extend ────────────────────────────────────────────────────────
 
 @router.post("/api/stories/{story_id}/extend")

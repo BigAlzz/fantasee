@@ -77,6 +77,9 @@ async def regenerate_scene(story_id: str, scene_idx: int):
             timeout=600,
         )
     scene["image_filenames"] = [new_filename] if new_filename else []
+    stale_outputs = set(scene.get("stale_outputs") or [])
+    if new_filename:
+        stale_outputs.discard("images")
 
     # Regenerate TTS
     from tts_utils import generate_tts, get_audio_duration
@@ -87,18 +90,28 @@ async def regenerate_scene(story_id: str, scene_idx: int):
             old_path = story_dir / old_audio
             if old_path.exists():
                 old_path.unlink()
-            audio_filename = f"tts_{story_id}_s{padded}.wav"
-            audio_path = str(story_dir / audio_filename)
-            # Prefer the explicit "tone" field on the manifest, fall back
-            # to the legacy position in tags ([style, tone, "generated"]).
-            story_tone = manifest.get("tone") or ""
-            if not story_tone:
-                tags = manifest.get("tags", [])
-                story_tone = tags[1] if len(tags) >= 2 else ""
-            ok = generate_tts(narration, audio_path, voice="Dean", tone=story_tone or "normal")
-            if ok:
-                scene["audio_filename"] = audio_filename
-                scene["audio_duration"] = get_audio_duration(audio_path)
+        audio_filename = f"tts_{story_id}_s{padded}.wav"
+        audio_path = str(story_dir / audio_filename)
+        # Prefer the explicit "tone" field on the manifest, fall back
+        # to the legacy position in tags ([style, tone, "generated"]).
+        story_tone = manifest.get("tone") or ""
+        if not story_tone:
+            tags = manifest.get("tags", [])
+            story_tone = tags[1] if len(tags) >= 2 else ""
+        ok = generate_tts(narration, audio_path, voice="Dean", tone=story_tone or "normal")
+        if not ok:
+            raise HTTPException(status_code=500, detail="Narration regeneration failed")
+        scene["audio_filename"] = audio_filename
+        scene["audio_duration"] = get_audio_duration(audio_path)
+        # Subtitles are derived from this exact audio file, never from the
+        # previous narration timing.
+        sys.path.insert(0, str(STORY_VIEWER_DIR))
+        from story_actions import _regen_scene_subs
+        _regen_scene_subs(story_dir, story_id, padded, scene, manifest)
+        stale_outputs.discard("audio")
+        stale_outputs.discard("subtitles")
+
+    scene["stale_outputs"] = [kind for kind in ("images", "audio", "subtitles", "scene_video", "full_video", "plex") if kind in stale_outputs]
 
     atomic_write_json(manifest_path, manifest)
     return {"status": "ok", "scene": scene}

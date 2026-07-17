@@ -18,6 +18,9 @@ export type Scene = {
   prompt?: string;
   image_filenames?: string[];
   audio_duration?: number;
+  audio_filename?: string;
+  subtitle_file?: string;
+  stale_outputs?: string[];
 };
 
 export type StoryDetail = Story & { scenes: Scene[] };
@@ -94,6 +97,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 export const api = {
   stories: () => request<{ stories: Story[] }>("/api/stories"),
   story: (id: string) => request<StoryDetail>(`/api/stories/${id}`),
+  updateScene: (storyId: string, sceneIndex: number, input: { title?: string; prompt?: string; narration?: string }) => request<{ status: string; scene: Scene; stale_outputs: string[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
   runs: () => request<{ runs: ProductionRun[] }>("/api/production/runs"),
   run: (id: string) => request<{ run: ProductionRun; jobs: ProductionJob[] }>(`/api/production/runs/${id}`),
   workers: () => request<{ workers: Worker[] }>("/api/production/workers"),
@@ -103,7 +107,7 @@ export const api = {
   spawn: (kind: "cpu" | "gpu") => request(`/api/comfyui/workers/spawn-${kind}`, { method: "POST" }),
   killComfy: (url: string) => request("/api/comfyui/workers/kill", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) }),
   generate: (input: GenerateInput) => request<{ task_id: string; message: string }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
-  regenerateScene: (storyId: string, sceneIndex: number) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/regenerate`, { method: "POST" }),
+  regenerateScene: (storyId: string, sceneIndex: number) => request<{ status: string; scene: Scene }>(`/api/stories/${storyId}/scenes/${sceneIndex}/regenerate`, { method: "POST" }),
   addSceneImage: (storyId: string, sceneIndex: number) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/add-image`, { method: "POST" }),
   sceneShots: (storyId: string, sceneIndex: number) => request<{ shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`),
   planSceneShots: (storyId: string, sceneIndex: number) => request<{ revision: number; shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pacing: "balanced" }) }),
