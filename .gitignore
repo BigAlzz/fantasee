@@ -12,6 +12,9 @@ audio/
 *.mp3
 *.mp4
 *.wav
+node_modules/
+dist/
+output/playwright/
 
 # Logs
 logs/

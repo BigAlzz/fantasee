@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -46,6 +46,9 @@ from fantasee_server.paths import STATIC_DIR, load_stories
 from fantasee_server.security import require_operator
 from fantasee_server.startup import startup_ensure_workers
 from fantasee_server.state import _library_agent_task
+
+
+STUDIO_DIR = Path(__file__).parent / "studio" / "dist"
 
 
 @asynccontextmanager
@@ -143,6 +146,18 @@ app.include_router(ws.router)
 # The root URL (``/``) is served by generated.router.serve_index
 # so the SPA's index.html is returned even for the bare root.
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.get("/studio/{path:path}", include_in_schema=False)
+def serve_studio(path: str = ""):
+    """Serve the independently-built Studio client without replacing legacy UI."""
+    index = STUDIO_DIR / "index.html"
+    if not index.is_file():
+        raise HTTPException(status_code=404, detail="Studio is not built. Run npm run build in studio/.")
+    requested = (STUDIO_DIR / path).resolve()
+    if path and requested.is_file() and requested.is_relative_to(STUDIO_DIR.resolve()):
+        return FileResponse(str(requested))
+    return FileResponse(str(index))
 
 
 # ── Public re-exports ───────────────────────────────────────────
