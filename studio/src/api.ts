@@ -134,4 +134,6 @@ export const api = {
   buildStoryShotTimeline: (storyId: string) => request<{ path: string; segments: Array<{ shot_id: string; start: number; end: number }> }>(`/api/stories/${storyId}/shots/timeline`, { method: "POST" }),
   storyTimeline: (storyId: string) => request<{ shot_segments: TimelineShot[]; segments: Array<{ scene_id: string; text: string; start: number; end: number }> }>(`/api/stories/${storyId}/timeline`),
   sceneSubtitles: (storyId: string, sceneIndex: number) => request<{ audio_filename: string; subtitle_file: string; segments: SubtitleCue[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/subtitles`),
+  renderStory: (storyId: string) => request<{ status: string; message?: string; rendered_count?: number }>(`/api/stories/${storyId}/render`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) }),
+  exportPlex: (storyId: string) => request<{ status: string; message?: string; task_id?: string }>(`/api/stories/${storyId}/export-plex`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) }),
 };
