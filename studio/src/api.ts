@@ -35,7 +35,7 @@ export type SemanticShot = {
   visual_context: string;
 };
 
-export type ShotAsset = { id: string; status: string; filename: string; revision?: number };
+export type ShotAsset = { id: string; status: string; filename: string; url?: string; revision?: number };
 export type TimelineShot = { scene_id: string; shot_id: string; asset_path: string; start: number; end: number };
 export type SubtitleCue = { start: number; end: number; text: string };
 

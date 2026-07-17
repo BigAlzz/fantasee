@@ -19,6 +19,7 @@ from fantasee_server.production_runtime import (
 from fantasee_server.production_store import ProductionStore
 from fantasee_server.production_worker import ProductionWorker
 from fantasee_server.paths import STORY_VIEWER_DIR, generated_story_dir
+from fantasee_server.discovery import generated_asset_url
 from fantasee_server.shot_planning import ShotSpec, plan_semantic_shots, validate_shot_plan
 from fantasee_server.state import atomic_write_json
 from fantasee_server.media_timeline import (
@@ -361,6 +362,7 @@ def list_shot_assets(story_id: str, scene_idx: int, shot_id: str):
         "id": asset.id,
         "status": asset.status,
         "filename": Path(asset.path).name,
+        "url": generated_asset_url(story_id, Path(asset.path).name),
         "revision": asset.metadata.get("revision"),
     } for asset in assets]}
 
