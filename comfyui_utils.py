@@ -24,6 +24,37 @@ COMFYUI_PORT = 8188
 COMFYUI_BASE = f"http://{COMFYUI_HOST}:{COMFYUI_PORT}"
 
 
+class ComfyGenerationError(RuntimeError):
+    """A ComfyUI prompt completed with a provider-side execution error."""
+
+
+def _safe_output_filename(filename: str) -> str:
+    """Return a Windows-safe leaf filename for a generated image."""
+    leaf = Path(str(filename).replace("\\", "/")).name
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", leaf).strip(" .")
+    if not safe or safe in {".", ".."}:
+        raise ValueError("ComfyUI returned an invalid image filename")
+    return safe
+
+
+def _history_error_message(status: dict) -> str | None:
+    """Extract a compact provider error from a ComfyUI history status."""
+    status_text = str(status.get("status_str") or "").lower()
+    if status_text not in {"error", "failed", "failure"}:
+        return None
+    messages = status.get("messages") or []
+    for message in messages:
+        if isinstance(message, (list, tuple)) and len(message) > 1:
+            detail = message[1]
+            if isinstance(detail, dict):
+                detail = detail.get("exception_message") or detail.get("message") or detail
+            if detail:
+                return str(detail)[:300]
+        elif message:
+            return str(message)[:300]
+    return f"ComfyUI reported status {status_text}"
+
+
 def _comfyui_bases() -> list[str]:
     """Return the list of ComfyUI base URLs to use.
 
@@ -1182,6 +1213,11 @@ def generate_image(
                     if prompt_id in history:
                         entry = history[prompt_id]
                         status = entry.get("status", {})
+                        provider_error = _history_error_message(status)
+                        if provider_error:
+                            raise ComfyGenerationError(
+                                f"ComfyUI prompt {prompt_id} failed: {provider_error}"
+                            )
                         if status.get("completed", False) is False and status.get("status_str") not in ("success", None):
                             # Still running, keep waiting
                             time.sleep(3)
@@ -1190,12 +1226,14 @@ def generate_image(
                         # Find output images
                         outputs = entry.get("outputs", {})
                         found_image = None
+                        found_subfolder = ""
                         for node_out in outputs.values():
                             for img_list in node_out.values():
                                 if isinstance(img_list, list):
                                     for img in img_list:
                                         if isinstance(img, dict) and img.get("filename"):
                                             found_image = img["filename"]
+                                            found_subfolder = str(img.get("subfolder") or "")
                                             break
                                     if found_image:
                                         break
@@ -1210,13 +1248,18 @@ def generate_image(
                             )
                             # Copy from ComfyUI output to our output dir
                             comfyui_out = Path.home() / "Documents/comfy/ComfyUI/output"
-                            src = comfyui_out / found_image
+                            safe_filename = _safe_output_filename(found_image)
+                            subfolder_path = Path(found_subfolder.replace("\\", "/")) if found_subfolder else Path()
+                            if subfolder_path.is_absolute() or ".." in subfolder_path.parts:
+                                raise ValueError("ComfyUI returned an unsafe image subfolder")
+                            source_relative = subfolder_path / found_image if found_subfolder else Path(found_image)
+                            src = comfyui_out / source_relative
                             validated_path = src
                             if src.exists():
                                 dest_dir = Path(output_dir) if output_dir else Path(".")
                                 dest_dir.mkdir(parents=True, exist_ok=True)
                                 import shutil
-                                dest = dest_dir / found_image
+                                dest = dest_dir / safe_filename
                                 shutil.copy2(str(src), str(dest))
                                 validated_path = dest
                                 print(
@@ -1230,7 +1273,7 @@ def generate_image(
                                     file=sys.stderr,
                                 )
                                 return None
-                            return found_image
+                            return safe_filename
 
                         # Prompt finished but produced no images — this is a real error
                         empty_output_polls += 1
@@ -1243,12 +1286,16 @@ def generate_image(
                             )
                             return None
                 time.sleep(3)
+            except ComfyGenerationError:
+                raise
             except Exception:
                 time.sleep(3)
 
         print(f"[comfyui_utils] Timeout after {timeout}s waiting for prompt_id={prompt_id}", file=sys.stderr)
         return None
 
+    except ComfyGenerationError:
+        raise
     except requests.ConnectionError:
         print(f"[comfyui_utils] Connection error to {base} — ComfyUI may have stopped", file=sys.stderr)
         return None
