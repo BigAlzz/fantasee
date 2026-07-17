@@ -200,3 +200,25 @@ def test_restoring_a_shot_plan_revision_creates_a_new_current_revision(tmp_path)
     assert store.list_shots("story-1", "scene-01")[0].visual_context == "Original context"
     assert store.list_shots("story-1", "scene-01", revision=2)[0].visual_context == "Unwanted revision"
     store.close()
+
+
+def test_reordering_shots_creates_revision_without_changing_visual_context(tmp_path):
+    store = ProductionStore(tmp_path / "production.db")
+    shots = [
+        ShotSpec("scene-01-shot-01", "scene-01", 1, "first", "wide", 4.0, "Road"),
+        ShotSpec("scene-01-shot-02", "scene-01", 2, "second", "close", 4.0, "Compass"),
+    ]
+    store.save_shot_plan("story-1", "scene-01", shots)
+
+    revision = store.reorder_shots(
+        "story-1", "scene-01", ["scene-01-shot-02", "scene-01-shot-01"]
+    )
+
+    latest = store.list_shots("story-1", "scene-01")
+    previous = store.list_shots("story-1", "scene-01", revision=1)
+    assert revision == 2
+    assert [shot.id for shot in latest] == ["scene-01-shot-02", "scene-01-shot-01"]
+    assert [shot.order for shot in latest] == [1, 2]
+    assert previous[0].visual_context == "Road"
+    assert latest[0].visual_context == "Compass"
+    store.close()

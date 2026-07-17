@@ -605,7 +605,8 @@ class ProductionStore:
         return {key: int(row[key]) for key in ("estimated", "reserved", "actual", "retries")}
 
     def save_shot_plan(
-        self, story_id: str, scene_id: str, shots: list[ShotSpec]
+        self, story_id: str, scene_id: str, shots: list[ShotSpec], *,
+        supersede_assets: bool = True,
     ) -> int:
         """Persist an immutable ordered revision for one scene's visual plan."""
         now = time.time()
@@ -631,7 +632,7 @@ class ProductionStore:
                 ],
             )
             shot_ids = [shot.id for shot in shots]
-            if shot_ids:
+            if shot_ids and supersede_assets:
                 placeholders = ",".join("?" for _ in shot_ids)
                 self.connection.execute(
                     f"""UPDATE production_assets SET status = 'superseded'
@@ -691,6 +692,32 @@ class ProductionStore:
             for shot in current
         ]
         return self.save_shot_plan(story_id, scene_id, revised)
+
+    def reorder_shots(self, story_id: str, scene_id: str, shot_ids: list[str]) -> int:
+        """Persist a new shot-order revision without replacing approved images."""
+        current = self.list_shots(story_id, scene_id)
+        expected = {shot.id for shot in current}
+        if not current or set(shot_ids) != expected or len(shot_ids) != len(expected):
+            raise ValueError("shot_ids must contain every current shot exactly once")
+        by_id = {shot.id: shot for shot in current}
+        reordered = [
+            ShotSpec(
+                id=shot_id,
+                scene_id=scene_id,
+                order=index,
+                purpose=by_id[shot_id].purpose,
+                shot_type=by_id[shot_id].shot_type,
+                duration_seconds=by_id[shot_id].duration_seconds,
+                visual_context=by_id[shot_id].visual_context,
+            )
+            for index, shot_id in enumerate(shot_ids, start=1)
+        ]
+        return self.save_shot_plan(
+            story_id,
+            scene_id,
+            reordered,
+            supersede_assets=False,
+        )
 
     def restore_shot_plan_revision(
         self, story_id: str, scene_id: str, *, revision: int

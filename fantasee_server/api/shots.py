@@ -31,6 +31,24 @@ from fantasee_server.media_timeline import (
 router = APIRouter(tags=["shots"])
 
 
+def _invalidate_shot_release(story_id: str, scene_idx: int) -> None:
+    """Mark visual ordering changes as stale through the release chain."""
+    manifest_path = generated_story_dir(story_id) / f"{story_id}.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    scene = manifest["scenes"][scene_idx]
+    existing = set(scene.get("stale_outputs") or [])
+    existing.update({"shot_timeline", "scene_video", "full_video", "plex"})
+    order = ("images", "audio", "subtitles", "shot_timeline", "scene_video", "full_video", "plex")
+    scene["stale_outputs"] = [kind for kind in order if kind in existing]
+    manifest["status"] = "draft"
+    pipeline = manifest.get("pipeline")
+    if not isinstance(pipeline, dict):
+        pipeline = {}
+    pipeline.update({"status": "draft", "next_stage": "shot_timeline"})
+    manifest["pipeline"] = pipeline
+    atomic_write_json(manifest_path, manifest)
+
+
 def _scene_for(story_id: str, scene_idx: int) -> tuple[dict, str]:
     manifest_path = generated_story_dir(story_id) / f"{story_id}.json"
     if not manifest_path.is_file():
@@ -68,6 +86,20 @@ def plan_scene_shots(story_id: str, scene_idx: int, body: dict = Body(default=No
     with ProductionStore(production_database_path()) as store:
         revision = store.save_shot_plan(story_id, scene_id, shots)
     return {"scene_id": scene_id, "revision": revision, "shots": [shot.__dict__ for shot in shots]}
+
+
+@router.patch("/api/stories/{story_id}/scenes/{scene_idx}/shots/order")
+def reorder_scene_shots(story_id: str, scene_idx: int, body: dict = Body(default=None)):
+    _, scene_id = _scene_for(story_id, scene_idx)
+    shot_ids = [str(value).strip() for value in (body or {}).get("shot_ids", []) if str(value).strip()]
+    try:
+        with ProductionStore(production_database_path()) as store:
+            revision = store.reorder_shots(story_id, scene_id, shot_ids)
+            shots = store.list_shots(story_id, scene_id, revision=revision)
+        _invalidate_shot_release(story_id, scene_idx)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"scene_id": scene_id, "revision": revision, "shots": [shot.__dict__ for shot in shots], "timeline_stale": True}
 
 
 @router.patch("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}")
