@@ -974,7 +974,9 @@ def _healthy_bases(timeout: float = 1.5) -> list[str]:
     """
     healthy = []
     for base in _comfyui_bases():
-        if is_running_at(base, timeout=timeout)["running"]:
+        status = is_running_at(base, timeout=timeout)
+        if status["running"]:
+            _infer_worker_kind(base, status)
             healthy.append(base)
     return healthy
 
@@ -992,6 +994,22 @@ def _worker_kind(url: str) -> str:
     if url == COMFYUI_BASE:
         return "gpu"
     return "manual"
+
+
+def _infer_worker_kind(url: str, status: dict) -> None:
+    """Record a worker's capability from ComfyUI's reported argv metadata."""
+    if url in _worker_kinds:
+        return
+    if url == COMFYUI_BASE:
+        _register_worker_kind(url, "gpu")
+        return
+    system = (status.get("system_stats") or {}).get("system") or {}
+    argv = system.get("argv") or ""
+    argv_text = " ".join(str(item) for item in argv) if isinstance(argv, list) else str(argv)
+    if "--directml" in argv_text:
+        _register_worker_kind(url, "gpu")
+    elif "--cpu" in argv_text:
+        _register_worker_kind(url, "cpu")
 
 
 def _bases_by_priority(bases: list[str]) -> list[str]:

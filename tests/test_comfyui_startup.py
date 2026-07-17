@@ -147,6 +147,18 @@ class TestComfyUIStartupReadiness(unittest.TestCase):
             comfyui_utils._worker_kinds[GPU_1] = "gpu"
             self.assertIsNone(comfyui_utils._pick_healthy_base("cpu"))
 
+    def test_explicit_max_worker_identity_is_inferred_from_comfy_argv(self):
+        cpu = "http://127.0.0.1:8190"
+        os.environ["COMFYUI_URLS"] = cpu
+        status = {
+            "running": True,
+            "url": cpu,
+            "system_stats": {"system": {"argv": ["main.py", "--cpu", "--port", "8190"]}},
+        }
+        with patch.object(comfyui_utils, "is_running_at", return_value=status):
+            self.assertEqual(comfyui_utils._healthy_bases(), [cpu])
+        self.assertEqual(comfyui_utils._worker_kind(cpu), "cpu")
+
 
 if __name__ == "__main__":
     unittest.main()
