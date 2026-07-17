@@ -1295,6 +1295,28 @@ def generate_image(
         return None
 
     except ComfyGenerationError:
+        if base_url is None:
+            alternatives = [worker for worker in _healthy_bases() if worker != base]
+            if alternatives:
+                fallback = alternatives[0]
+                print(
+                    f"[comfyui_utils] Retrying failed prompt on alternate worker {fallback}",
+                    file=sys.stderr,
+                )
+                return generate_image(
+                    prompt=prompt,
+                    output_prefix=output_prefix,
+                    output_dir=output_dir,
+                    negative_prompt=negative_prompt,
+                    seed=seed,
+                    checkpoint=checkpoint,
+                    width=width,
+                    height=height,
+                    timeout=timeout,
+                    workflow_path=workflow_path,
+                    append_positive_guard=append_positive_guard,
+                    base_url=fallback,
+                )
         raise
     except requests.ConnectionError:
         print(f"[comfyui_utils] Connection error to {base} — ComfyUI may have stopped", file=sys.stderr)
