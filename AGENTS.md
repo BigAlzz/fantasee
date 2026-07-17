@@ -15,6 +15,20 @@ The product is not finished when generation returns successfully. A production
 is finished only when every required artifact exists, passes validation, and is
 derived from the current approved inputs.
 
+## Confirmed Initial Build Parameters
+
+- Windows is the first supported platform; adapters should not prevent later
+  cross-platform work.
+- The new Studio frontend uses React, TypeScript, and Vite.
+- SQLite is the required metadata store for the first production release.
+- The first milestone is durable queue state, restart recovery, persistent
+  events, and truthful progress.
+- The new Studio library starts empty. Existing stories stay in their archive.
+- Autopilot is configurable through approval gates and creative locks.
+- The Director chooses shot density from narration, pacing, and scene purpose.
+- LLM work uses many bounded, schema-validated calls rather than one call that
+  writes an entire story.
+
 ## Non-Negotiable Invariants
 
 1. **Truthful completion.** Never label a story, scene, shot, job, or release
@@ -45,6 +59,13 @@ derived from the current approved inputs.
    Existing stories remain outside the new library and are never deleted or
    silently imported. A later, explicit import feature may bring selected
    stories across with previews, backups, and rollback.
+14. **Granular LLM work.** Do not ask one LLM call to write and finalize an
+   entire story. Each call owns one bounded deliverable and is followed by
+   validation, critique, or revision before downstream work proceeds.
+15. **Token discipline.** More calls and larger contexts must buy measurable
+   quality or reliability. Every production tracks estimated and actual token
+   spend, reuses approved context, and escalates budgets only when evidence
+   shows the current budget is insufficient.
 
 ## Domain Language
 
@@ -170,6 +191,57 @@ Agent rules:
 7. Keep prompts model-aware and within the selected model's effective limits.
 8. Preserve the canonical narration rules under `skills/` unless a production
    explicitly selects another versioned style pack.
+
+### LLM Micro-Commissioning
+
+The LLM pipeline is hierarchical and deliberately granular. A normal
+production may use separate calls for:
+
+- creative-intent interpretation and title candidates
+- story bible sections and continuity rules
+- act or arc outline
+- one scene card at a time
+- one scene's narration and dialogue passes
+- one scene's shot plan
+- one shot's visual prompt
+- one scene's voice-performance direction
+- continuity checks between adjacent scenes
+- critic findings and targeted revisions
+
+Rules for each call:
+
+1. Ask for one clear deliverable, not an entire story plus all metadata.
+2. Supply only the relevant bounded context, not the entire production by
+   default.
+3. Require a versioned schema or a single clearly scoped text artifact.
+4. Validate the result before saving it as an approved revision.
+5. Use a separate critic or verifier call for high-value creative artifacts.
+6. Revise only the failed section, preserving approved neighboring work.
+7. Record model, prompt template, context references, settings, and response
+   fingerprint for every call.
+8. Make call-level failures retryable without restarting unrelated work.
+9. Use deterministic context assembly so a retry sees the same approved inputs.
+10. Make whole-story calls opt-in exceptions requiring an explicit production
+    rule and a documented reason.
+
+Token policy:
+
+- Set a task-specific input and output budget from the deliverable schema.
+- Prefer a larger bounded budget for a complex scene over a shallow whole-story
+  request with the same total budget.
+- Do not request tokens that the schema, context, or downstream consumer cannot
+  use.
+- Start at the lowest budget expected to produce a complete result.
+- Escalate only after a validator, critic, or user request identifies a real
+  deficiency.
+- Retry with targeted feedback, not the entire story context.
+- Cache approved context summaries and revisions instead of resending raw
+  history on every call.
+- Record estimated, reserved, and actual token usage for every call.
+- Enforce per-run and per-story budgets, with an explicit user-visible reason
+  when a budget is increased.
+- Measure quality improvement per additional token before making a task's budget
+  the new default.
 
 ## Durable Job Rules
 

@@ -366,6 +366,79 @@ repair.
 Quality: actionable findings, no unsupported aesthetic score, and no direct
 mutation.
 
+### 13.1 Granular LLM Production
+
+The Writer and Critic do not receive a request such as "write the whole story
+and make it production-ready." The engine commissions a sequence of bounded
+deliverables. Each deliverable is validated, persisted as a revision, and made
+available to the next call only after it passes its contract.
+
+The default call ladder is:
+
+1. Interpret creative intent and produce title and direction candidates.
+2. Build the story bible in focused sections: cast, world, rules, conflicts,
+   and continuity constraints.
+3. Outline the story by arc or act.
+4. Generate one scene card at a time from the approved outline and bible.
+5. Generate or revise one scene's narration and dialogue.
+6. Have the Director plan that scene's semantic shots and choose visual density
+   from narration duration, pacing, and dramatic purpose.
+7. Generate one shot prompt at a time with only relevant character, world, and
+   neighboring-shot context.
+8. Direct one scene's voice performance at a time.
+9. Run continuity and style critics over bounded scene windows.
+10. Revise only failed scenes, shots, or passages.
+
+Each LLM call records:
+
+- task type and output schema
+- prompt-template revision
+- bounded context references
+- provider, model, temperature, token limits, and retry policy
+- raw response location or redacted diagnostic reference
+- normalized output and fingerprint
+- validation and critic evidence
+
+This creates higher-quality calls, smaller failure domains, better retries, and
+more useful user controls. A complete production may involve many small calls,
+but each call is understandable, testable, and independently replaceable.
+
+Whole-story calls are allowed only as explicit experiments or provider-specific
+shortcuts. They are not part of the default production contract.
+
+### 13.2 Token Economics and Resolution
+
+Granularity is a quality tool, not a reason to spend tokens without control.
+The engine maintains a token ledger for every run and story:
+
+- estimated tokens before submission
+- reserved tokens while queued
+- actual input and output usage when reported
+- cached-token reuse where supported
+- retry and escalation spend
+- quality evidence associated with the spend
+
+Each task receives a budget based on the size and complexity of its deliverable.
+The initial values are configuration, not hard-coded assumptions. A scene may
+legitimately receive a larger output budget, such as 4096 tokens, when its
+characters, continuity, dialogue, or medical and technical detail require more
+resolution. That budget is attached to the scene call, not wasted on a whole
+story prompt that cannot use the same detail effectively.
+
+The default budget policy is:
+
+1. Start with the smallest budget likely to satisfy the output schema.
+2. Validate structure, length, continuity, style, and usefulness.
+3. Escalate only the failed deliverable when a real deficiency is found.
+4. Send targeted feedback and bounded context on the retry.
+5. Stop when the contract passes or the configured spend limit is reached.
+6. Show the user why more tokens were requested and what improved.
+
+The system must measure quality gained per additional token. A higher budget
+becomes a default only when repeated evidence shows it improves the relevant
+artifact. More calls are not inherently better; the goal is higher resolution
+per useful token.
+
 ## 14. TDD Strategy
 
 ### 14.1 Proposed Test Seams
@@ -478,15 +551,18 @@ Commit sequence:
 9. Add priority changes for queued jobs.
 10. Add parent and child progress aggregation.
 11. Add scheduler startup recovery.
-12. Project durable events over the current WebSocket interface.
-13. Replace one low-risk background operation with the durable queue.
-14. Add restart-during-job and reconnect-during-job browser tests.
+12. Add token budget reservation and spend ledger behavior.
+13. Add approved-context cache references to job inputs.
+14. Project durable events over the current WebSocket interface.
+15. Replace one low-risk background operation with the durable queue.
+16. Add restart-during-job and reconnect-during-job browser tests.
 
 Acceptance gate:
 
 - Killing and restarting the server does not lose queued work.
 - Expired work is safely retried without duplicate committed output.
 - UI progress recovers after refresh.
+- Token spend is visible, bounded, and not double-counted on retries.
 
 ### Phase 3: Immutable Assets and Provenance
 
@@ -558,7 +634,8 @@ Commit sequence:
 8. Add revision comparison behavior.
 9. Add rollback behavior.
 10. Add dependency invalidation from story to release.
-11. Import legacy scene images as inferred shot candidates.
+11. Document a later opt-in archive import without making it part of the new
+    Studio library.
 12. Add revise-one-shot vertical API slice.
 13. Add browser test proving unrelated scenes remain current.
 
@@ -577,21 +654,32 @@ Commit sequence:
 
 1. Version the canonical story-style pack.
 2. Add Writer bible schema and contract test.
-3. Add Writer outline schema and contract test.
-4. Add Writer scene schema and contract test.
-5. Add continuity context selection.
-6. Add Director shot-plan schema and contract test.
-7. Add shot-purpose and visual-distinctness validation.
-8. Add model-aware prompt budget policy.
-9. Add character and world reference resolution.
-10. Add approval gates for bible, scenes, and shot plans.
-11. Add create-story vertical slice through approved shot plan.
+3. Add focused title and creative-direction calls with response schemas.
+4. Add Writer bible section calls for cast, world, rules, and conflicts.
+5. Add Writer outline calls by arc or act.
+6. Add Writer scene-card calls one scene at a time.
+7. Add focused narration and dialogue calls per scene.
+8. Add continuity context selection from approved neighboring revisions.
+9. Add Director shot-plan schema and contract test.
+10. Add Director density selection from narration duration and pacing.
+11. Add shot-purpose and visual-distinctness validation.
+12. Add model-aware prompt budget policy.
+13. Add one-shot visual prompt calls with bounded context.
+14. Add character and world reference resolution.
+15. Add critic calls for bounded scene windows and targeted revisions.
+16. Add approval gates for bible, scenes, and shot plans.
+17. Add create-story vertical slice through the granular call ladder.
+18. Add budget-escalation tests showing that only failed deliverables receive
+    additional tokens.
 
 Acceptance gate:
 
 - No brittle prose parser is required for primary creative outputs.
 - Every planned shot has a distinct narrative purpose.
 - Prompts fit the selected image model's effective limits.
+- No default LLM call owns an entire story.
+- A failed scene or shot call can be retried without rewriting approved work.
+- A larger scene budget improves a measured quality or completeness failure.
 
 ### Phase 7: Worker Registry and Image Production
 
@@ -857,19 +945,20 @@ The first decision checkpoint established the following:
    persistent events, and truthful progress.
 5. The new Studio starts with a clean library. Existing stories remain archived
    and are not imported or deleted by the rebuild.
+6. The new Studio frontend will use React, TypeScript, and Vite.
+7. SQLite is the only required metadata database for the first production
+   release.
+8. The Director chooses shot density from narration, pacing, and scene purpose.
+9. LLM production uses many smaller, higher-quality calls with bounded context,
+   schemas, validation, and targeted revision rather than one whole-story call.
 
 ## 22. Remaining Decisions Requiring User Confirmation
 
-1. Whether React, TypeScript, and Vite are accepted for the new studio.
-2. Whether SQLite remains the only supported metadata database for the first
-   production release.
-3. Whether shot counts remain user-selected exactly or become a visual-density
-   range chosen by the Director within limits.
-4. Whether the first enhanced release prioritizes Story Studio editing, maximum
+1. Whether the first enhanced release prioritizes Story Studio editing, maximum
    unattended production, or worker throughput.
-5. Whether the initial voice system remains narrator-only or introduces a cast
+2. Whether the initial voice system remains narrator-only or introduces a cast
    of character voices in the core rebuild.
-6. Which proposed public test seams are approved for TDD.
+3. Which proposed public test seams are approved for TDD.
 
 ## 23. Immediate Next Actions After Decisions
 
