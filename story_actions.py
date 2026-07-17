@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Optional
 
 from story_storage import STORIES_ROOT, ensure_story_layout, existing_story_dir
+from image_quality import is_usable_story_image, requested_images_per_scene
 
 
 # ── Constants ──────────────────────────────────────────────────────────
@@ -469,6 +470,7 @@ def plan_repair(story_id: str, story_dir: Optional[Path] = None) -> RepairPlan:
     story_dir = _resolve_story_dir(story_id, story_dir)
     manifest = _load_manifest(story_dir)
     scenes = manifest.get("scenes") or []
+    target_images = requested_images_per_scene(manifest)
 
     plan = RepairPlan()
     for i, sc in enumerate(scenes):
@@ -478,7 +480,8 @@ def plan_repair(story_id: str, story_dir: Optional[Path] = None) -> RepairPlan:
 
         # ── Image check ──────────────────────────────────────────
         img_files = [story_dir / f for f in (sc.get("image_filenames") or []) if f]
-        image_present = bool(img_files) and all(p.exists() for p in img_files)
+        usable_img_files = [path for path in img_files if is_usable_story_image(path)]
+        image_present = len(usable_img_files) >= target_images
         if not image_present:
             sr.missing.append("image")
             sr.actions.append("regen_image")
@@ -491,8 +494,13 @@ def plan_repair(story_id: str, story_dir: Optional[Path] = None) -> RepairPlan:
                 prev = scenes[i - 1]
                 prev_imgs = [story_dir / f for f in (prev.get("image_filenames") or []) if f]
                 prev_imgs = [p for p in prev_imgs if p.exists()]
-                if prev_imgs and img_files:
-                    dist = min(_phash_hamming(cur, prev) for cur in img_files for prev in prev_imgs)
+                prev_imgs = [path for path in prev_imgs if is_usable_story_image(path)]
+                if prev_imgs and usable_img_files:
+                    dist = min(
+                        _phash_hamming(cur, prev)
+                        for cur in usable_img_files
+                        for prev in prev_imgs
+                    )
                     if dist <= PHASH_DUPLICATE_THRESHOLD:
                         sr.duplicate_image = True
                         sr.actions.append("regen_image")
@@ -674,10 +682,6 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
         # doing nothing. The endpoint translates this to a 503.
         raise RuntimeError("ComfyUI is not running — start a worker first")
 
-    # Drop any existing images so the new prefix starts fresh
-    for old in scene_obj.get("image_filenames", []):
-        _safe_unlink(story_dir / old)
-
     prompt = scene_obj.get("prompt") or ""
     if not prompt:
         raise RuntimeError("Scene has no prompt — cannot regenerate image")
@@ -686,8 +690,10 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
     tags = manifest.get("tags") or []
     style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
     checkpoint = checkpoint_for_style(style)
+    target_images = requested_images_per_scene(manifest)
+    old_images = list(scene_obj.get("image_filenames") or [])
     new_imgs = []
-    for i in range(max(1, len(scene_obj.get("image_filenames") or [None]))):
+    for i in range(target_images):
         prefix = f"{story_id}_s{padded}_{safe_title}_{(i + 1):02d}"
         filename = generate_image(
             prompt=prompt,
@@ -699,7 +705,24 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
         )
         if filename:
             new_imgs.append(filename)
+    if len(new_imgs) < target_images:
+        raise RuntimeError(
+            f"ComfyUI produced {len(new_imgs)} of {target_images} usable images for scene {padded}"
+        )
+
+    for old in old_images:
+        if old not in new_imgs:
+            _safe_unlink(story_dir / old)
     scene_obj["image_filenames"] = new_imgs
+
+    # Any video built from the old artwork is now stale and must be rebuilt.
+    _safe_unlink(story_dir / f"{story_id}_s{padded}.mp4")
+    _safe_unlink(story_dir / f"{story_id}_full.mp4")
+    _safe_unlink(story_dir / "final" / f"{story_id}_full.mp4")
+    plex_dir = story_dir / "final" / "plex"
+    if plex_dir.is_dir():
+        for plex_video in plex_dir.glob("*.mp4"):
+            _safe_unlink(plex_video)
 
 
 def _regen_scene_audio(story_dir, story_id, padded, scene_obj, manifest) -> None:

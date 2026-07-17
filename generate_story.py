@@ -347,9 +347,9 @@ story tone. Write narration whose pacing feels natural over that loop:
 
 For each scene, provide:
 1. Scene title (short, evocative, 2-5 words)
-2. Visual prompt (DETAILED natural language paragraph for image generation — never a tag list.
-   Write it as descriptive prose. Include: character appearances, setting, lighting, camera
-   angle/position, composition, color palette, mood, atmosphere. 80-150 words.)
+2. Visual prompt (COMPACT natural language prompt for image generation — never a tag list.
+   Write 35-60 words in this order: shot type, who is doing what, setting, then
+   lighting and visual style. Put the main action and location in the first 25 words.)
 3. Narrative (what happens in this scene — 40-80 words, purely in prose)
 4. Narration (voiceover text that will be read aloud by a narrator whose
    voice and delivery style match the requested TONE. The TTS model uses
@@ -571,7 +571,7 @@ Format each scene exactly as:
 
 --- SCENE 1
 Title: <title>
-Visual Prompt: <detailed natural language image generation prompt — 80-150 words>
+Visual Prompt: <compact natural language image generation prompt — 35-60 words, action first>
 Narrative: <what happens — 40-80 words>
 Narration: <voiceover text — 80-150 words, dramatic, present tense>
 
@@ -622,7 +622,8 @@ Tone: {tone}{char_section}
 
 Generate exactly {num_scenes} scenes. Each scene MUST have a Narration field
 (voiceover text for TTS — 80-150 words, dramatic, present tense).
-Make each visual prompt detailed enough for AI image generation.
+Keep each visual prompt compact enough for an SD 1.5 CLIP encoder: 35-60 words,
+with the main action and location in the first 25 words.
 
 CRITICAL: For each scene, the Visual Prompt MUST start by naming ONE
 shot type from this list: extreme wide shot, wide shot, long shot,
@@ -962,6 +963,10 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
         "tags": [style, tone, "generated"],
         "tone": tone,
         "voice_preset": voice_preset,
+        "story_concept": concept,
+        "style": style,
+        "num_scenes": num_scenes,
+        "images_per_scene": images_per_scene,
         "generated": True,
         "status": "generating",
         "hero_image": title_slide,
@@ -1254,6 +1259,10 @@ Be evocative but concise."""
         "tags": tags,
         "tone": tone,           # explicit top-level field for TTS lookups
         "voice_preset": voice_preset,
+        "story_concept": concept,
+        "style": style,
+        "num_scenes": num_scenes,
+        "images_per_scene": images_per_scene,
         "generated": True,
         "status": "draft",
         "hero_image": title_slide,

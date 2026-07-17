@@ -3725,8 +3725,8 @@ const API = {
   async fetchStories() {
     // Fetch both pre-built and generated stories
     const [builtRes, genRes] = await Promise.all([
-      fetch('/api/stories'),
-      fetch('/api/generated-stories').catch(() => ({ json: () => ({ stories: [] }) })),
+      fetch('/api/stories', { cache: 'no-store' }),
+      fetch('/api/generated-stories', { cache: 'no-store' }).catch(() => ({ json: () => ({ stories: [] }) })),
     ]);
     const built = await builtRes.json();
     const gen = await genRes.json();
@@ -3922,11 +3922,44 @@ function pickHeroImage(story) {
   return '';
 }
 
+function isTitleArtwork(url) {
+  const lowered = String(url || '').toLowerCase();
+  return lowered.includes('title_slide')
+    || lowered.includes('/assets/title/')
+    || lowered.includes('/title/');
+}
+
+function normalizeStoryArtUrl(story, value) {
+  if (!value) return '';
+  const url = String(value).replaceAll('\\', '/');
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) {
+    return url;
+  }
+  if (url.includes('/')) return `/${url}`;
+  return story.generated === false ? `/images/${url}` : `/generated/${story.id}/${url}`;
+}
+
 function pickStoryArt(story, offset = 0) {
   if (!story) return '';
-  const art = story.scene_art_urls || story.sceneArtUrls || [];
-  if (art.length) return art[Math.min(offset, art.length - 1)];
-  return pickHeroImage(story);
+  const candidates = [];
+  const addCandidates = (values) => {
+    for (const value of values || []) candidates.push(value);
+  };
+
+  // Scene art is the only valid card artwork. Never use the generated
+  // title slide here, even when it is exposed as the story's hero image.
+  addCandidates(story.scene_art_urls || story.sceneArtUrls);
+  for (const scene of story.scenes || []) {
+    addCandidates(scene.image_urls);
+    addCandidates(scene.image_filenames);
+  }
+  addCandidates([story.cover_image_url, story.cover_image]);
+
+  const usable = candidates
+    .map(value => normalizeStoryArtUrl(story, value))
+    .filter(url => url && !isTitleArtwork(url));
+  if (!usable.length) return '';
+  return usable[Math.min(offset, usable.length - 1)];
 }
 
 function criticMatchPercent(story) {
@@ -4528,7 +4561,6 @@ async function improveStory(storyId) {
           status: 'running',
           message: data.message || 'Improvement started…',
         });
-        toast.success('Improvement started in the background.');
       } else {
         toast.success(`Improved ${data.improved_scenes.length} scenes. Render: ${data.render_ok ? '✓' : '✗'}`);
         openDetail(storyId);
@@ -4631,7 +4663,6 @@ async function improveLoop(storyId) {
           status: 'running',
           message: data.message || 'Improvement loop started…',
         });
-        toast.success('Improvement loop started in the background.');
       } else {
         const msg = data.status === 'target_reached'
           ? `Target reached in ${data.rounds_completed} rounds! Stars: ${data.final_stars}`
@@ -5079,7 +5110,6 @@ async function executeDeleteStory() {
       throw new Error(data.detail || data.error || 'Delete failed');
     }
     if (data.status === 'running' && data.task_id) {
-      showToast(`Deleting "${storyId}" in the background.`, 'success');
       prefillProgressPanel(data.task_id, `Deleting ${storyId}`, {
         kind: 'delete_story',
         story_id: storyId,
@@ -5209,7 +5239,6 @@ async function executeRegenerateStory() {
     const data = await res.json();
     prefillProgressPanel(data.task_id, `Re-generating: ${storyId}`,
                         { kind: 'regenerate' });
-    showToast(`Re-generation started in the background.`, 'success', { duration: 4000 });
     closeRegenModal();
   } catch (e) {
     showToast(`Re-generate failed: ${e.message}`, 'error');
@@ -5332,7 +5361,6 @@ async function executeRepairStory() {
     const data = await res.json();
     prefillProgressPanel(data.task_id, `Repairing: ${storyId}`,
                         { kind: 'repair' });
-    showToast(`Repair started in the background.`, 'success', { duration: 4000 });
     closeRepairModal();
   } catch (e) {
     showToast(`Repair failed: ${e.message}`, 'error');
@@ -6109,8 +6137,6 @@ function exportPlexFromButton(btn) {
 
 async function exportPlexAction(storyId, btn) {
   if (btn) setBusy(btn, true, '<span class="spinner"></span> Exporting…');
-  // Show the per-stage toast immediately so the user sees feedback.
-  showPlexProgressToast('<div class="plex-stage plex-stage-current">Starting Plex export…</div>');
 
   function onWs(e) {
     try {
@@ -6118,50 +6144,17 @@ async function exportPlexAction(storyId, btn) {
       if (data.type !== 'task_update') return;
       if (!data.task_id || !data.task_id.startsWith('plex-')) return;
       if (data.story_id && data.story_id !== storyId) return;
-      const stage = data.stage || 'discover';
-      const label = PLEX_STAGE_LABELS[stage] || stage;
-      const pct = Math.round((data.progress || 0) * 100);
       const status = data.status || 'running';
-      const cssClass = status === 'error' ? 'plex-stage-error'
-        : status === 'done' ? 'plex-stage-done' : 'plex-stage-current';
-      const html = `<div class="plex-stage ${cssClass}">
-        <span class="plex-stage-label">${label}</span>
-        <span class="plex-pct">${pct}%</span>
-      </div>`;
-      // Replace the contents of the toast — keeps the UI simple and
-      // avoids needing to diff per-stage.
       const done = status === 'done';
       const fail = status === 'error';
-      const finalHtml = `
-        ${html}
-        <div class="plex-stage ${done ? 'plex-stage-done' : fail ? 'plex-stage-error' : ''}">
-          <span class="plex-stage-label">${done ? '✓ Ready' : fail ? '✗ ' + (data.message || 'Failed') : 'In progress…'}</span>
-        </div>
-      `;
-      showPlexProgressToast(finalHtml);
+      // WebSocket task updates are rendered by the persistent bottom task
+      // panel. Keep this listener only for the export button lifecycle.
       if (done) {
-        // If the server copied the package to the user's Plex library,
-        // surface the destination so they know where to look.
-        const destDir = data.result && data.result.destination_dir;
-        const destErr = data.result && data.result.destination_error;
-        if (destDir) {
-          toast.success(`Plex export ready — copied to ${destDir}`);
-        } else if (destErr) {
-          toast.warn(`Plex export ready, but library copy failed: ${destErr}`);
-        } else {
-          toast.success('Plex export ready — click "Open Plex package" to download.');
-        }
         if (btn) setBusy(btn, false);
         // Refresh story cache so the new package shows up
         setTimeout(() => init(), 500);
-        // Auto-dismiss the toast after a few seconds
-        setTimeout(() => {
-          const t = document.getElementById('plex-progress-toast');
-          if (t) t.remove();
-        }, 6000);
         if (ws) ws.removeEventListener('message', onWs);
       } else if (fail) {
-        toast.error(data.message || 'Plex export failed');
         if (btn) setBusy(btn, false);
         if (ws) ws.removeEventListener('message', onWs);
       }
@@ -6175,35 +6168,14 @@ async function exportPlexAction(storyId, btn) {
       backgroundMuted: state.backgroundMuted,
       backgroundAudio: state.backgroundAudio,
     });
-    if (Array.isArray(state.tasks)) {
-      state.tasks.push({
-        id: result.task_id, kind: 'plex_export', story_id: storyId,
-        status: 'running', message: 'Plex export started',
-      });
-    }
+    prefillProgressPanel(result.task_id, `Plex export: ${storyId}`, {
+      kind: 'plex_export', story_id: storyId,
+      status: 'running', message: 'Plex export started',
+    });
   } catch (e) {
     toast.error(`Plex export failed: ${e.message || e}`);
     if (btn) setBusy(btn, false);
   }
-}
-
-function showPlexProgressToast(html) {
-  let toastEl = document.getElementById('plex-progress-toast');
-  if (!toastEl) {
-    toastEl = document.createElement('div');
-    toastEl.id = 'plex-progress-toast';
-    toastEl.className = 'gen-progress-toast plex-progress-toast';
-    toastEl.innerHTML = `
-      <div class="toast-header">
-        <span class="toast-title">Plex Export</span>
-        <button type="button" class="toast-close" data-action="dismiss-plex-toast" aria-label="Dismiss notification">&times;</button>
-      </div>
-      <div class="plex-stages" id="plex-stages"></div>
-    `;
-    document.body.appendChild(toastEl);
-  }
-  const stages = toastEl.querySelector('#plex-stages');
-  if (stages) stages.innerHTML = html;
 }
 
 async function openPlexPackage(btn) {
@@ -6770,9 +6742,8 @@ async function submitCreate(e) {
       }));
       const result = await API.submitGenerationQueue(items);
       // Close the modal immediately so the user can navigate freely while
-      // the queue runs in the background. The right-hand progress panel
-      // and the persistent top-right toast are the running indicators.
-      showToast(`Queue of ${result.item_count} stories started in the background.`, 'success', { duration: 5000 });
+      // the queue runs in the background. The bottom task panel is the
+      // single running indicator for background work.
       prefillProgressPanel(result.queue_id, `Queue of ${result.item_count} stories`, { kind: 'queue', item_count: result.item_count });
       closeCreateModal();
       resetCreateForm();
@@ -6818,7 +6789,6 @@ async function submitCreate(e) {
       ...commonFields(),
     };
     const result = await API.submitGeneration(body);
-    showToast(`Generation started in the background — task ${result.task_id}.`, 'success', { duration: 4000 });
     prefillProgressPanel(result.task_id, concept, { kind: 'story' });
     closeCreateModal();
     resetCreateForm();
@@ -6864,7 +6834,6 @@ async function generateSelectedSeeds() {
         voice_preset: voice,
       });
       const concept = `${seed.title} — ${seed.description}`;
-      showToast(`"${seed.title}" generating in the background — task ${result.task_id}.`, 'success', { duration: 4000 });
       prefillProgressPanel(result.task_id, concept, { kind: 'story' });
     } else {
       // Multiple seeds → submit as a queue so they run sequentially in
@@ -6879,7 +6848,6 @@ async function generateSelectedSeeds() {
         voice_preset: voice,
       }));
       const result = await API.submitGenerationQueue(items);
-      showToast(`${selected.length} stories queued in the background.`, 'success', { duration: 5000 });
       prefillProgressPanel(result.queue_id, `Queue of ${selected.length} seeds`, { kind: 'queue', item_count: selected.length });
     }
     closeCreateModal();
@@ -7318,8 +7286,8 @@ function connectWebSocket() {
 
         // Some progress messages contain the generated story title —
         // e.g. `Story: "Whispers of Progress" (id: whispers-of-progress)`.
-        // Parse that and store it on the task so the panel + toast can
-        // show the real name instead of "Task undefined".
+        // Parse that and store it on the task so the panel can show the
+        // real name instead of "Task undefined".
         if (typeof data.message === 'string') {
           const m = data.message.match(/^Story:\s*"([^"]+)"\s*\(id:\s*([^)]+)\)/);
           if (m) {
@@ -7345,9 +7313,6 @@ function connectWebSocket() {
         }
         if (data.kind === 'delete_story' && data.status === 'done') {
           const sid = data.story_id;
-          const report = data.result || {};
-          const sizeMb = ((report.bytes_freed || 0) / 1024 / 1024).toFixed(1);
-          toast.success(`Deleted "${sid}" — ${report.files_deleted || 0} files, ${sizeMb} MB`);
           if (state.currentDetail && state.currentDetail.id === sid) closeDetail();
           try {
             const all = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
@@ -7358,31 +7323,20 @@ function connectWebSocket() {
           } catch (e) {}
           setTimeout(() => init(), 250);
         } else if (data.kind === 'delete_story' && data.status === 'error') {
-          toast.error(data.message || `Delete failed for ${data.story_id}`);
           setTimeout(() => init(), 250);
         } else if ((data.kind === 'improve' || data.kind === 'improve_loop') && data.status === 'done') {
           const sid = data.story_id;
-          const result = data.result || {};
-          if (data.kind === 'improve') {
-            const count = (result.improved_scenes || []).length;
-            toast.success(`Improved ${count} scene${count === 1 ? '' : 's'}.`);
-          } else if (result.status === 'target_reached') {
-            toast.success(`Improvement target reached: ${result.final_stars || 0} stars.`);
-          } else {
-            toast.success(`Improvement loop complete: ${result.final_stars || 0} stars.`);
-          }
           if (state.currentDetail && state.currentDetail.id === sid) {
             setTimeout(() => openDetail(sid), 250);
           } else {
             setTimeout(() => init(), 250);
           }
         } else if ((data.kind === 'improve' || data.kind === 'improve_loop') && data.status === 'error') {
-          toast.error(data.message || `Improvement failed for ${data.story_id}`);
-        } else if (data.kind === 'library_maintenance' && data.status === 'done') {
-          toast.success(data.message || 'Library maintenance complete.');
-          setTimeout(() => init(), 500);
-        } else if (data.kind === 'library_maintenance' && data.status === 'error') {
-          toast.error(data.message || 'Library maintenance failed.');
+          setTimeout(() => init(), 250);
+        } else if (data.kind === 'library_maintenance' &&
+                   (data.status === 'done' || data.status === 'error')) {
+          // The bottom task panel is the single status surface for this
+          // background task. Refresh the library after it settles.
           setTimeout(() => init(), 500);
         }
       }
@@ -7536,46 +7490,15 @@ pollComfyUI();
 setInterval(pollComfyUI, 15000);
 
 // ═══════════════════════════════════════════════════════════════════════
-// GENERATION PROGRESS TOAST
+// GENERATION PROGRESS PANEL HOOK
 // ═══════════════════════════════════════════════════════════════════════
 function showGenProgress(taskId, message, progress, title) {
-  let toast = document.getElementById('gen-progress-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'gen-progress-toast';
-    toast.className = 'gen-progress-toast';
-    toast.innerHTML = `
-      <div class="toast-header">
-        <span class="toast-title" id="gen-progress-title">Generating Story…</span>
-        <button type="button" class="toast-close" data-action="dismiss-gen-toast" aria-label="Dismiss notification">&times;</button>
-      </div>
-      <div class="progress-bar-track"><div class="progress-bar-fill" id="gen-progress-fill"></div></div>
-      <div><span class="toast-message" id="gen-progress-msg"></span><span class="toast-percent" id="gen-progress-pct"></span></div>
-    `;
-    document.body.appendChild(toast);
-  }
-  const titleEl = document.getElementById('gen-progress-title');
-  if (title) {
-    titleEl.textContent = `Generating: ${title}`;
-  } else if (!titleEl.dataset.placeholder) {
-    // First time we see the toast and we don't have a title yet — keep
-    // the generic placeholder until the server sends the real name.
-    titleEl.textContent = 'Generating Story…';
-  }
-  document.getElementById('gen-progress-msg').textContent = message || '';
-  const pct = Math.round((progress || 0) * 100);
-  document.getElementById('gen-progress-pct').textContent = pct > 0 ? `${pct}%` : '';
-  // Use --pct CSS variable so the transform: scaleX() bar stays on the
-  // compositor (animating `width` triggers layout on the whole row).
-  document.getElementById('gen-progress-fill').style.setProperty('--pct', (progress || 0));
-
+  // Keep this compatibility hook for existing WebSocket callers, but route
+  // all generation progress through the persistent bottom task panel.
+  openProgressPanel();
+  updateProgressDisplay();
   if (progress >= 1.0 || (message && message.includes('complete'))) {
-    titleEl.textContent = `✓ ${title || 'Story'} complete!`;
-    // Keep the toast visible a bit longer (10s) so the user has time to
-    // notice the success state before it fades. The progress panel on
-    // the right remains as the persistent record of all tasks.
-    setTimeout(() => toast.remove(), 10000);
-    // Refresh story list so the new story shows up immediately
+    // Refresh story list so the new story shows up immediately.
     setTimeout(() => init(), 1000);
   }
 }
