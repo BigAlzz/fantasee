@@ -65,6 +65,7 @@ async def lifespan(app: FastAPI):
     # Resume durable generation jobs after ComfyUI has had a chance to start.
     asyncio.create_task(generation.recover_generation_jobs())
     asyncio.create_task(recover_library_jobs())
+    asyncio.create_task(shots.recover_shot_jobs())
 
     # On startup, check whether a ComfyUI worker is already running. If
     # not (e.g. user just ran `start.bat server` with no ComfyUI), auto-spawn

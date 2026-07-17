@@ -563,6 +563,8 @@ class ProductionStore:
         *,
         lease_seconds: float = 60,
         capabilities: tuple[str, ...] = (),
+        job_types: tuple[str, ...] = (),
+        run_id: str | None = None,
         now: float | None = None,
     ) -> ProductionJob | None:
         now = time.time() if now is None else now
@@ -580,20 +582,23 @@ class ProductionStore:
                 """,
                 (now, now),
             )
-            candidates = self.connection.execute(
-                """
+            query = """
                 SELECT * FROM production_jobs
                 WHERE status IN ('queued', 'retryable') AND available_at <= ?
-                ORDER BY created_at, id
-                """,
-                (now,),
-            ).fetchall()
+            """
+            params: tuple[Any, ...] = (now,)
+            if run_id:
+                query += " AND run_id = ?"
+                params += (run_id,)
+            candidates = self.connection.execute(query + " ORDER BY created_at, id", params).fetchall()
             worker_capabilities = set(capabilities)
+            accepted_job_types = set(job_types)
             row = next(
                 (
                     candidate
                     for candidate in candidates
-                    if set(json.loads(candidate["required_capabilities_json"])).issubset(
+                    if (not accepted_job_types or candidate["job_type"] in accepted_job_types)
+                    and set(json.loads(candidate["required_capabilities_json"])).issubset(
                         worker_capabilities
                     )
                 ),

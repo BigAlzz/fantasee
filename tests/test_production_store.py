@@ -173,3 +173,16 @@ def test_revising_one_shot_preserves_the_previous_plan_revision(tmp_path):
     assert latest[0].visual_context == "Old road"
     assert latest[1].visual_context == "A cracked brass compass in rain"
     store.close()
+
+
+def test_worker_can_lease_only_its_declared_job_type(tmp_path):
+    store = ProductionStore(tmp_path / "production.db")
+    run = store.create_run(story_id="story-1", command="repair", input_fingerprint="test")
+    store.enqueue_job(run.id, job_type="library.complete", payload={}, idempotency_key="library")
+    shot_job = store.enqueue_job(run.id, job_type="shot.generate", payload={}, idempotency_key="shot")
+
+    lease = store.lease_next_job("shot-gpu", capabilities=("gpu",), job_types=("shot.generate",))
+
+    assert lease is not None
+    assert lease.id == shot_job.id
+    store.close()

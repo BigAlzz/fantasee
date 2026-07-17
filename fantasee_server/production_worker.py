@@ -19,6 +19,8 @@ class ProductionWorker:
         *,
         worker_id: str,
         capabilities: tuple[str, ...] = (),
+        job_types: tuple[str, ...] = (),
+        run_id: str | None = None,
         lease_seconds: float = 60,
         heartbeat_seconds: float | None = None,
         max_attempts: int = 3,
@@ -26,6 +28,8 @@ class ProductionWorker:
         self.database_path = Path(database_path)
         self.worker_id = worker_id
         self.capabilities = capabilities
+        self.job_types = job_types
+        self.run_id = run_id
         self.lease_seconds = lease_seconds
         self.heartbeat_seconds = heartbeat_seconds or max(1.0, lease_seconds / 3)
         self.max_attempts = max(1, max_attempts)
@@ -43,6 +47,8 @@ class ProductionWorker:
                 self.worker_id,
                 lease_seconds=self.lease_seconds,
                 capabilities=self.capabilities,
+                job_types=self.job_types,
+                run_id=self.run_id,
             )
             if job is None:
                 store.update_worker(self.worker_id, status="idle")
