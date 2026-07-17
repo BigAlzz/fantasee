@@ -99,6 +99,23 @@ export type GenerateInput = {
 };
 
 export type SeedSuggestion = { title: string; description: string; style?: string; tone?: string; characters?: string };
+export type StudioSettings = {
+  comfyui_urls: string;
+  comfyui_auto_spawn: boolean;
+  llm_base_url: string;
+  llm_api_key?: string;
+  llm_model: string;
+  tts_voice_preset: string;
+  tts_speed: number;
+  plex_destination: string;
+  whisper_model_size: string;
+  default_scenes: number;
+  default_images_per_scene: number;
+  default_style: string;
+  default_tone: string;
+  narration_style: string;
+  [key: string]: unknown;
+};
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
@@ -139,4 +156,6 @@ export const api = {
   sceneSubtitles: (storyId: string, sceneIndex: number) => request<{ audio_filename: string; subtitle_file: string; segments: SubtitleCue[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/subtitles`),
   renderStory: (storyId: string) => request<{ status: string; message?: string; rendered_count?: number }>(`/api/stories/${storyId}/render`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) }),
   exportPlex: (storyId: string) => request<{ status: string; message?: string; task_id?: string }>(`/api/stories/${storyId}/export-plex`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) }),
+  settings: () => request<StudioSettings>("/api/settings"),
+  updateSettings: (settings: StudioSettings) => request<{ ok: boolean; settings: StudioSettings }>("/api/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) }),
 };
