@@ -37,6 +37,7 @@ export type SemanticShot = {
 
 export type ShotAsset = { id: string; status: string; filename: string; revision?: number };
 export type TimelineShot = { scene_id: string; shot_id: string; asset_path: string; start: number; end: number };
+export type SubtitleCue = { start: number; end: number; text: string };
 
 export type ProductionJob = {
   id: string;
@@ -132,4 +133,5 @@ export const api = {
   buildShotTimeline: (storyId: string, sceneIndex: number) => request<{ path: string; segments: Array<{ shot_id: string; start: number; end: number }> }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/timeline`, { method: "POST" }),
   buildStoryShotTimeline: (storyId: string) => request<{ path: string; segments: Array<{ shot_id: string; start: number; end: number }> }>(`/api/stories/${storyId}/shots/timeline`, { method: "POST" }),
   storyTimeline: (storyId: string) => request<{ shot_segments: TimelineShot[]; segments: Array<{ scene_id: string; text: string; start: number; end: number }> }>(`/api/stories/${storyId}/timeline`),
+  sceneSubtitles: (storyId: string, sceneIndex: number) => request<{ audio_filename: string; subtitle_file: string; segments: SubtitleCue[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/subtitles`),
 };

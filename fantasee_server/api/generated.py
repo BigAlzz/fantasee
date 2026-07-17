@@ -121,6 +121,30 @@ def serve_generated_vtt(filename: str):
     return FileResponse(str(filepath), media_type="text/vtt")
 
 
+@router.get("/api/stories/{story_id}/scenes/{scene_idx}/subtitles")
+def get_scene_subtitles(story_id: str, scene_idx: int):
+    """Return the Whisper cues tied to the scene's current audio file."""
+    story_dir = generated_story_dir(story_id)
+    manifest_path = story_dir / f"{story_id}.json"
+    if not manifest_path.is_file():
+        raise HTTPException(status_code=404, detail="Story not found")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        scene = (manifest.get("scenes") or [])[scene_idx]
+    except (OSError, json.JSONDecodeError, IndexError, TypeError):
+        raise HTTPException(status_code=404, detail="Scene not found")
+    subtitle_name = scene.get("subtitle_file") or f"subs_{story_id}_s{scene_idx + 1:02d}.json"
+    subtitle_path = path_under(story_dir, subtitle_name)
+    if not subtitle_path.is_file():
+        raise HTTPException(status_code=404, detail="Subtitles not found")
+    try:
+        payload = json.loads(subtitle_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=422, detail="Subtitles are unreadable") from exc
+    segments = payload if isinstance(payload, list) else payload.get("segments", [])
+    return {"audio_filename": scene.get("audio_filename") or "", "subtitle_file": subtitle_name, "segments": segments}
+
+
 # ── Generated story list / detail ─────────────────────────────────
 
 @router.get("/api/generated-stories")
