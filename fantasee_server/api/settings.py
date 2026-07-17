@@ -73,6 +73,7 @@ DEFAULTS: dict = {
     "default_images_per_scene": 5,
     "default_style": "fantasy painterly",
     "default_tone": "dramatic",
+    "narration_style": "",
 }
 
 
@@ -103,6 +104,7 @@ class Settings(BaseModel):
     default_images_per_scene: int = Field(default=5, ge=1, le=10)
     default_style: str = Field(default="fantasy painterly")
     default_tone: str = Field(default="dramatic")
+    narration_style: str = Field(default="", description="Narration style name (maps to skills/<name>-style-prompt.md)")
 
 
 # ── Persistence ───────────────────────────────────────────────────
@@ -203,6 +205,41 @@ def update_settings(body: Settings):
     apply_settings_to_env(data)
 
     return {"ok": True, "settings": _mask_settings(data)}
+
+
+@router.get("/narration-styles")
+def list_narration_styles():
+    """List available narration style prompts from skills/."""
+    skills_dir = Path(__file__).parent.parent.parent / "skills"
+    styles = []
+    if skills_dir.exists():
+        for f in sorted(skills_dir.glob("*-style-prompt.md")):
+            name = f.name.replace("-style-prompt.md", "")
+            # Read first non-empty, non-heading line as description
+            desc = ""
+            try:
+                for line in f.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        desc = line[:120]
+                        break
+            except (OSError, UnicodeError):
+                pass
+            styles.append({"name": name, "description": desc})
+    # Always include the default (Finn style from style.md)
+    default_desc = ""
+    default_path = skills_dir / "style.md"
+    if default_path.exists():
+        try:
+            for line in default_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    default_desc = line[:120]
+                    break
+        except (OSError, UnicodeError):
+            pass
+    styles.insert(0, {"name": "finn", "description": default_desc or "Default literary narration style"})
+    return {"styles": styles}
 
 
 @router.get("/llm-models")

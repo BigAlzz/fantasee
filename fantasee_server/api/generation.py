@@ -120,6 +120,8 @@ async def _run_generation(task_id: str, req: GenerateRequest, job_progress=None)
     ]
     if req.characters:
         cmd += ["--characters", req.characters]
+    if getattr(req, "narration_style", ""):
+        cmd += ["--narration-style", req.narration_style]
 
     process = await asyncio.create_subprocess_exec(
         *cmd,

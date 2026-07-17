@@ -85,6 +85,20 @@ def revise_scene_shot(story_id: str, scene_idx: int, shot_id: str, body: dict = 
     return {"scene_id": scene_id, "revision": revision, "shots": [shot.__dict__ for shot in shots]}
 
 
+@router.patch("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}/lock")
+def lock_scene_shot(story_id: str, scene_idx: int, shot_id: str, body: dict = Body(default=None)):
+    _, scene_id = _scene_for(story_id, scene_idx)
+    if not shot_id.startswith(f"{scene_id}-shot-"):
+        raise HTTPException(status_code=400, detail="Shot does not belong to this scene")
+    with ProductionStore(production_database_path()) as store:
+        shots = store.list_shots(story_id, scene_id)
+        if not any(shot.id == shot_id for shot in shots):
+            raise HTTPException(status_code=404, detail="Shot not found")
+        locked = bool((body or {}).get("locked", True))
+        lock = store.set_lock(story_id, "shot", shot_id, locked)
+    return {"shot_id": shot_id, "locked": lock is not None, "locked_at": lock.locked_at if lock else None}
+
+
 async def _run_shot_job(run_id: str) -> None:
     """Claim one queued shot job on a GPU-capable local worker."""
     worker = ProductionWorker(
@@ -282,6 +296,22 @@ def build_story_shot_timeline_route(story_id: str):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     target = write_shot_timeline(story_id, story_dir, segments)
     return {"path": str(target), "segments": [segment.__dict__ for segment in segments]}
+
+
+@router.get("/api/stories/{story_id}/timeline")
+def get_story_timeline(story_id: str):
+    timeline_path = generated_story_dir(story_id) / "working" / "timeline.json"
+    if not timeline_path.is_file():
+        raise HTTPException(status_code=404, detail="Canonical timeline not built")
+    try:
+        timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=409, detail="Canonical timeline is unreadable") from exc
+    return {
+        "story_id": story_id,
+        "segments": timeline.get("segments") or [],
+        "shot_segments": timeline.get("shot_segments") or [],
+    }
 
 
 @router.get("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}/assets")

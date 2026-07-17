@@ -117,6 +117,14 @@ class ProductionTokenUsage:
     created_at: float
 
 
+@dataclass(frozen=True)
+class ProductionLock:
+    story_id: str
+    target_type: str
+    target_id: str
+    locked_at: float
+
+
 class ProductionStore:
     """SQLite implementation of the durable production state seam."""
 
@@ -235,6 +243,13 @@ class ProductionStore:
             );
             CREATE INDEX IF NOT EXISTS idx_production_token_usage_run
                 ON production_token_usage(run_id, created_at);
+            CREATE TABLE IF NOT EXISTS production_locks (
+                story_id TEXT NOT NULL,
+                target_type TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                locked_at REAL NOT NULL,
+                PRIMARY KEY (story_id, target_type, target_id)
+            );
             """
         )
         self.connection.commit()
@@ -648,6 +663,8 @@ class ProductionStore:
         visual_context: str,
     ) -> int:
         """Copy the current plan into a new revision with one revised shot."""
+        if self.is_locked(story_id, "shot", shot_id):
+            raise ValueError("shot is locked; unlock it before revising")
         current = self.list_shots(story_id, scene_id)
         if not current or not any(shot.id == shot_id for shot in current):
             raise ValueError(f"shot not found: {shot_id}")
@@ -713,6 +730,39 @@ class ProductionStore:
         ).fetchone()
         return self._asset_from_row(row) if row else None
 
+    def set_lock(self, story_id: str, target_type: str, target_id: str, locked: bool) -> ProductionLock | None:
+        with self.connection:
+            if locked:
+                self.connection.execute(
+                    """INSERT INTO production_locks (story_id, target_type, target_id, locked_at)
+                       VALUES (?, ?, ?, ?)
+                       ON CONFLICT(story_id, target_type, target_id)
+                       DO UPDATE SET locked_at = excluded.locked_at""",
+                    (story_id, target_type, target_id, time.time()),
+                )
+            else:
+                self.connection.execute(
+                    "DELETE FROM production_locks WHERE story_id = ? AND target_type = ? AND target_id = ?",
+                    (story_id, target_type, target_id),
+                )
+        return self.get_lock(story_id, target_type, target_id)
+
+    def get_lock(self, story_id: str, target_type: str, target_id: str) -> ProductionLock | None:
+        row = self.connection.execute(
+            """SELECT * FROM production_locks
+               WHERE story_id = ? AND target_type = ? AND target_id = ?""",
+            (story_id, target_type, target_id),
+        ).fetchone()
+        if row is None:
+            return None
+        return ProductionLock(
+            story_id=row["story_id"], target_type=row["target_type"],
+            target_id=row["target_id"], locked_at=row["locked_at"],
+        )
+
+    def is_locked(self, story_id: str, target_type: str, target_id: str) -> bool:
+        return self.get_lock(story_id, target_type, target_id) is not None
+
     def approve_asset(self, asset_id: str) -> ProductionAsset:
         with self.connection:
             candidate = self.connection.execute(
@@ -720,6 +770,8 @@ class ProductionStore:
             ).fetchone()
             if candidate is None:
                 raise ValueError(f"production asset not found: {asset_id}")
+            if self.is_locked(candidate["story_id"], "shot", candidate["scene_id"]):
+                raise ValueError("shot is locked; unlock it before approving a replacement")
             self.connection.execute(
                 """
                 UPDATE production_assets SET status = 'superseded'
@@ -1040,6 +1092,13 @@ class ProductionStore:
             estimated_tokens=row["estimated_tokens"], reserved_tokens=row["reserved_tokens"],
             actual_tokens=row["actual_tokens"], retries=row["retries"],
             created_at=row["created_at"],
+        )
+
+    @staticmethod
+    def _lock_from_row(row: sqlite3.Row) -> ProductionLock:
+        return ProductionLock(
+            story_id=row["story_id"], target_type=row["target_type"],
+            target_id=row["target_id"], locked_at=row["locked_at"],
         )
 
     def close(self) -> None:

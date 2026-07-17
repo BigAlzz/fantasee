@@ -20,6 +20,7 @@ class GenerateRequest(BaseModel):
     characters: str = ""
     tone: str = "dramatic"
     voice_preset: str = "Dean"
+    narration_style: str = ""  # optional: name of a style file in skills/
 
 
 class SeedRequest(BaseModel):

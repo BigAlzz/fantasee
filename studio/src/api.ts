@@ -33,6 +33,7 @@ export type SemanticShot = {
 };
 
 export type ShotAsset = { id: string; status: string; filename: string; revision?: number };
+export type TimelineShot = { scene_id: string; shot_id: string; asset_path: string; start: number; end: number };
 
 export type ProductionJob = {
   id: string;
@@ -114,4 +115,5 @@ export const api = {
   restoreShotRevision: (storyId: string, sceneIndex: number, revision: number) => request<{ revision: number; shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/revisions/${revision}/restore`, { method: "POST" }),
   buildShotTimeline: (storyId: string, sceneIndex: number) => request<{ path: string; segments: Array<{ shot_id: string; start: number; end: number }> }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/timeline`, { method: "POST" }),
   buildStoryShotTimeline: (storyId: string) => request<{ path: string; segments: Array<{ shot_id: string; start: number; end: number }> }>(`/api/stories/${storyId}/shots/timeline`, { method: "POST" }),
+  storyTimeline: (storyId: string) => request<{ shot_segments: TimelineShot[]; segments: Array<{ scene_id: string; text: string; start: number; end: number }> }>(`/api/stories/${storyId}/timeline`),
 };

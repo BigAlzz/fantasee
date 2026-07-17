@@ -770,7 +770,7 @@ block in the system prompt for details and keywords."""
         try:
             response = adapter.complete(
                 name="story.outline",
-                system=STORY_OUTLINE_SYSTEM,
+                system=system_prompt,
                 prompt=prompt,
                 max_tokens=outline_max_tokens,
             ).text
@@ -1195,7 +1195,7 @@ Be evocative but concise."""
     # ── Step 3: Generate scene outline + narration ─────────────────────
     emit("running", "Step 3/6: Generating scenes and narration...", 0.08)
     update_stage(story_dir, "outline", "running", message="Generating and reviewing the scene outline")
-    scenes = generate_story_outline(concept, num_scenes, style, characters, tone)
+    scenes = generate_story_outline(concept, num_scenes, style, characters, tone, narration_style=narration_style)
     if not scenes:
         update_stage(story_dir, "outline", "failed", message="Outline generation or quality review failed")
         emit("error", "Failed to generate scene outline.")

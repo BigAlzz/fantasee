@@ -20,6 +20,7 @@ import sys
 from fastapi import APIRouter, Body, HTTPException
 
 from fantasee_server.discovery import ensure_title_slide_for_manifest
+from fantasee_server.library import story_completion_report
 from fantasee_server.paths import (
     GEN_OUTPUTS,
     STORY_VIEWER_DIR,
@@ -278,6 +279,18 @@ async def render_story(story_id: str, body: dict = Body(default=None)):
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
+    completion = story_completion_report(story_id, story_dir=story_dir)
+    blocking = {"story_text", "audio", "subtitles", "shot_image", "shot_timeline"}
+    blocked = sorted(blocking.intersection(completion.get("missing") or []))
+    if blocked:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Rendering is blocked until the approved timeline inputs are ready",
+                "missing": blocked,
+                "issues": [issue for issue in completion.get("issues", []) if issue.get("kind") in blocked][:20],
+            },
+        )
     try:
         ensure_title_slide_for_manifest(
             story_dir,
