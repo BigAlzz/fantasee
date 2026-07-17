@@ -607,14 +607,28 @@ previous scene. Maintain consistent character appearances across ALL scenes."""
 STORY_STYLE_PATH = Path(__file__).parent / "skills" / "style.md"
 
 
-def load_story_style_prompt() -> str:
-    """Load the canonical narration style used by generation and repairs."""
+def load_story_style_prompt(style_name: str = "") -> str:
+    """Load a narration style prompt from skills/.
+
+    If style_name is given, looks for skills/<style_name>-style-prompt.md.
+    Falls back to skills/style.md (the canonical default).
+    """
+    skills_dir = Path(__file__).parent / "skills"
+    if style_name:
+        candidate = skills_dir / f"{style_name}-style-prompt.md"
+        if candidate.exists():
+            try:
+                return candidate.read_text(encoding="utf-8").strip()
+            except (OSError, UnicodeError):
+                pass
+    # Default fallback
     try:
         return STORY_STYLE_PATH.read_text(encoding="utf-8").strip()
     except (OSError, UnicodeError):
         return ""
 
 
+# Module-level default (no style_name) for backward compat
 _STYLE_OVERRIDE = (
     "\n\nMANDATORY NARRATION STYLE OVERRIDE:\n"
     "For all narration and dialogue, follow the canonical style below. "
@@ -625,9 +639,92 @@ _STYLE_OVERRIDE = (
 STORY_OUTLINE_SYSTEM += _STYLE_OVERRIDE
 
 
+GRANULAR_BIBLE_SYSTEM = (
+    "You are the story bible editor. Return compact JSON only with keys: "
+    "cast, world, rules, conflicts, continuity. Each value is a short string "
+    "or array of concrete facts. Do not write scenes or prose."
+)
+GRANULAR_ARC_SYSTEM = (
+    "You are a story architect. Return compact JSON only with an array called "
+    "beats. Each beat has scene_number, purpose, turning_point, and continuity."
+)
+GRANULAR_SCENE_SYSTEM = (
+    "You are a scene writer working inside an approved story bible. Write exactly "
+    "one scene using these labels: Title, Visual Prompt, Narrative, Narration. "
+    "Keep the prompt 35-60 words and narration 80-150 words. Use the canonical style."
+)
+GRANULAR_SCENE_SYSTEM += _STYLE_OVERRIDE
+
+
+def generate_story_outline_granular(
+    concept: str, num_scenes: int, style: str, characters: str, tone: str,
+) -> Optional[list]:
+    """Commission bounded context and one validated scene at a time."""
+    emit("running", "Commissioning story bible in focused sections...", 0.04)
+    budget = TokenBudget(limit=max(8192, 3600 + num_scenes * 2400))
+    adapter = GranularLLMAdapter(call_llm, budget=budget, usage_sink=_llm_usage_sink)
+    context = f"Concept: {concept}\nStyle: {style}\nTone: {tone}\nCharacters: {characters or '(none)'}"
+    try:
+        bible = adapter.complete(
+            name="story.bible", system=GRANULAR_BIBLE_SYSTEM,
+            prompt=context + "\nBuild the five required bible sections.", max_tokens=1400,
+        ).text
+        arc = adapter.complete(
+            name="story.arc", system=GRANULAR_ARC_SYSTEM,
+            prompt=context + "\nBible:\n" + bible + f"\nPlan exactly {num_scenes} scene beats.",
+            max_tokens=min(2200, max(1000, num_scenes * 180)),
+        ).text
+    except (RuntimeError, ValueError) as exc:
+        emit("error", f"Granular story context failed: {exc}")
+        return None
+
+    scenes: list[dict] = []
+    for index in range(1, num_scenes + 1):
+        previous = scenes[-1] if scenes else {}
+        prompt = (
+            f"{context}\nApproved bible:\n{bible}\nApproved arc:\n{arc}\n"
+            f"Write scene {index} of {num_scenes}. Previous scene: {previous.get('title', '(opening)')}\n"
+            "The scene must change the situation and end with a concrete turn."
+        )
+        try:
+            raw = adapter.complete(
+                name=f"scene.{index:02d}.card", system=GRANULAR_SCENE_SYSTEM,
+                prompt=prompt, max_tokens=1200,
+            ).text
+            parsed = parse_scene_response(f"Scene {index}\n{raw}", expected_scenes=1)
+        except (RuntimeError, ValueError) as exc:
+            emit("warning", f"Scene {index} commission failed: {exc}")
+            parsed = []
+        if len(parsed) != 1 or not _has_scene_content(parsed[0]):
+            emit("error", f"Scene {index} failed its schema gate.")
+            return None
+        scenes.append(parsed[0])
+        emit("running", f"Commissioned scene {index} of {num_scenes}.", 0.08 + 0.55 * index / num_scenes)
+
+    return refine_scenes_granular(
+        scenes, concept=concept, style=style, tone=tone,
+        characters=characters, adapter=adapter,
+    )
+
+
 def generate_story_outline(concept: str, num_scenes: int, style: str,
-                           characters: str, tone: str) -> Optional[list]:
-    """Generate a complete story outline using MiMo LLM."""
+                           characters: str, tone: str,
+                           narration_style: str = "") -> Optional[list]:
+    """Generate a complete outline through bounded creative commissions."""
+    if os.environ.get("FANTASEE_GRANULAR_LADDER", "1") != "0":
+        return generate_story_outline_granular(concept, num_scenes, style, characters, tone, narration_style=narration_style)
+
+    # Build system prompt with the selected narration style
+    system_prompt = STORY_OUTLINE_SYSTEM
+    if narration_style:
+        style_text = load_story_style_prompt(narration_style)
+        if style_text:
+            system_prompt += (
+                "\n\nMANDATORY NARRATION STYLE OVERRIDE:\n"
+                "For all narration and dialogue, follow the style below. "
+                "It overrides earlier tone-specific or manhwa narration guidance.\n\n"
+                + style_text
+            )
     emit("running", "Generating story outline with MiMo LLM...", 0.05)
 
     char_section = f"\nCharacters: {characters}" if characters else ""
@@ -998,6 +1095,7 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
                  characters: str = "", tone: str = "dramatic",
                  skip_images: bool = False, images_per_scene: int = 5,
                  voice_preset: str = "Dean",
+                 narration_style: str = "",
                  background_audio: Optional[str] = None,
                  background_volume: Optional[float] = None,
                  background_muted: bool = False):
@@ -1408,6 +1506,7 @@ if __name__ == "__main__":
     parser.add_argument("--characters", default="", help="Character descriptions")
     parser.add_argument("--tone", default="dramatic", help="Story tone")
     parser.add_argument("--voice", default="Dean", help="Xiaomi voice: Mia, Chloe, Milo, Dean (default: Dean)")
+    parser.add_argument("--narration-style", default="", help="Narration style name (maps to skills/<name>-style-prompt.md)")
     parser.add_argument("--skip-images", action="store_true", help="Skip ComfyUI rendering")
     parser.add_argument("--target-duration", type=float, help="Target total duration in minutes (overrides --scenes)")
     parser.add_argument("--background-audio", default=None,
@@ -1433,6 +1532,7 @@ if __name__ == "__main__":
             skip_images=args.skip_images,
             images_per_scene=args.images_per_scene,
             voice_preset=args.voice,
+            narration_style=args.narration_style,
             background_audio=args.background_audio,
             background_volume=args.background_volume,
             background_muted=args.background_muted,
