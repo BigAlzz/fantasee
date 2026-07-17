@@ -22,6 +22,16 @@ export type Scene = {
 
 export type StoryDetail = Story & { scenes: Scene[] };
 
+export type SemanticShot = {
+  id: string;
+  revision?: number;
+  order: number;
+  purpose: string;
+  shot_type: string;
+  duration_seconds: number;
+  visual_context: string;
+};
+
 export type ProductionJob = {
   id: string;
   job_type: string;
@@ -92,4 +102,6 @@ export const api = {
   generate: (input: GenerateInput) => request<{ task_id: string; message: string }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
   regenerateScene: (storyId: string, sceneIndex: number) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/regenerate`, { method: "POST" }),
   addSceneImage: (storyId: string, sceneIndex: number) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/add-image`, { method: "POST" }),
+  sceneShots: (storyId: string, sceneIndex: number) => request<{ shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`),
+  planSceneShots: (storyId: string, sceneIndex: number) => request<{ revision: number; shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pacing: "balanced" }) }),
 };

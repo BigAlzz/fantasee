@@ -1,6 +1,7 @@
 import time
 
 from fantasee_server.production_store import ProductionStore
+from fantasee_server.shot_planning import ShotSpec
 
 
 def test_run_and_events_survive_store_restart(tmp_path):
@@ -130,3 +131,24 @@ def test_cancel_and_retry_job_are_explicit_state_transitions(tmp_path):
     assert retried.status == "queued"
     assert retried.lease_token is None
     store.close()
+
+
+def test_semantic_shot_plan_survives_store_restart(tmp_path):
+    database_path = tmp_path / "production.db"
+    shots = [
+        ShotSpec("scene-01-shot-01", "scene-01", 1, "establish (1)", "wide", 5.0, "A flooded road"),
+        ShotSpec("scene-01-shot-02", "scene-01", 2, "reveal detail (2)", "close", 5.0, "A flooded road"),
+    ]
+
+    store = ProductionStore(database_path)
+    revision = store.save_shot_plan("story-1", "scene-01", shots)
+    store.close()
+
+    reopened = ProductionStore(database_path)
+    persisted = reopened.list_shots("story-1", "scene-01")
+
+    assert revision == 1
+    assert [shot.id for shot in persisted] == ["scene-01-shot-01", "scene-01-shot-02"]
+    assert persisted[1].purpose == "reveal detail (2)"
+    assert persisted[0].revision == 1
+    reopened.close()

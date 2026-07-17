@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from fantasee_server.shot_planning import ShotSpec
+
 
 @dataclass(frozen=True)
 class ProductionRun:
@@ -75,6 +77,20 @@ class ProductionAsset:
     status: str
     metadata: dict[str, Any]
     supersedes: str | None
+    created_at: float
+
+
+@dataclass(frozen=True)
+class ProductionShot:
+    id: str
+    story_id: str
+    scene_id: str
+    revision: int
+    order: int
+    purpose: str
+    shot_type: str
+    duration_seconds: float
+    visual_context: str
     created_at: float
 
 
@@ -158,6 +174,21 @@ class ProductionStore:
             );
             CREATE INDEX IF NOT EXISTS idx_production_assets_current
                 ON production_assets(story_id, scene_id, asset_type, status);
+            CREATE TABLE IF NOT EXISTS production_shots (
+                story_id TEXT NOT NULL,
+                scene_id TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                id TEXT NOT NULL,
+                shot_order INTEGER NOT NULL,
+                purpose TEXT NOT NULL,
+                shot_type TEXT NOT NULL,
+                duration_seconds REAL NOT NULL,
+                visual_context TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                PRIMARY KEY (story_id, scene_id, revision, id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_production_shots_current
+                ON production_shots(story_id, scene_id, revision, shot_order);
             """
         )
         self.connection.commit()
@@ -414,6 +445,57 @@ class ProductionStore:
             (story_id,),
         ).fetchall()
         return [self._asset_from_row(row) for row in rows]
+
+    def save_shot_plan(
+        self, story_id: str, scene_id: str, shots: list[ShotSpec]
+    ) -> int:
+        """Persist an immutable ordered revision for one scene's visual plan."""
+        now = time.time()
+        with self.connection:
+            revision = self.connection.execute(
+                """
+                SELECT COALESCE(MAX(revision), 0) + 1
+                FROM production_shots WHERE story_id = ? AND scene_id = ?
+                """,
+                (story_id, scene_id),
+            ).fetchone()[0]
+            self.connection.executemany(
+                """
+                INSERT INTO production_shots
+                    (story_id, scene_id, revision, id, shot_order, purpose, shot_type,
+                     duration_seconds, visual_context, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (story_id, scene_id, revision, shot.id, shot.order, shot.purpose,
+                     shot.shot_type, shot.duration_seconds, shot.visual_context, now)
+                    for shot in shots
+                ],
+            )
+        return revision
+
+    def list_shots(
+        self, story_id: str, scene_id: str, *, revision: int | None = None
+    ) -> list[ProductionShot]:
+        if revision is None:
+            revision = self.connection.execute(
+                """
+                SELECT MAX(revision) FROM production_shots
+                WHERE story_id = ? AND scene_id = ?
+                """,
+                (story_id, scene_id),
+            ).fetchone()[0]
+        if revision is None:
+            return []
+        rows = self.connection.execute(
+            """
+            SELECT * FROM production_shots
+            WHERE story_id = ? AND scene_id = ? AND revision = ?
+            ORDER BY shot_order, id
+            """,
+            (story_id, scene_id, revision),
+        ).fetchall()
+        return [self._shot_from_row(row) for row in rows]
 
     def get_current_asset(
         self, story_id: str, scene_id: str, asset_type: str
@@ -717,6 +799,21 @@ class ProductionStore:
             status=row["status"],
             metadata=json.loads(row["metadata_json"]),
             supersedes=row["supersedes"],
+            created_at=row["created_at"],
+        )
+
+    @staticmethod
+    def _shot_from_row(row: sqlite3.Row) -> ProductionShot:
+        return ProductionShot(
+            id=row["id"],
+            story_id=row["story_id"],
+            scene_id=row["scene_id"],
+            revision=row["revision"],
+            order=row["shot_order"],
+            purpose=row["purpose"],
+            shot_type=row["shot_type"],
+            duration_seconds=row["duration_seconds"],
+            visual_context=row["visual_context"],
             created_at=row["created_at"],
         )
 
