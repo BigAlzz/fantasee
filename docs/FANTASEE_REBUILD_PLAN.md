@@ -1,6 +1,6 @@
 # Fantasee Studio Rebuild Plan
 
-Status: Draft for architecture interview
+Status: Decision checkpoint 1 complete; implementation pending
 
 Created: 2026-07-17
 
@@ -200,9 +200,9 @@ flowchart LR
 
 ## 8. Technology Direction
 
-These are proposed defaults and require confirmation where marked open:
+These are the confirmed defaults for the first rebuild checkpoint:
 
-| Area | Proposed choice | Reason |
+| Area | Confirmed choice | Reason |
 |---|---|---|
 | Backend | Python, FastAPI, Pydantic | Preserve working media and provider code |
 | Metadata | SQLite with WAL | Durable local operation without infrastructure |
@@ -406,8 +406,9 @@ work in progress.
 
 ### Phase 0: Safety, Decisions, and Characterization
 
-Outcome: The current app has an explicit behavioral safety net and agreed
-architecture decisions.
+Outcome: The current app has an explicit behavioral safety net and the first
+architecture decisions are recorded. The new Studio remains an empty library;
+the existing library is preserved separately.
 
 Commit sequence:
 
@@ -430,8 +431,8 @@ Acceptance gate:
 
 ### Phase 1: Package Structure and Durable Store
 
-Outcome: SQLite can index current stories without becoming a second conflicting
-source of truth.
+Outcome: SQLite becomes the durable source of truth for new Studio productions,
+without importing the existing story archive.
 
 Commit sequence:
 
@@ -447,16 +448,17 @@ Commit sequence:
 10. Add timeline and release tables.
 11. Implement the Production Store interface.
 12. Add transaction rollback and restart tests.
-13. Add a read-only legacy manifest importer.
-14. Add importer idempotency and malformed-manifest tests.
-15. Add a command that previews import changes without writing.
-16. Add an explicit import command with backup evidence.
+13. Add an archive inventory command that reports legacy stories without
+    importing them.
+14. Add an explicit import-preview contract for a future feature.
 
 Acceptance gate:
 
 - A fresh database can be created and migrated forward and backward.
-- Existing stories import repeatedly without duplication or mutation.
-- Restarting the server preserves imported identities and events.
+- Existing stories remain intact and are visible only through the current or
+  legacy browser until a later import is explicitly requested.
+- New Studio stories can be created in a clean database with no legacy rows.
+- Restarting the server preserves production identities and events.
 
 ### Phase 2: Durable Runs, Events, and Queue
 
@@ -812,17 +814,19 @@ provider secrets or entire prompts to public UI by default.
 
 ## 19. Rollout Strategy
 
-Use feature flags and dual-read periods, not dual writes where avoidable.
+Use feature flags and small pull requests into the rebuild branch, followed by a
+final review pull request into `main`. Do not import the current story library
+as part of the first Studio release.
 
 Recommended sequence:
 
 1. Legacy app reads legacy stories as today.
-2. New store imports and indexes legacy stories read-only.
-3. New UI queries the new projection while legacy writes continue.
-4. One vertical command writes through the new engine.
-5. More commands move after parity and restart tests pass.
-6. Legacy writes become read-only.
-7. Library migration completes.
+2. New Studio initializes an empty managed library.
+3. One vertical command writes through the new engine.
+4. More commands move after parity and restart tests pass.
+5. Small phase pull requests merge into the rebuild branch.
+6. A final rebuild pull request targets `main` after acceptance gates pass.
+7. A later, explicit archive-import project may migrate selected stories.
 8. Legacy code is removed only after rollback approval.
 
 ## 20. Major Risks and Mitigations
@@ -839,28 +843,35 @@ Recommended sequence:
 | Queue duplicates expensive work | Leases, idempotency keys, and output fingerprints |
 | Visual quality remains inconsistent | Reference locks, candidate approval, model-aware prompts, critic evidence |
 
-## 21. Provisional Decisions Requiring User Confirmation
+## 21. Confirmed Decisions
 
-1. Whether the rebuild remains Windows-first or must be cross-platform from the
-   first phase.
-2. Whether React, TypeScript, and Vite are accepted for the new studio.
-3. Whether SQLite remains the only supported metadata database for the first
+The first decision checkpoint established the following:
+
+1. The initial platform is Windows-first, with portable adapter interfaces for
+   later cross-platform work.
+2. Autopilot is configurable. Users may set approval gates and lock creative
+   decisions rather than choosing between forced manual work and blind autonomy.
+3. Delivery uses small pull requests into `codex/fantasee-studio-rebuild`, then
+   one final pull request into `main`.
+4. The first implementation milestone is durable queue state, restart recovery,
+   persistent events, and truthful progress.
+5. The new Studio starts with a clean library. Existing stories remain archived
+   and are not imported or deleted by the rebuild.
+
+## 22. Remaining Decisions Requiring User Confirmation
+
+1. Whether React, TypeScript, and Vite are accepted for the new studio.
+2. Whether SQLite remains the only supported metadata database for the first
    production release.
-4. Whether all existing local stories must be migrated, or only selected stories
-   plus an archived legacy browser.
-5. Whether creative approval is required after bible, scene, shot, and final cut,
-   or whether a configurable autopilot mode may approve them.
-6. Whether shot counts remain user-selected exactly or become a visual-density
+3. Whether shot counts remain user-selected exactly or become a visual-density
    range chosen by the Director within limits.
-7. Whether the first enhanced release prioritizes Story Studio editing, maximum
+4. Whether the first enhanced release prioritizes Story Studio editing, maximum
    unattended production, or worker throughput.
-8. Whether the initial voice system remains narrator-only or introduces a cast
+5. Whether the initial voice system remains narrator-only or introduces a cast
    of character voices in the core rebuild.
-9. Whether public GitHub development should happen as one long-lived rebuild
-   branch or as small pull requests merged continuously.
-10. Which proposed public test seams are approved for TDD.
+6. Which proposed public test seams are approved for TDD.
 
-## 22. Immediate Next Actions After Decisions
+## 23. Immediate Next Actions After Decisions
 
 1. Record confirmed choices as ADRs.
 2. Confirm the TDD seams.

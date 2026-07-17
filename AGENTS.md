@@ -40,7 +40,11 @@ derived from the current approved inputs.
 11. **Backward compatibility during migration.** Existing story folders remain
     readable and restorable until migration is explicitly declared complete.
 12. **User-owned creative decisions.** Agents may propose revisions. They do
-    not overwrite locked or approved work without an explicit production rule.
+   not overwrite locked or approved work without an explicit production rule.
+13. **Fresh Studio library.** The rebuild starts with an empty managed library.
+   Existing stories remain outside the new library and are never deleted or
+   silently imported. A later, explicit import feature may bring selected
+   stories across with previews, backups, and rollback.
 
 ## Domain Language
 
@@ -311,10 +315,13 @@ task-panel implementations for the same operation.
 
 ## Migration Rules
 
-Use a strangler migration. Do not replace the working app in one commit.
+Use a strangler migration for the engine and UI, but start the new Studio with
+an empty managed library. Do not replace the working app in one commit.
 
 - Characterize current behavior before moving it.
-- Import existing manifests without mutating them by default.
+- Keep existing manifests in their current archive without mutating them.
+- Treat legacy import as a later opt-in capability, not a prerequisite for the
+  first Studio release.
 - Introduce new reads before new writes.
 - Keep feature flags for old and new execution paths during transition.
 - Migrate one vertical capability at a time.
