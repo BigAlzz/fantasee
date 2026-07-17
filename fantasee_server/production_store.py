@@ -8,6 +8,7 @@ server database.
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 import time
 import uuid
@@ -779,6 +780,14 @@ class ProductionStore:
             ).fetchone()
             if candidate is None:
                 raise ValueError(f"production asset not found: {asset_id}")
+            path = Path(candidate["path"])
+            if not path.is_file() or path.stat().st_size <= 0:
+                raise ValueError("asset file is missing or empty")
+            expected_hash = candidate["content_hash"]
+            if expected_hash:
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+                if digest != expected_hash:
+                    raise ValueError("asset checksum does not match its registered content")
             if self.is_locked(candidate["story_id"], "shot", candidate["scene_id"]):
                 raise ValueError("shot is locked; unlock it before approving a replacement")
             self.connection.execute(

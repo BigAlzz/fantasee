@@ -27,11 +27,13 @@ def test_same_generation_fingerprint_is_reused(tmp_path):
 
 def test_approving_replacement_preserves_previous_asset(tmp_path):
     registry = AssetRegistry(tmp_path / "production.db")
+    (tmp_path / "audio-old.wav").write_bytes(b"old audio")
+    (tmp_path / "audio-new.wav").write_bytes(b"new audio")
     old = registry.put_candidate(
         story_id="story-1",
         scene_id="scene-1",
         asset_type="audio",
-        path="audio-old.wav",
+        path=str(tmp_path / "audio-old.wav"),
         generation_fingerprint="old",
     )
     registry.approve(old.id)
@@ -39,7 +41,7 @@ def test_approving_replacement_preserves_previous_asset(tmp_path):
         story_id="story-1",
         scene_id="scene-1",
         asset_type="audio",
-        path="audio-new.wav",
+        path=str(tmp_path / "audio-new.wav"),
         generation_fingerprint="new",
         supersedes=old.id,
     )
@@ -49,6 +51,28 @@ def test_approving_replacement_preserves_previous_asset(tmp_path):
     assets = {asset.id: asset for asset in registry.list_assets("story-1")}
     assert assets[old.id].status == "superseded"
     assert assets[replacement.id].status == "approved"
+    registry.close()
+
+
+def test_approval_rejects_missing_or_changed_hashed_file(tmp_path):
+    registry = AssetRegistry(tmp_path / "production.db")
+    image = tmp_path / "image.png"
+    image.write_bytes(b"original")
+    candidate = registry.put_file_candidate(
+        story_id="story-1",
+        scene_id="scene-1",
+        asset_type="image",
+        path=image,
+        generation_fingerprint="image-fingerprint",
+    )
+    image.write_bytes(b"tampered")
+
+    try:
+        registry.approve(candidate.id)
+    except ValueError as exc:
+        assert "checksum" in str(exc)
+    else:
+        raise AssertionError("tampered asset should not be approved")
     registry.close()
 
 
