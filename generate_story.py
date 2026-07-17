@@ -30,6 +30,7 @@ from story_storage import STORIES_ROOT, ensure_story_layout
 from fantasee_server.security import validate_provider_url
 from story_pipeline import initialize_pipeline, update_stage
 from story_quality import outline_feedback, review_scene_outline
+from fantasee_server.llm_adapter import GranularLLMAdapter, TokenBudget
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -82,7 +83,12 @@ def _resolve_api_key():
 # ── LLM-based Scene Generation (via MiMo API) ──────────────────────────
 
 
-def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str]:
+def call_llm(
+    system: str,
+    prompt: str,
+    temperature: float = 0.7,
+    max_tokens: int | None = None,
+) -> Optional[str]:
     """Call the MiMo LLM API."""
     _resolve_api_key()
     if not MIIMO_API_KEY:
@@ -101,7 +107,7 @@ def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str
             {"role": "user", "content": prompt},
         ],
         "temperature": temperature,
-        "max_completion_tokens": 16384,
+        "max_completion_tokens": max_tokens or 16384,
     }
     for attempt in range(3):
         try:
@@ -639,6 +645,9 @@ block in the system prompt for details and keywords."""
     scenes = []
     response = ""
     last_review = None
+    budget = TokenBudget(limit=max(4096, num_scenes * 2200))
+    adapter = GranularLLMAdapter(call_llm, budget=budget)
+    outline_max_tokens = min(16384, max(2048, num_scenes * 900))
     for attempt in range(3):
         prompt = user_prompt
         if attempt:
@@ -649,7 +658,16 @@ block in the system prompt for details and keywords."""
             )
         if attempt and last_review:
             prompt += "\nFix these quality issues before returning the outline:\n" + outline_feedback(last_review)
-        response = call_llm(STORY_OUTLINE_SYSTEM, prompt)
+        try:
+            response = adapter.complete(
+                name="story.outline",
+                system=STORY_OUTLINE_SYSTEM,
+                prompt=prompt,
+                max_tokens=outline_max_tokens,
+            ).text
+        except (RuntimeError, ValueError) as exc:
+            emit("warning", f"Outline commission unavailable: {exc}")
+            response = ""
         if not response:
             continue
         scenes = parse_scene_response(response, expected_scenes=num_scenes)
@@ -682,8 +700,73 @@ block in the system prompt for details and keywords."""
             "warning",
             f"Outline accepted with {len(last_review['issues'])} review note(s).",
         )
+    if os.environ.get("FANTASEE_SCENE_REFINEMENT", "1") != "0":
+        scenes = refine_scenes_granular(
+            scenes,
+            concept=concept,
+            style=style,
+            tone=tone,
+            characters=characters,
+            adapter=adapter,
+        )
     emit("running", f"Generated {len(scenes)} scenes with narration.", 0.15)
     return scenes
+
+
+SCENE_REFINEMENT_SYSTEM = """You are a scene editor. Revise exactly one story scene.
+Return exactly these four labels and nothing else:
+Title: ...
+Visual Prompt: ...
+Narrative: ...
+Narration: ...
+
+Keep the scene's event and continuity. Improve concrete action, sensory detail,
+visual specificity, and narration rhythm. Keep visual prompts under 60 words.
+Keep narration between 80 and 150 words. Do not add exposition or dialogue tags.
+"""
+
+
+def refine_scenes_granular(
+    scenes: list[dict],
+    *,
+    concept: str,
+    style: str,
+    tone: str,
+    characters: str,
+    adapter: GranularLLMAdapter,
+) -> list[dict]:
+    """Commission bounded revisions without allowing one bad response to erase a scene."""
+    refined: list[dict] = []
+    for index, scene in enumerate(scenes):
+        prompt = f"""Story concept: {concept}
+Style: {style}
+Tone: {tone}
+Characters: {characters or '(none)'}
+Scene number: {index + 1} of {len(scenes)}
+Previous scene title: {(scenes[index - 1].get('title') if index else '(opening)')}
+Next scene title: {(scenes[index + 1].get('title') if index + 1 < len(scenes) else '(ending)')}
+
+Scene to revise:
+Title: {scene.get('title', '')}
+Visual Prompt: {scene.get('prompt', '')}
+Narrative: {scene.get('narrative', '')}
+Narration: {scene.get('narration', '')}
+"""
+        try:
+            revised_text = adapter.complete(
+                name=f"scene.{index + 1}.revise",
+                system=SCENE_REFINEMENT_SYSTEM,
+                prompt=prompt,
+                max_tokens=1000,
+            ).text
+            parsed = parse_scene_response(f"Scene 1\n{revised_text}", expected_scenes=1)
+            if len(parsed) == 1 and _has_scene_content(parsed[0]):
+                refined.append(parsed[0])
+                continue
+        except (RuntimeError, ValueError) as exc:
+            emit("warning", f"Scene {index + 1} revision skipped: {exc}")
+        refined.append(scene)
+    return refined
 
 
 # ── Story ID Generation ────────────────────────────────────────────────
