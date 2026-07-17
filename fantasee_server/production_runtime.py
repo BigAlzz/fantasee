@@ -66,6 +66,52 @@ def update_task(
         store.append_event(task_id, "task.progress", event_payload)
 
 
+def enqueue_task_job(
+    task_id: str,
+    *,
+    job_id: str,
+    job_type: str,
+    payload: dict[str, Any],
+    required_capabilities: tuple[str, ...] = (),
+) -> None:
+    with ProductionStore(_database_path()) as store:
+        store.enqueue_job(
+            task_id,
+            job_id=job_id,
+            job_type=job_type,
+            payload=payload,
+            idempotency_key=job_id,
+            required_capabilities=required_capabilities,
+        )
+        store.append_event(task_id, "task.job_queued", {
+            "job_id": job_id,
+            "job_type": job_type,
+        })
+
+
+def update_task_job(
+    task_id: str,
+    *,
+    job_id: str,
+    status: str,
+    progress: float = 0,
+    message: str | None = None,
+) -> None:
+    with ProductionStore(_database_path()) as store:
+        store.set_job_status(
+            job_id,
+            status=status,
+            progress=progress,
+            message=message,
+        )
+        store.append_event(task_id, "task.job_updated", {
+            "job_id": job_id,
+            "status": status,
+            "progress": progress,
+            "message": message,
+        })
+
+
 def finish_task(
     task_id: str,
     *,
@@ -89,6 +135,7 @@ def get_persisted_task(task_id: str) -> dict[str, Any] | None:
         if run is None:
             return None
         events = store.list_events(task_id)
+        jobs = store.list_jobs(task_id)
     return {
         "run": {
             "id": run.id,
@@ -106,5 +153,17 @@ def get_persisted_task(task_id: str) -> dict[str, Any] | None:
                 "created_at": event.created_at,
             }
             for event in events
+        ],
+        "jobs": [
+            {
+                "id": job.id,
+                "job_type": job.job_type,
+                "status": job.status,
+                "attempts": job.attempts,
+                "progress": job.progress,
+                "message": job.message,
+                "required_capabilities": list(job.required_capabilities),
+            }
+            for job in jobs
         ],
     }

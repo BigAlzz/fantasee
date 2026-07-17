@@ -30,6 +30,13 @@ from typing import Optional
 from fastapi import APIRouter, Body, HTTPException
 
 from fantasee_server.library import _complete_story_for_library
+from fantasee_server.production_runtime import (
+    enqueue_task_job,
+    finish_task,
+    start_task,
+    update_task,
+    update_task_job,
+)
 from fantasee_server.models import GenerateRequest, QueueRequest, SeedRequest
 from fantasee_server.paths import STORY_VIEWER_DIR
 import fantasee_server.paths as _paths
@@ -149,6 +156,15 @@ async def _run_generation(task_id: str, req: GenerateRequest):
                     if progress is not None:
                         update["progress"] = progress
                     _generation_tasks[task_id].update(update)
+                    try:
+                        update_task(
+                            task_id,
+                            stage=data.get("stage", "generate"),
+                            progress=float(progress or 0),
+                            message=message,
+                        )
+                    except Exception as exc:
+                        print(f"[generation] durable progress update failed: {exc}", file=sys.stderr)
 
                     # Push to all websocket clients
                     payload = {
@@ -180,6 +196,11 @@ async def _run_generation(task_id: str, req: GenerateRequest):
                         "progress": 0.78,
                         "result": data,
                     })
+                    try:
+                        update_task(task_id, stage="draft", progress=0.78,
+                                    message=_generation_tasks[task_id]["message"])
+                    except Exception as exc:
+                        print(f"[generation] durable draft update failed: {exc}", file=sys.stderr)
                     await _broadcast_ws_json({
                         "type": "task_update",
                         "task_id": task_id,
@@ -222,6 +243,10 @@ async def _run_generation(task_id: str, req: GenerateRequest):
             "progress": 0,
             "error_detail": failure_detail,
         })
+        try:
+            finish_task(task_id, status="failed", message=f"Failed: {failure_detail}")
+        except Exception as exc:
+            print(f"[generation] durable failure update failed: {exc}", file=sys.stderr)
         payload = {
             "type": "task_update", "task_id": task_id,
             "status": "error", "message": f"Failed: {failure_detail}",
@@ -240,6 +265,10 @@ async def _run_generation(task_id: str, req: GenerateRequest):
             "progress": 0,
             "error_detail": "generate_story.py did not emit __RESULT__",
         })
+        try:
+            finish_task(task_id, status="failed", message="Generation finished without a story result.")
+        except Exception as exc:
+            print(f"[generation] durable failure update failed: {exc}", file=sys.stderr)
         await _broadcast_ws_json({
             "type": "task_update",
             "task_id": task_id,
@@ -259,6 +288,11 @@ async def _run_generation(task_id: str, req: GenerateRequest):
             "message": msg,
             "progress": progress,
         })
+        try:
+            update_task(task_id, stage=stage, progress=progress, message=msg,
+                        payload={"story_id": story_id})
+        except Exception as exc:
+            print(f"[generation] durable completion update failed: {exc}", file=sys.stderr)
         _broadcast_ws_json_from_thread(loop, {
             "type": "task_update",
             "task_id": task_id,
@@ -285,6 +319,12 @@ async def _run_generation(task_id: str, req: GenerateRequest):
             "progress": 1.0,
             "result": generated_result,
         })
+        try:
+            finish_task(task_id, status="succeeded",
+                        message=_generation_tasks[task_id]["message"],
+                        payload={"story_id": story_id})
+        except Exception as exc:
+            print(f"[generation] durable completion update failed: {exc}", file=sys.stderr)
         global _state  # noqa: F824  (state lives in fantasee_server.state)
         _state._stories_cache = _paths.load_stories()
         await _broadcast_ws_json({
@@ -306,6 +346,11 @@ async def _run_generation(task_id: str, req: GenerateRequest):
             "progress": _generation_tasks[task_id].get("progress", 0.78),
             "error_detail": detail,
         })
+        try:
+            finish_task(task_id, status="failed", message=f"Failed: {detail}",
+                        payload={"story_id": story_id})
+        except Exception as exc:
+            print(f"[generation] durable failure update failed: {exc}", file=sys.stderr)
         await _broadcast_ws_json({
             "type": "task_update",
             "task_id": task_id,
@@ -329,6 +374,11 @@ async def start_generation(req: GenerateRequest):
         "request": req.model_dump(),
         "created_at": now(),
     }
+    try:
+        start_task(task_id, story_id=req.story_concept, kind="generate",
+                   metadata=req.model_dump())
+    except Exception as exc:
+        print(f"[generation] durable task start failed: {exc}", file=sys.stderr)
 
     # Notify websocket clients
     for ws in _websocket_clients[:]:
@@ -367,6 +417,11 @@ async def _run_queue(queue_id: str, items: list[GenerateRequest]) -> None:
     queue_task["status"] = "running"
     queue_task["progress"] = 0
     queue_task["message"] = f"Queue started ({total} stories)"
+    try:
+        update_task(queue_id, stage="queue", progress=0,
+                    message=queue_task["message"])
+    except Exception as exc:
+        print(f"[queue] durable start update failed: {exc}", file=sys.stderr)
 
     completed_titles: list[str] = []
     failed_titles: list[str] = []
@@ -382,6 +437,19 @@ async def _run_queue(queue_id: str, items: list[GenerateRequest]) -> None:
             "request": item.model_dump(),
             "created_at": now(),
         }
+        try:
+            start_task(sub_id, story_id=item.story_concept, kind="generate",
+                       metadata=item.model_dump())
+            enqueue_task_job(
+                queue_id,
+                job_id=sub_id,
+                job_type="story.generate",
+                payload=item.model_dump(),
+            )
+            update_task_job(queue_id, job_id=sub_id, status="running",
+                            message=f"Starting story {idx + 1}/{total}")
+        except Exception as exc:
+            print(f"[queue] durable child start failed: {exc}", file=sys.stderr)
 
         # Notify websocket of the sub-task start
         for ws in _websocket_clients[:]:
@@ -404,16 +472,37 @@ async def _run_queue(queue_id: str, items: list[GenerateRequest]) -> None:
             sub = _generation_tasks.get(sub_id, {})
             if sub.get("status") == "done":
                 completed_titles.append(sub.get("message", item.story_concept[:60]))
+                try:
+                    update_task_job(queue_id, job_id=sub_id, status="succeeded",
+                                    progress=1, message=sub.get("message"))
+                except Exception as exc:
+                    print(f"[queue] durable child completion failed: {exc}", file=sys.stderr)
             else:
                 failed_titles.append(item.story_concept[:60])
+                try:
+                    update_task_job(queue_id, job_id=sub_id, status="failed",
+                                    progress=1, message=sub.get("message"))
+                except Exception as exc:
+                    print(f"[queue] durable child failure failed: {exc}", file=sys.stderr)
         except Exception as e:
             print(f"[queue] sub-task {sub_id} crashed: {e}", file=sys.stderr)
             failed_titles.append(item.story_concept[:60])
+            try:
+                update_task_job(queue_id, job_id=sub_id, status="failed",
+                                progress=1, message=str(e))
+            except Exception as exc:
+                print(f"[queue] durable child failure failed: {exc}", file=sys.stderr)
 
         # Update queue progress
         overall = round((idx + 1) / total, 3)
         queue_task["progress"] = overall
         queue_task["message"] = f"Story {idx + 1}/{total} done ({len(completed_titles)} OK, {len(failed_titles)} failed)"
+        try:
+            update_task(queue_id, stage="queue", progress=overall,
+                        message=queue_task["message"],
+                        payload={"completed": completed_titles, "failed": failed_titles})
+        except Exception as exc:
+            print(f"[queue] durable progress update failed: {exc}", file=sys.stderr)
 
         for ws in _websocket_clients[:]:
             try:
@@ -432,6 +521,12 @@ async def _run_queue(queue_id: str, items: list[GenerateRequest]) -> None:
     queue_task["message"] = f"Queue complete: {len(completed_titles)} succeeded, {len(failed_titles)} failed"
     queue_task["completed"] = completed_titles
     queue_task["failed"] = failed_titles
+    try:
+        finish_task(queue_id, status="succeeded" if not failed_titles else "failed",
+                    message=queue_task["message"],
+                    payload={"completed": completed_titles, "failed": failed_titles})
+    except Exception as exc:
+        print(f"[queue] durable finish update failed: {exc}", file=sys.stderr)
 
     # Reload story cache so the new stories show up in /api/stories
     _state._stories_cache = _paths.load_stories()
@@ -473,6 +568,11 @@ async def start_generation_queue(req: QueueRequest):
         "item_count": len(req.items),
         "created_at": now(),
     }
+    try:
+        start_task(queue_id, story_id="queue", kind="generation_queue",
+                   metadata={"items": [item.model_dump() for item in req.items]})
+    except Exception as exc:
+        print(f"[queue] durable task start failed: {exc}", file=sys.stderr)
 
     # Notify websocket clients
     for ws in _websocket_clients[:]:

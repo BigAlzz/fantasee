@@ -142,6 +142,20 @@ class ProductionStore:
         ).fetchone()
         return self._run_from_row(row) if row else None
 
+    def update_run(self, run_id: str, *, status: str) -> ProductionRun:
+        now = time.time()
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_runs SET status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (status, now, run_id),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError(f"production run not found: {run_id}")
+        return self.get_run(run_id)
+
     def append_event(
         self, run_id: str, event_type: str, payload: dict[str, Any]
     ) -> ProductionEvent:
@@ -185,13 +199,14 @@ class ProductionStore:
         self,
         run_id: str,
         *,
+        job_id: str | None = None,
         job_type: str,
         payload: dict[str, Any],
         idempotency_key: str,
         required_capabilities: tuple[str, ...] = (),
     ) -> ProductionJob:
         now = time.time()
-        job_id = uuid.uuid4().hex
+        job_id = job_id or uuid.uuid4().hex
         with self.connection:
             self.connection.execute(
                 """
@@ -218,6 +233,17 @@ class ProductionStore:
             "SELECT * FROM production_jobs WHERE id = ?", (job_id,)
         ).fetchone()
         return self._job_from_row(row) if row else None
+
+    def list_jobs(self, run_id: str) -> list[ProductionJob]:
+        rows = self.connection.execute(
+            """
+            SELECT * FROM production_jobs
+            WHERE run_id = ?
+            ORDER BY created_at, id
+            """,
+            (run_id,),
+        ).fetchall()
+        return [self._job_from_row(row) for row in rows]
 
     def lease_next_job(
         self,
@@ -297,6 +323,28 @@ class ProductionStore:
             )
         if cursor.rowcount != 1:
             raise ValueError("job lease is invalid or has expired")
+        return self.get_job(job_id)
+
+    def set_job_status(
+        self,
+        job_id: str,
+        *,
+        status: str,
+        progress: float = 0,
+        message: str | None = None,
+    ) -> ProductionJob:
+        now = time.time()
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE production_jobs
+                SET status = ?, progress = ?, message = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (status, progress, message, now, job_id),
+            )
+        if cursor.rowcount != 1:
+            raise ValueError(f"production job not found: {job_id}")
         return self.get_job(job_id)
 
     @staticmethod
