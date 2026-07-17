@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import {
   Archive, ChevronRight, Clapperboard, Cpu, Gauge, Image, Library,
   LoaderCircle, MoreHorizontal, Pause, Play, Plus, Radio, RefreshCw,
   Search, Settings, SlidersHorizontal, Sparkles, Square, UserRoundCog,
   Volume2, X,
 } from "lucide-react";
-import { api, type ComfyWorker, type ProductionJob, type ProductionRun, type Story, type Worker } from "./api";
+import { api, type ComfyWorker, type GenerateInput, type ProductionJob, type ProductionRun, type Story, type Worker } from "./api";
 
 const nav = [
   [Library, "Library"], [Clapperboard, "Productions"], [Archive, "Assets"], [UserRoundCog, "Workers"], [Settings, "Settings"],
@@ -64,6 +64,8 @@ export function App() {
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("Connecting to the production ledger...");
   const [busy, setBusy] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic fantasy realism", num_scenes: 8, images_per_scene: 5, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean" });
 
   const refresh = async () => {
     try {
@@ -106,6 +108,20 @@ export function App() {
     finally { setBusy(false); }
   };
 
+  const submitBrief = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (brief.story_concept.trim().length < 10) { setNotice("Give the director at least a sentence of story intent."); return; }
+    setBusy(true);
+    try {
+      const result = await api.generate(brief);
+      setSelectedRunId(result.task_id);
+      setCreateOpen(false);
+      setNotice(`Production ${result.task_id} has entered the durable queue.`);
+      await refresh();
+    } catch (error) { setNotice(error instanceof Error ? error.message : "The production brief could not be queued."); }
+    finally { setBusy(false); }
+  };
+
   return <main className="studio-shell">
     <aside className="rail">
       <div className="brand"><span>FantaSee</span><small>Studio</small></div>
@@ -115,7 +131,7 @@ export function App() {
     </aside>
 
     <section className="workspace">
-      <header className="command-bar"><label><Search size={19}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search stories..." /></label><div><button className="icon-button" onClick={() => void refresh()} aria-label="Refresh"><RefreshCw size={18}/></button><button className="create"><Plus size={17}/> Create story</button><button className="icon-button" aria-label="Studio controls"><SlidersHorizontal size={18}/></button></div></header>
+      <header className="command-bar"><label><Search size={19}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search stories..." /></label><div><button className="icon-button" onClick={() => void refresh()} aria-label="Refresh"><RefreshCw size={18}/></button><button className="create" onClick={() => setCreateOpen(true)}><Plus size={17}/> Create story</button><button className="icon-button" aria-label="Studio controls"><SlidersHorizontal size={18}/></button></div></header>
       <div className="status-strip"><span className="led green"/> {notice} <span>•</span> {activeWorkers.length} active worker{activeWorkers.length === 1 ? "" : "s"}</div>
       <div className="content-grid">
         <section className="library-module metal-panel">
@@ -141,6 +157,15 @@ export function App() {
         const comfyUrl = (worker as ComfyWorker).url;
         return <WorkerLane key={index} worker={worker} jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn(index ? "cpu" : "gpu"), `${index ? "CPU" : "GPU"} ComfyUI worker started.`)} onKill={comfyUrl ? () => void runAction(() => api.killComfy(comfyUrl), "Selected ComfyUI worker stopped.") : undefined}/>;
       }) : <WorkerLane empty jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")}/>}</section>
+      {createOpen && <div className="modal-scrim" role="presentation"><form className="brief-modal metal-panel" onSubmit={submitBrief}>
+        <div className="eyebrow"><span>New production brief</span><button type="button" className="icon-button" onClick={() => setCreateOpen(false)} aria-label="Close"><X size={17}/></button></div>
+        <h2>Set the story in motion.</h2><p>The director will break this brief into granular scene commissions and complete every media requirement before release.</p>
+        <label className="brief-field wide">Story intent<textarea autoFocus value={brief.story_concept} onChange={(event) => setBrief({ ...brief, story_concept: event.target.value })} placeholder="A medic from Johannesburg wakes in a cold mountain village where every wound carries a memory..." /></label>
+        <div className="brief-grid"><label className="brief-field">Scenes<input type="number" min="3" max="20" value={brief.num_scenes} onChange={(event) => setBrief({ ...brief, num_scenes: Number(event.target.value) })}/></label><label className="brief-field">Images per scene<input type="number" min="1" max="10" value={brief.images_per_scene} onChange={(event) => setBrief({ ...brief, images_per_scene: Number(event.target.value) })}/></label><label className="brief-field">Style<input value={brief.style} onChange={(event) => setBrief({ ...brief, style: event.target.value })}/></label><label className="brief-field">Tone<input value={brief.tone} onChange={(event) => setBrief({ ...brief, tone: event.target.value })}/></label></div>
+        <label className="brief-field wide">Characters and continuity<textarea value={brief.characters} onChange={(event) => setBrief({ ...brief, characters: event.target.value })} placeholder="Optional character, setting, or visual continuity notes." /></label>
+        <label className="brief-field wide">Narrator<input value={brief.voice_preset} onChange={(event) => setBrief({ ...brief, voice_preset: event.target.value })}/></label>
+        <div className="modal-actions"><button type="button" className="outline-button" onClick={() => setCreateOpen(false)}>Cancel</button><button className="create" disabled={busy} type="submit"><Plus size={17}/> Queue production</button></div>
+      </form></div>}
     </section>
   </main>;
 }

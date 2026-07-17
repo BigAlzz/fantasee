@@ -50,6 +50,16 @@ export type ComfyWorker = {
   queue_running?: number;
 };
 
+export type GenerateInput = {
+  story_concept: string;
+  style: string;
+  num_scenes: number;
+  images_per_scene: number;
+  characters: string;
+  tone: string;
+  voice_preset: string;
+};
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
@@ -66,4 +76,5 @@ export const api = {
   cancelJob: (id: string) => request(`/api/production/jobs/${id}/cancel`, { method: "POST" }),
   spawn: (kind: "cpu" | "gpu") => request(`/api/comfyui/workers/spawn-${kind}`, { method: "POST" }),
   killComfy: (url: string) => request("/api/comfyui/workers/kill", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) }),
+  generate: (input: GenerateInput) => request<{ task_id: string; message: string }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
 };
