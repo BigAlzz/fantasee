@@ -61,6 +61,13 @@ export type ProductionRun = {
   item_count?: number;
 };
 
+export type ProductionEvent = {
+  sequence: number;
+  event_type: string;
+  payload: Record<string, unknown>;
+  created_at: number;
+};
+
 export type Worker = {
   id: string;
   capabilities: string[];
@@ -100,6 +107,7 @@ export const api = {
   updateScene: (storyId: string, sceneIndex: number, input: { title?: string; prompt?: string; narration?: string }) => request<{ status: string; scene: Scene; stale_outputs: string[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
   runs: () => request<{ runs: ProductionRun[] }>("/api/production/runs"),
   run: (id: string) => request<{ run: ProductionRun; jobs: ProductionJob[] }>(`/api/production/runs/${id}`),
+  events: (id: string, afterSequence = 0) => request<{ run_id: string; events: ProductionEvent[]; next_sequence: number }>(`/api/production/runs/${id}/events?after_sequence=${afterSequence}`),
   workers: () => request<{ workers: Worker[] }>("/api/production/workers"),
   comfyWorkers: () => request<{ workers: ComfyWorker[] }>("/api/comfyui/workers"),
   retryJob: (id: string) => request(`/api/production/jobs/${id}/retry`, { method: "POST" }),

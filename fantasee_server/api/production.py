@@ -47,6 +47,28 @@ def get_production_run(run_id: str):
     return task
 
 
+@router.get("/api/production/runs/{run_id}/events")
+def list_production_events(run_id: str, after_sequence: int = 0):
+    """Return durable progress events after a reconnect cursor."""
+    with ProductionStore(production_database_path()) as store:
+        if store.get_run(run_id) is None:
+            raise HTTPException(status_code=404, detail="Production run not found")
+        events = store.list_events(run_id, after_sequence=max(0, after_sequence))
+    return {
+        "run_id": run_id,
+        "events": [
+            {
+                "sequence": event.sequence,
+                "event_type": event.event_type,
+                "payload": event.payload,
+                "created_at": event.created_at,
+            }
+            for event in events
+        ],
+        "next_sequence": events[-1].sequence if events else max(0, after_sequence),
+    }
+
+
 @router.get("/api/production/runs/{run_id}/token-usage")
 def get_production_token_usage(run_id: str):
     with ProductionStore(production_database_path()) as store:
