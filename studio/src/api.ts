@@ -90,6 +90,22 @@ export type ProductionRun = {
   worker_status?: string;
 };
 
+export type GenerationTask = {
+  id: string;
+  parent?: string;
+  kind?: string;
+  story_id?: string;
+  story_name?: string;
+  title?: string;
+  status: string;
+  progress: number;
+  stage?: string;
+  message: string;
+  request?: Record<string, unknown>;
+  created_at?: number;
+  updated_at?: number;
+};
+
 export type ProductionEvent = {
   sequence: number;
   event_type: string;
@@ -269,6 +285,7 @@ export const api = {
   releaseSubtitles: (storyId: string, releaseId: string) => `/api/stories/${storyId}/releases/${releaseId}/subtitles`,
   updateScene: (storyId: string, sceneIndex: number, input: { title?: string; prompt?: string; narration?: string }) => request<{ status: string; scene: Scene; stale_outputs: string[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
   runs: () => request<{ runs: ProductionRun[] }>("/api/production/runs"),
+  generationTasks: () => request<{ tasks: GenerationTask[] }>("/api/generate/tasks"),
   run: (id: string) => request<{ run: ProductionRun; jobs: ProductionJob[] }>(`/api/production/runs/${id}`),
   events: (id: string, afterSequence = 0) => request<{ run_id: string; events: ProductionEvent[]; next_sequence: number }>(`/api/production/runs/${id}/events?after_sequence=${afterSequence}`),
   deleteRun: (id: string) => request<{ status: string; run_id: string; story_id: string; message: string }>(`/api/production/runs/${id}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: true }) }),

@@ -5,10 +5,11 @@ import {
   Search, Settings, Sparkles, Square, Trash2, Wand2,
   Volume1, Volume2, X,
 } from "lucide-react";
-import { api, type BackgroundTrack, type ComfyWorker, type GenerateInput, type MigrationReadiness, type ProductionEvent, type ProductionJob, type ProductionRelease, type ProductionRun, type RenderingMode, type SavedVoiceProfile, type Scene, type SeedSuggestion, type SemanticShot, type ShotAsset, type Story, type StoryDetail, type StudioSettings, type SubtitleCue, type TimelineShot, type TtsGenerateInput, type TtsModel, type Worker, type WorldArc, type WorldCharacter, type WorldKnowledgeBase, type WorldRelationship } from "./api";
+import { api, type BackgroundTrack, type ComfyWorker, type GenerateInput, type GenerationTask, type MigrationReadiness, type ProductionEvent, type ProductionJob, type ProductionRelease, type ProductionRun, type RenderingMode, type SavedVoiceProfile, type Scene, type SeedSuggestion, type SemanticShot, type ShotAsset, type Story, type StoryDetail, type StudioSettings, type SubtitleCue, type TimelineShot, type TtsGenerateInput, type TtsModel, type Worker, type WorldArc, type WorldCharacter, type WorldKnowledgeBase, type WorldRelationship } from "./api";
 import { StoryStudioWorkspace } from "./StoryStudio";
 import { LibraryCatalog } from "./LibraryCatalog";
 import { StoryDetails } from "./StoryDetails";
+import { projectProductionActivity, type ProductionActivity } from "./productionActivity";
 
 const nav = [
   [Library, "Library"], [Sparkles, "Story Studio"], [Volume2, "Voice Studio"], [Clapperboard, "Production Runs"], [Archive, "Assets"], [Settings, "Settings"],
@@ -427,6 +428,7 @@ function UsageLeds({ label, value, source }: { label: string; value?: number | n
 export function App() {
   const [stories, setStories] = useState<Story[]>([]);
   const [runs, setRuns] = useState<ProductionRun[]>([]);
+  const [generationTasks, setGenerationTasks] = useState<GenerationTask[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [comfyWorkers, setComfyWorkers] = useState<ComfyWorker[]>([]);
   const [selectedStoryId, setSelectedStoryId] = useState<string | undefined>(() => readStudioUiState().selectedStoryId);
@@ -473,13 +475,14 @@ export function App() {
 
   const refreshCore = async () => {
     try {
-      const [storyResult, runResult, controlResult] = await Promise.all([
-        api.stories(), api.runs(), api.productionControl().catch(() => ({ admission_paused: false, rendering_mode: "gpu" as RenderingMode })),
+      const [storyResult, runResult, taskResult, controlResult] = await Promise.all([
+        api.stories(), api.runs(), api.generationTasks(), api.productionControl().catch(() => ({ admission_paused: false, rendering_mode: "gpu" as RenderingMode })),
       ]);
       const sortedStories = [...storyResult.stories].sort((a, b) => Number(b.updated_at || b.created_at || 0) - Number(a.updated_at || a.created_at || 0));
       setStories(sortedStories);
       const visibleRuns = runResult.runs.filter((run) => !run.kind.includes("library_story"));
       setRuns(visibleRuns);
+      setGenerationTasks(taskResult.tasks || []);
       setAdmissionPaused(controlResult.admission_paused);
       setRenderingMode(controlResult.rendering_mode);
       setSelectedStoryId((current) => current && sortedStories.some((story) => story.id === current) ? current : sortedStories[0]?.id);
@@ -567,9 +570,17 @@ export function App() {
   const activeWorkers = [...workers, ...comfyWorkers].filter((worker) => (worker as Worker).status !== "stale" && (worker as ComfyWorker).running !== false);
   const activeComfyWorkers = comfyWorkers.filter((worker) => worker.running !== false);
   const sidebarWorkers = activeComfyWorkers;
-  const workingWorkerCount = workers.filter((worker) => worker.status === "running" && Boolean(worker.current_job_id)).length
-    + comfyWorkers.filter((worker) => worker.running !== false && (worker.queue_running || 0) > 0).length;
-  const workerSummary = `${activeWorkers.length} online · ${workingWorkerCount} working`;
+  const productionActivity = projectProductionActivity(generationTasks, workers);
+  const gpuWorkingCount = activeComfyWorkers.filter((worker) => (worker.queue_running || 0) > 0).length;
+  const productionStatus = productionActivity.workingRoles
+    ? `${productionActivity.workingRoles} production role${productionActivity.workingRoles === 1 ? "" : "s"} working`
+    : productionActivity.activities.length
+      ? `${productionActivity.activities.length} production role${productionActivity.activities.length === 1 ? "" : "s"} waiting`
+      : "Production idle";
+  const gpuStatus = activeComfyWorkers.length
+    ? `GPU ${gpuWorkingCount ? "busy" : "idle"} (${activeComfyWorkers.length} online)`
+    : "GPU offline";
+  const workerSummary = `${productionStatus} · ${gpuStatus}`;
 
   const runAction = async (action: () => Promise<unknown>, message: string) => {
     setBusy(true);
@@ -659,7 +670,8 @@ export function App() {
     <aside className="rail">
       <div className="brand"><img src="branding/fantasee-studio-banner.png" alt="FantaSee Studio" /></div>
       <nav>{nav.map(([Icon, label], index) => <button className={label === activeView ? "nav-item active" : "nav-item"} key={label} onClick={() => { setActiveView(label); setNotice(`${label} desk selected.`); }} aria-current={label === activeView ? "page" : undefined}><Icon size={19}/><span>{label}</span><i>{label === activeView ? "" : undefined}</i></button>)}</nav>
-      <section className="rail-workers" aria-label="ComfyUI workers"><div className="rail-section-title"><span>ComfyUI workers</span><small>{sidebarWorkers.length} online</small></div><div className="rail-worker-stack">{sidebarWorkers.length ? sidebarWorkers.map((worker, index) => { const comfyUrl = (worker as ComfyWorker).url; return <WorkerLane key={`${workerIdentity(worker)}-${index}`} worker={worker} jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")} onKill={comfyUrl ? () => void runAction(() => api.killComfy(comfyUrl), "Selected ComfyUI worker stopped.") : undefined}/>; }) : <WorkerLane empty jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")}/>}</div></section>
+      <section className="rail-activity" aria-label="Production activity"><div className="rail-section-title"><span>Production activity</span><small>{productionActivity.workingRoles} working</small></div><div className="rail-activity-stack">{productionActivity.activities.length ? productionActivity.activities.slice(0, 3).map((activity) => <ProductionActivityLane key={activity.id} activity={activity}/>) : <div className="rail-activity-empty"><span className="led muted"/><div><strong>No production roles active</strong><small>Queued work will appear here with its real stage.</small></div></div>}</div></section>
+      <section className="rail-workers" aria-label="ComfyUI workers"><div className="rail-section-title"><span>Render hardware</span><small>{sidebarWorkers.length} GPU online</small></div><div className="rail-worker-stack">{sidebarWorkers.length ? sidebarWorkers.map((worker, index) => { const comfyUrl = (worker as ComfyWorker).url; return <WorkerLane key={`${workerIdentity(worker)}-${index}`} worker={worker} jobs={[]} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")} onKill={comfyUrl ? () => void runAction(() => api.killComfy(comfyUrl), "Selected ComfyUI worker stopped.") : undefined}/>; }) : <WorkerLane empty jobs={[]} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")}/>}</div></section>
       <div className="rail-status"><span><span className="led green"/> {notice}</span><small>{workerSummary}</small></div>
     </aside>
 
@@ -1533,10 +1545,21 @@ function StoryEditor({ story, sceneIndex, busy, onClose, onSelectScene, onStoryR
     </div></> : <div className="empty-state"><LoaderCircle className="spin" size={30}/><p>Loading story workstation...</p><button className="outline-button" onClick={onClose}>Close</button></div>}{story && scene && timelineShots.length > 0 && <div className="timeline-rack"><header><span>Canonical visual timeline</span><span>{timelineShots.length} approved shots</span></header><div className="timeline-track">{timelineShots.map((segment) => <i key={segment.shot_id} style={{ left: `${segment.start / timelineDuration * 100}%`, width: `${Math.max(1, (segment.end - segment.start) / timelineDuration * 100)}%` }}><span>{segment.shot_id}</span></i>)}</div></div>}{story && scene && selectedShot && <button className="shot-lock-float" disabled={busy} onClick={() => onAction(async () => { const result = await api.lockSceneShot(story.id, sceneIndex, selectedShot.id, !shotLocked); setShotLocked(result.locked); }, `${shotLocked ? "Unlocked" : "Locked"} shot ${selectedShot.order}.`)}>{shotLocked ? "Unlock selected shot" : "Lock selected shot"}</button>}</section></div>;
 }
 
+function ProductionActivityLane({ activity }: { activity: ProductionActivity }) {
+  const progress = Math.round(activity.progress * 100);
+  const working = ["running", "leased"].includes(activity.status);
+  const waiting = ["queued", "retryable"].includes(activity.status);
+  return <article className="production-activity-card"><div className="activity-heading"><span className={`led ${working ? "blue live" : waiting ? "amber" : runLedTone(activity.status)}`}/><strong>{activity.role}</strong><small>{activity.stage}</small></div><div className="activity-story" title={activity.story}>{activity.story}</div><p title={activity.message}>{activity.message}</p><div className="activity-progress"><div className="progress-track"><i style={{ width: `${progress}%` }}/></div><b>{progress}%</b></div>{activity.workerId && <small className="activity-worker">Worker · {activity.workerId}</small>}</article>;
+}
+
 function WorkerLane({ worker, jobs, busy, empty, onSpawn, onKill }: { worker?: Worker | ComfyWorker; jobs: ProductionJob[]; busy: boolean; empty?: boolean; onSpawn: () => void; onKill?: () => void }) {
-  const runningJob = jobs.find((job) => job.status === "running");
+  const productionWorker = worker as Worker | undefined;
+  const comfyWorker = worker as ComfyWorker | undefined;
+  const runningJob = jobs.find((job) => job.id === productionWorker?.current_job_id || job.worker_id === productionWorker?.id);
+  const comfyRunning = (comfyWorker?.queue_running || 0) > 0;
   const progress = Math.round((runningJob?.progress || 0) * 100);
   const telemetry = worker as ComfyWorker | undefined;
-  const storyName = runningJob ? jobStoryName(runningJob) : "No story assigned";
-  return <article className="worker-lane metal-panel"><div className="worker-title"><span className={empty ? "led amber" : "led green"}/><h2>{empty ? "Worker bay available" : workerLabel(worker!)}</h2><small>{empty ? "awaiting assignment" : "signal live"}</small></div><div className="lane-task"><span>Story</span><strong title={storyName}>{empty ? "No worker in this lane" : storyName}</strong><small>{runningJob?.message || (empty ? "Awaiting assignment" : "Standing by for a durable job")} · queue {jobs.filter((job) => ["queued", "running"].includes(job.status)).length}</small></div><div className="meter"><span>Progress</span><div className="progress-track"><i style={{width: `${progress}%`}}/></div><b>{progress}%</b></div><div className="worker-usage"><UsageLeds label="CPU" value={telemetry?.telemetry?.cpu_percent} source={telemetry?.telemetry?.cpu_source}/><UsageLeds label="GPU" value={telemetry?.telemetry?.gpu_percent} source={telemetry?.telemetry?.gpu_source || telemetry?.telemetry?.source}/></div><div className="lane-actions">{empty ? <button disabled={busy} onClick={onSpawn}><Plus size={17}/> Start GPU</button> : <><button disabled={busy} onClick={onSpawn} title="Start an additional worker"><Plus size={17}/></button>{onKill && <button disabled={busy} onClick={onKill} title="Stop this selected worker"><X size={17}/></button>}</>}</div></article>;
+  const storyName = runningJob ? jobStoryName(runningJob) : comfyRunning ? "Artwork render" : "No story assigned";
+  const taskMessage = runningJob?.message || (comfyRunning ? `${comfyWorker?.queue_running} ComfyUI workflow${comfyWorker?.queue_running === 1 ? "" : "s"} rendering` : empty ? "Awaiting assignment" : "Standing by for an artwork job");
+  return <article className="worker-lane metal-panel"><div className="worker-title"><span className={empty ? "led amber" : comfyRunning || runningJob ? "led blue live" : "led green"}/><h2>{empty ? "Worker bay available" : workerLabel(worker!)}</h2><small>{empty ? "awaiting assignment" : comfyRunning || runningJob ? "rendering" : "signal live · idle"}</small></div><div className="lane-task"><span>Assignment</span><strong title={storyName}>{empty ? "No worker in this lane" : storyName}</strong><small>{taskMessage} · queue {comfyWorker?.queue_remaining ?? jobs.filter((job) => ["queued", "running"].includes(job.status)).length}</small></div><div className="meter"><span>Progress</span><div className="progress-track"><i style={{width: `${progress}%`}}/></div><b>{comfyRunning && !runningJob ? "live" : `${progress}%`}</b></div><div className="worker-usage"><UsageLeds label="CPU" value={telemetry?.telemetry?.cpu_percent} source={telemetry?.telemetry?.cpu_source}/><UsageLeds label="GPU" value={telemetry?.telemetry?.gpu_percent} source={telemetry?.telemetry?.gpu_source || telemetry?.telemetry?.source}/></div><div className="lane-actions">{empty ? <button disabled={busy} onClick={onSpawn}><Plus size={17}/> Start GPU</button> : <><button disabled={busy} onClick={onSpawn} title="Start an additional worker"><Plus size={17}/></button>{onKill && <button disabled={busy} onClick={onKill} title="Stop this selected worker"><X size={17}/></button>}</>}</div></article>;
 }
