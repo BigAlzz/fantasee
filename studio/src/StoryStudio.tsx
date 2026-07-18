@@ -181,6 +181,76 @@ export function StoryStudioWorkspace({
       ],
     });
 
+  const growSupportingCast = () => {
+    const templates: Array<Omit<WorldCharacter, "id">> = [
+      {
+        name: "Mara Voss",
+        role: "Boundary cartographer",
+        description: "A field mapper who turns forbidden borders into negotiable paths.",
+        voice: "Mia",
+        style: "Intimate audiobook",
+        age: "31",
+        alignment: "Chaotic good",
+        traits: "curious, exacting, protective",
+        appearance: "Weathered field coat, ink-stained gloves, and a brass compass worn at the throat.",
+        biography: "Mara grew up moving between settlements and learned that every official map leaves someone out.",
+        motivation: "Make a route through the world's oldest division before a faction turns it into a battlefield.",
+      },
+      {
+        name: "Tomas Rell",
+        role: "Keeper of forbidden memory",
+        description: "A quiet archivist who knows which version of history each faction is hiding.",
+        voice: "Milo",
+        style: "Grounded and textured",
+        age: "56",
+        alignment: "True neutral",
+        traits: "patient, secretive, observant",
+        appearance: "Layered archive robes, copper spectacles, and a satchel of hand-bound memory plates.",
+        biography: "Tomas inherited a sealed archive and spent decades discovering that its missing pages were removed by living people.",
+        motivation: "Protect the truth long enough for younger characters to choose what to do with it.",
+      },
+      {
+        name: "Ilya Renn",
+        role: "Rival claimant",
+        description: "A charismatic organizer who believes peace is only possible when one side controls the terms.",
+        voice: "Dean",
+        style: "Deep, restrained authority",
+        age: "38",
+        alignment: "Conflicted militant",
+        traits: "magnetic, strategic, resentful",
+        appearance: "Ceremonial red sash, split knuckles, and a signet carved from the world's forbidden material.",
+        biography: "Ilya built a movement out of the losses everyone else wanted to call inevitable.",
+        motivation: "Win a place for the dispossessed, even if the victory makes him the next tyrant.",
+      },
+    ];
+    const existingNames = new Set(world.characters.map((character) => character.name.trim()));
+    const newCharacters = templates.filter((character) => !existingNames.has(character.name)).map((character, index) => ({
+      ...character,
+      id: `character-${Date.now()}-${index}`,
+    }));
+    if (!newCharacters.length) return;
+    const anchor = world.characters.find((character) => character.name.trim())?.name || newCharacters[0].name;
+    const newRelationships: WorldRelationship[] = newCharacters.map((character, index) => ({
+      id: `relationship-${Date.now()}-${index}`,
+      from: character.name,
+      to: anchor,
+      label: index === 0 ? "protects" : index === 1 ? "depends on" : "opposes",
+      status: index === 2 ? "fractured" : "forming",
+    }));
+    if (newCharacters.length > 1) {
+      newRelationships.push({
+        id: `relationship-${Date.now()}-network`,
+        from: newCharacters[0].name,
+        to: newCharacters[2]?.name || newCharacters[1].name,
+        label: "uneasy alliance",
+        status: "forming",
+      });
+    }
+    updateWorld({ characters: [...world.characters, ...newCharacters], relationships: [...world.relationships, ...newRelationships] });
+    setTab("characters");
+    setSaveMessage(`Drafted ${newCharacters.length} supporting characters and ${newRelationships.length} relationship links. Review and save the canon.`);
+  };
+
   const saveWorld = () => {
     try {
       window.localStorage.setItem("fantasee.world.knowledge", worldSnapshot);
@@ -386,6 +456,7 @@ export function StoryStudioWorkspace({
           updateArc={updateArc}
           addRelationship={addRelationship}
           addArc={addArc}
+          onGrowCast={growSupportingCast}
           onSave={saveWorld}
           onOpenCharacters={() => setTab("characters")}
         />
@@ -400,6 +471,7 @@ export function StoryStudioWorkspace({
           updateArc={updateArc}
           addRelationship={addRelationship}
           addArc={addArc}
+          onGrowCast={growSupportingCast}
           portraitBusy={portraitBusy}
           portraitsBusy={portraitBatchBusy}
           onGeneratePortrait={generatePortrait}
@@ -747,6 +819,7 @@ function WorldBuilderTab({
   updateArc,
   addRelationship,
   addArc,
+  onGrowCast,
   onSave,
   onOpenCharacters,
 }: {
@@ -756,6 +829,7 @@ function WorldBuilderTab({
   updateArc: (id: string, patch: Partial<WorldArc>) => void;
   addRelationship: () => void;
   addArc: () => void;
+  onGrowCast: () => void;
   onSave: () => void;
   onOpenCharacters: () => void;
 }) {
@@ -771,6 +845,9 @@ function WorldBuilderTab({
           </p>
         </div>
         <div className="world-builder-actions">
+          <button type="button" className="outline-button" onClick={onGrowCast}>
+            <WandSparkles size={14} /> Grow supporting cast
+          </button>
           <button type="button" className="outline-button" onClick={onSave}>
             <Save size={14} /> Save canon
           </button>
@@ -788,7 +865,7 @@ function WorldBuilderTab({
             </small>
           </div>
           <span>
-            {world.characters.length} sheets - {world.arcs.length} arcs
+            {world.characters.length} sheets - {world.relationships.length} links - {world.arcs.length} arcs
           </span>
         </div>
         <div className="brief-grid">
@@ -933,6 +1010,7 @@ function WorldBuilderTab({
           )}
         </div>
       </section>
+      <RelationshipWebPreview world={world} />
       <section className="world-section diagram-section">
         <div className="section-heading">
           <div>
@@ -954,6 +1032,47 @@ function WorldBuilderTab({
   );
 }
 
+function RelationshipWebPreview({ world }: { world: WorldKnowledgeBase }) {
+  const characters = world.characters.filter((character) => character.name.trim()).slice(0, 12);
+  const width = 760;
+  const columns = 4;
+  const rows = Math.max(1, Math.ceil(characters.length / columns));
+  const height = Math.max(220, rows * 96 + 64);
+  const positions = new Map(characters.map((character, index) => [character.name, {
+    x: 96 + (index % columns) * 185,
+    y: 45 + Math.floor(index / columns) * 96,
+  }]));
+  const links = world.relationships.filter((relationship) => positions.has(relationship.from) && positions.has(relationship.to));
+  const shortLabel = (value: string) => value.length > 20 ? `${value.slice(0, 18)}...` : value;
+  return (
+    <section className="world-section relationship-web-section">
+      <div className="section-heading">
+        <div>
+          <h2>Relationship web</h2>
+          <small>See the cast as a living network, not a list of disconnected notes.</small>
+        </div>
+        <span>{links.length} mapped links</span>
+      </div>
+      {characters.length ? (
+        <div className="relationship-web-shell">
+          <div className="relationship-web-toolbar"><span><span className="led blue live" /> Character network</span><small>Lines are derived from the editable relationship ledger.</small></div>
+          <div className="relationship-web-canvas">
+            <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Character relationship map">
+              <defs><marker id="relationship-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#b17d3e" /></marker></defs>
+              {links.map((relationship) => {
+                const from = positions.get(relationship.from)!;
+                const to = positions.get(relationship.to)!;
+                return <g key={relationship.id} className={`relationship-edge ${relationship.status}`}><line x1={from.x} y1={from.y + 20} x2={to.x} y2={to.y - 20} markerEnd="url(#relationship-arrow)" /><text x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 4}>{shortLabel(relationship.label)}</text></g>;
+              })}
+              {[...positions.entries()].map(([name, position]) => <g className="relationship-node" key={name} transform={`translate(${position.x - 72}, ${position.y - 20})`}><rect width="144" height="40" rx="2" /><text x="72" y="24" textAnchor="middle">{shortLabel(name)}</text></g>)}
+            </svg>
+          </div>
+        </div>
+      ) : <div className="empty-state relationship-web-empty"><GitBranch size={22} /><p>Add characters to see their relationship network.</p></div>}
+    </section>
+  );
+}
+
 function CharacterSheetsTab({
   world,
   updateWorld,
@@ -963,6 +1082,7 @@ function CharacterSheetsTab({
   updateArc,
   addRelationship,
   addArc,
+  onGrowCast,
   portraitBusy,
   portraitsBusy,
   onGeneratePortrait,
@@ -977,6 +1097,7 @@ function CharacterSheetsTab({
   updateArc: (id: string, patch: Partial<WorldArc>) => void;
   addRelationship: () => void;
   addArc: () => void;
+  onGrowCast: () => void;
   portraitBusy?: string;
   portraitsBusy: boolean;
   onGeneratePortrait: (character: WorldCharacter) => Promise<void>;
@@ -1010,6 +1131,9 @@ function CharacterSheetsTab({
           </button>
           <button type="button" className="create" onClick={addCharacter}>
             <Plus size={14} /> Add character
+          </button>
+          <button type="button" className="outline-button" onClick={onGrowCast}>
+            <WandSparkles size={14} /> Grow supporting cast
           </button>
         </div>
       </section>

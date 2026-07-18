@@ -6,6 +6,8 @@ import inspect
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from fantasee_server.llm_tokens import llm_unlimited, scaled_llm_tokens
+
 
 def estimate_tokens(text: str) -> int:
     return max(1, (len(text or "") + 3) // 4)
@@ -21,7 +23,7 @@ class TokenBudget:
 
     def reserve(self, amount: int) -> None:
         amount = max(1, int(amount))
-        if self.actual_tokens + self.reserved_tokens + amount > self.limit:
+        if not llm_unlimited() and self.actual_tokens + self.reserved_tokens + amount > self.limit:
             raise ValueError("LLM token budget would be exceeded")
         self.reserved_tokens += amount
 
@@ -65,7 +67,7 @@ class GranularLLMAdapter:
         max_tokens: int,
         temperature: float | None = None,
     ) -> LLMResult:
-        reserved = max(1, int(max_tokens))
+        reserved = scaled_llm_tokens(max_tokens)
         self.budget.reserve(reserved)
         retries = 0
         try:
@@ -74,7 +76,10 @@ class GranularLLMAdapter:
                     system,
                     prompt,
                     temperature=self.temperature if temperature is None else temperature,
-                    max_tokens=reserved,
+                    # The production provider boundary applies the same multiplier
+                    # when it builds the HTTP request; reserve the scaled amount
+                    # here without scaling the adapter's public call seam twice.
+                    max_tokens=max_tokens,
                 )
             except TypeError:
                 text = self.call(system, prompt, self.temperature if temperature is None else temperature)

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fantasee_server.production_runtime import get_persisted_task, list_persisted_tasks, production_database_path
 from fantasee_server.production_store import ProductionStore
+from fantasee_server.state import _generation_tasks
 from story_storage import validate_story_id
 from fastapi.responses import FileResponse
 
@@ -72,6 +73,33 @@ def get_production_run(run_id: str):
     if task is None:
         raise HTTPException(status_code=404, detail="Production run not found")
     return task
+
+
+@router.delete("/api/production/runs/{run_id}")
+def delete_production_run(run_id: str, body: dict | None = Body(default=None)):
+    """Delete a finished production run and its durable history."""
+    confirm = bool((body or {}).get("confirm", False))
+    if not confirm:
+        raise HTTPException(status_code=400, detail="Send {confirm: true} to delete this run")
+
+    with ProductionStore(production_database_path()) as store:
+        run = store.get_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="Production run not found")
+        active_jobs = [job for job in store.list_jobs(run_id) if job.status in {"queued", "leased", "running", "retryable"}]
+        if active_jobs:
+            raise HTTPException(status_code=409, detail="Active production runs cannot be deleted until their jobs finish.")
+        deleted = store.delete_run(run_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Production run not found")
+    _generation_tasks.pop(run_id, None)
+    return {
+        "status": "ok",
+        "run_id": run_id,
+        "story_id": run.story_id,
+        "message": "Production run deleted.",
+    }
 
 
 @router.get("/api/production/runs/{run_id}/events")

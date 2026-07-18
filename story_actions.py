@@ -274,6 +274,7 @@ def regenerate_story(
     *,
     backup: bool = True,
     story_dir: Optional[Path] = None,
+    progress_callback: Optional[Callable[[str, str, Optional[float]], None]] = None,
 ) -> dict:
     """Wipe a story and re-run the generation pipeline from scratch.
 
@@ -293,6 +294,9 @@ def regenerate_story(
     if not story_dir.is_dir():
         raise FileNotFoundError(f"Story directory not found: {story_dir}")
 
+    if progress_callback:
+        progress_callback("discover", "Reading the saved story direction and production inputs", 0.02)
+
     manifest = _load_manifest(story_dir)
     if not manifest.get("story_concept") and not manifest.get("description"):
         # Older manifests stored the concept in `description`; fall back
@@ -306,6 +310,10 @@ def regenerate_story(
     style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
     tone = manifest.get("tone") or (tags[1] if len(tags) > 1 else "dramatic")
     voice = manifest.get("voice_preset") or "Dean"
+    narration_style = manifest.get("narration_style") or ""
+    world_context = manifest.get("world_context") or ""
+    voice_assignments = manifest.get("voice_assignments") or ""
+    characters = manifest.get("characters") or ""
     concept = (manifest.get("story_concept") or manifest.get("description") or "").strip()
     if not concept:
         raise ValueError("Manifest has no concept — cannot re-generate.")
@@ -319,6 +327,8 @@ def regenerate_story(
     # ── Backup to .trash/ ───────────────────────────────────────────
     backup_path = None
     if backup:
+        if progress_callback:
+            progress_callback("backup", "Securing a backup before replacing the current production", 0.06)
         TRASH_DIR.mkdir(parents=True, exist_ok=True)
         # Use a unique name so multiple regens don't clobber each other
         import time as _time
@@ -327,6 +337,8 @@ def regenerate_story(
         shutil.copytree(story_dir, backup_path)
 
     # ── Wipe everything in the story dir except the dir itself ────
+    if progress_callback:
+        progress_callback("reset", "Clearing stale generated assets while preserving the backup", 0.1)
     for child in list(story_dir.iterdir()):
         if child.is_dir() and not child.name.startswith("."):
             shutil.rmtree(child, ignore_errors=True)
@@ -359,6 +371,10 @@ def regenerate_story(
         "tags": [style, tone, "generated"],
         "tone": tone,
         "voice_preset": voice,
+        "narration_style": narration_style,
+        "characters": characters,
+        "world_context": world_context,
+        "voice_assignments": voice_assignments,
         "generated": True,
         "status": "regenerating",
         "background_audio": manifest.get("background_audio"),
@@ -374,6 +390,8 @@ def regenerate_story(
     # The caller (server endpoint) wraps this in a thread so the event
     # loop stays responsive.
     try:
+        if progress_callback:
+            progress_callback("generate", "Starting the full story pipeline: script, scenes, images, narration, and subtitles", 0.12)
         result = run_pipeline(
             concept=concept,
             num_scenes=num_scenes,
@@ -381,6 +399,10 @@ def regenerate_story(
             tone=tone,
             voice_preset=voice,
             images_per_scene=images_per_scene,
+            characters=characters,
+            narration_style=narration_style,
+            world_context=world_context,
+            progress_callback=progress_callback,
         )
     except Exception as pipeline_err:
         # Pipeline failed — restore from backup if we made one
@@ -698,6 +720,7 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
             output_dir=str(story_dir),
             seed=seed_base + i,
             checkpoint=checkpoint,
+            style=style,
             timeout=300,
         )
         if filename:
@@ -917,6 +940,7 @@ Tone: {tone}"""
                         output_dir=str(story_dir),
                         seed=seed + img_idx,
                         checkpoint=image_checkpoint,
+                        style=style,
                         timeout=300,
                     )
                     if filename:

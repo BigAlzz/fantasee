@@ -20,6 +20,7 @@ from pathlib import Path
 
 import requests
 from story_storage import STORIES_ROOT, existing_story_dir
+from fantasee_server.llm_tokens import scaled_llm_tokens
 
 OUTPUTS_DIR = STORIES_ROOT
 SCRIPT_DIR = Path(__file__).parent
@@ -74,6 +75,7 @@ def llm_call(messages, model="mimo-v2.5-pro", temperature=0.7, max_tokens=2048, 
     if not api_key:
         print("[pipeline] ERROR: No XIAOMI_API_KEY", file=sys.stderr)
         return None
+    max_tokens = scaled_llm_tokens(max_tokens)
 
     for attempt in range(3):
         try:

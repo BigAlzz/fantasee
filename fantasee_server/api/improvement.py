@@ -26,6 +26,7 @@ from fantasee_server.paths import (
     generated_story_dir,
 )
 from fantasee_server.security import validate_provider_url
+from fantasee_server.llm_tokens import scaled_llm_tokens
 from fantasee_server.state import (
     _resolve_env_var,
     atomic_write_json,
@@ -130,8 +131,8 @@ async def regenerate_scene(story_id: str, scene_idx: int, body: dict = Body(defa
 
 
 @router.post("/api/stories/{story_id}/scenes/{scene_idx}/add-image")
-async def add_scene_image(story_id: str, scene_idx: int):
-    """Add an additional image to a scene for more visual variety."""
+async def add_scene_image(story_id: str, scene_idx: int, body: dict = Body(default=None)):
+    """Add one or more images with director or explicit manual placement."""
     story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
@@ -143,6 +144,16 @@ async def add_scene_image(story_id: str, scene_idx: int):
         raise HTTPException(status_code=400, detail="Invalid scene index")
 
     scene = scenes[scene_idx]
+    options = body or {}
+    mode = str(options.get("mode") or "director").strip().lower()
+    if mode not in {"director", "manual"}:
+        raise HTTPException(status_code=400, detail="mode must be director or manual")
+    try:
+        count = int(options.get("count", 1))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="count must be an integer") from exc
+    if count < 1 or count > 4:
+        raise HTTPException(status_code=400, detail="count must be between 1 and 4")
     scene_num = scene_idx + 1
     padded = f"{scene_num:02d}"
     safe_title = re.sub(r'[^a-zA-Z0-9]+', '_', scene.get("title", "")).strip("_")[:30]
@@ -153,24 +164,68 @@ async def add_scene_image(story_id: str, scene_idx: int):
     if not status.get("running", False):
         raise HTTPException(status_code=503, detail="ComfyUI not running")
 
-    existing = len(scene.get("image_filenames", []))
-    seed = hash(story_id + str(scene_num) + str(existing)) % (2**32 - 1)
-    prefix = f"{story_id}_s{padded}_{safe_title}_{existing + 1:02d}"
+    images = scene.setdefault("image_filenames", [])
+    try:
+        manual_position = int(options.get("position", len(images)))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="position must be an integer") from exc
+    insert_at = max(0, min(len(images), manual_position))
+    director_shots = []
+    if mode == "director":
+        try:
+            from fantasee_server.production_runtime import production_database_path
+            from fantasee_server.production_store import ProductionStore
+            from fantasee_server.shot_planning import plan_semantic_shots
+            scene_id = f"scene-{scene_num:02d}"
+            with ProductionStore(production_database_path()) as store:
+                director_shots = store.list_shots(story_id, scene_id)
+                if not director_shots:
+                    planned = plan_semantic_shots(
+                        scene_id=scene_id,
+                        narration=scene.get("narration") or scene.get("narration_text") or scene.get("narrative") or "",
+                        visual_direction=scene.get("prompt") or "",
+                    )
+                    store.save_shot_plan(story_id, scene_id, planned)
+                    director_shots = store.list_shots(story_id, scene_id)
+        except Exception:
+            # Image generation remains useful even if the optional durable shot
+            # plan is unavailable on an older story.
+            director_shots = []
 
-    filename = generate_image(
-        prompt=scene["prompt"],
-        output_prefix=prefix,
-        output_dir=str(story_dir),
-        seed=seed,
-        timeout=600,
-    )
+    added: list[str] = []
+    placements: list[dict] = []
+    for offset in range(count):
+        current_count = len(images)
+        target_shot = director_shots[min(current_count, len(director_shots) - 1)] if director_shots else None
+        if mode == "director" and target_shot:
+            position = max(0, min(current_count, target_shot.order - 1))
+            prompt = target_shot.visual_context or scene.get("prompt") or ""
+        else:
+            position = max(0, min(current_count, insert_at + offset))
+            prompt = scene.get("prompt") or ""
+        seed = hash(f"{story_id}:{scene_num}:{current_count}:{mode}") % (2**32 - 1)
+        prefix = f"{story_id}_s{padded}_{safe_title}_{current_count + 1:02d}"
+        filename = generate_image(
+            prompt=prompt,
+            output_prefix=prefix,
+            output_dir=str(story_dir),
+            seed=seed,
+            timeout=600,
+        )
+        if not filename:
+            continue
+        images.insert(position, filename)
+        added.append(filename)
+        placements.append({"filename": filename, "position": position, "shot_id": target_shot.id if target_shot else None})
 
-    if filename:
-        scene.setdefault("image_filenames", []).append(filename)
-        atomic_write_json(manifest_path, manifest)
-        return {"status": "ok", "filename": filename, "total_images": len(scene["image_filenames"])}
-
-    raise HTTPException(status_code=500, detail="Image generation failed")
+    if not added:
+        raise HTTPException(status_code=500, detail="Image generation failed; no new asset was returned")
+    stale = set(scene.get("stale_outputs") or [])
+    stale.update({"scene_video", "full_video", "plex"})
+    scene["stale_outputs"] = [kind for kind in ("images", "audio", "subtitles", "scene_video", "full_video", "plex") if kind in stale]
+    manifest["status"] = "draft"
+    atomic_write_json(manifest_path, manifest)
+    return {"status": "ok", "filename": added[-1], "filenames": added, "placements": placements, "total_images": len(images), "mode": mode}
 
 
 @router.post("/api/stories/{story_id}/scenes/{scene_idx}/refine-prompt")
@@ -229,7 +284,7 @@ async def refine_prompt(story_id: str, scene_idx: int, body: dict = Body(default
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.7,
-            "max_completion_tokens": 512,
+            "max_completion_tokens": scaled_llm_tokens(512),
         },
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         timeout=120,

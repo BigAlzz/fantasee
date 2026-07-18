@@ -45,6 +45,7 @@ SUGGESTED_STYLES = [
     "noir chiaroscuro",
     "sci-fi concept",
     "children's illustration",
+    "comic book panels",
 ]
 
 
@@ -59,6 +60,7 @@ DEFAULTS: dict = {
     "llm_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
     "llm_api_key": "",
     "llm_model": "mimo-v2.5-pro",
+    "llm_unlimited": True,
 
     # TTS provider (falls back to the LLM credential when its own key is blank)
     "tts_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
@@ -86,6 +88,7 @@ DEFAULTS: dict = {
     # Generation defaults
     "default_scenes": 5,
     "default_images_per_scene": 5,
+    "default_visual_style": "comic book panels",
     "default_style": "fantasy painterly",
     "default_tone": "dramatic",
     "narration_style": "",
@@ -103,6 +106,7 @@ class Settings(BaseModel):
     llm_base_url: str = Field(default="https://token-plan-sgp.xiaomimimo.com/v1", description="LLM API base URL")
     llm_api_key: str = Field(default="", description="LLM API key (stored locally, never sent to browser)")
     llm_model: str = Field(default="mimo-v2.5-pro", description="LLM model name")
+    llm_unlimited: bool = Field(default=True, description="Remove Fantasee completion ceilings; provider limits still apply")
 
     # TTS
     tts_base_url: str = Field(default="https://token-plan-sgp.xiaomimimo.com/v1", description="TTS API base URL")
@@ -127,6 +131,7 @@ class Settings(BaseModel):
     # Generation defaults
     default_scenes: int = Field(default=5, ge=1, le=50)
     default_images_per_scene: int = Field(default=5, ge=1, le=10)
+    default_visual_style: str = Field(default="comic book panels", description="Default visual direction for new story briefs")
     default_style: str = Field(default="fantasy painterly")
     default_tone: str = Field(default="dramatic")
     narration_style: str = Field(default="", description="Narration style name (maps to skills/<name>-style-prompt.md)")
@@ -217,6 +222,7 @@ def apply_settings_to_env(settings: dict) -> None:
     os.environ["XIAOMI_BASE_URL"] = llm_base_url
     os.environ["XIAOMI_API_KEY"] = settings.get("llm_api_key", DEFAULTS["llm_api_key"])
     os.environ["FANTASEE_LLM_MODEL"] = settings.get("llm_model", DEFAULTS["llm_model"])
+    os.environ["FANTASEE_LLM_UNLIMITED"] = "1" if settings.get("llm_unlimited", DEFAULTS["llm_unlimited"]) else "0"
     os.environ["FANTASEE_TTS_BASE_URL"] = tts_base_url
     os.environ["FANTASEE_TTS_API_KEY"] = (
         settings.get("tts_api_key") or settings.get("llm_api_key", DEFAULTS["llm_api_key"])

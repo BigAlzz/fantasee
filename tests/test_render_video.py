@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from render_video import render_scene
+from render_video import concatenate_scenes, concatenate_vtts, render_scene
 
 
 pytestmark = pytest.mark.skipif(
@@ -77,3 +77,49 @@ def test_render_scene_encodes_each_input_image(tmp_path: Path) -> None:
     late = _frame_mean(rendered, 1.5)
     assert early[0] > early[2] * 2
     assert late[2] > late[0] * 2
+
+
+def test_concatenate_scenes_uses_a_scene_fade_transition(tmp_path: Path) -> None:
+    first = tmp_path / "first.mp4"
+    second = tmp_path / "second.mp4"
+    for output, color in ((first, "red"), (second, "blue")):
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-f", "lavfi", "-i", f"color=c={color}:s=160x90:r=10",
+                "-f", "lavfi", "-i", "anullsrc=r=8000:cl=mono", "-t", "1.0",
+                "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                str(output),
+            ],
+            capture_output=True,
+            check=True,
+        )
+
+    rendered = concatenate_scenes([first, second], "scene-fade", tmp_path)
+
+    assert rendered is not None
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(rendered)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    # A crossfade overlaps the scene boundary instead of hard-cutting at 2s.
+    assert float(probe.stdout.strip()) < 1.8
+
+
+def test_concatenate_vtts_uses_the_scene_transition_clock(tmp_path: Path) -> None:
+    first = tmp_path / "first.vtt"
+    second = tmp_path / "second.vtt"
+    first.write_text("WEBVTT\n\n1\n00:00:00.000 --> 00:00:01.000\nFirst\n", encoding="utf-8")
+    second.write_text("WEBVTT\n\n1\n00:00:00.000 --> 00:00:01.000\nSecond\n", encoding="utf-8")
+
+    output = concatenate_vtts(
+        [first, second],
+        "subtitle-fade",
+        tmp_path,
+        scene_durations=[1.0, 1.0],
+    )
+
+    assert output is not None
+    content = output.read_text(encoding="utf-8")
+    assert "00:00:00.200 --> 00:00:01.200" in content

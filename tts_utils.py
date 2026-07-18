@@ -528,6 +528,70 @@ def _write_tts_audio(audio_bytes: bytes, output_path: Path, speed: Optional[floa
                 pass
 
 
+def _split_tts_text(text: str, max_chars: Optional[int] = None) -> list[str]:
+    """Split long narration at sentence boundaries to prevent TTS drift.
+
+    Long single requests can make a voice model lose the script after a
+    minute or so and continue with invented speech. Bounded requests keep
+    each response anchored to the approved narration text.
+    """
+    limit = max_chars or int(os.environ.get("FANTASEE_TTS_CHUNK_CHARS", "360"))
+    limit = max(160, limit)
+    sentences = [part.strip() for part in re.findall(r"[^.!?\n]+[.!?]+|[^.!?\n]+$", text) if part.strip()]
+    if not sentences:
+        return [text.strip()] if text.strip() else []
+
+    chunks: list[str] = []
+    current: list[str] = []
+    current_length = 0
+    for sentence in sentences:
+        if len(sentence) > limit:
+            words = sentence.split()
+            for word in words:
+                proposed = (" ".join(current + [word])).strip()
+                if current and len(proposed) > limit:
+                    chunks.append(" ".join(current).strip())
+                    current = []
+                current.append(word)
+            current_length = len(" ".join(current))
+            continue
+        proposed_length = current_length + len(sentence) + (1 if current else 0)
+        if current and proposed_length > limit:
+            chunks.append(" ".join(current).strip())
+            current = []
+            current_length = 0
+        current.append(sentence)
+        current_length += len(sentence) + (1 if current_length else 0)
+    if current:
+        chunks.append(" ".join(current).strip())
+    return [chunk for chunk in chunks if chunk]
+
+
+def _merge_wav_bytes(parts: list[bytes]) -> Optional[bytes]:
+    """Join provider WAV responses while preserving their sample format."""
+    if not parts:
+        return None
+    if len(parts) == 1:
+        return parts[0]
+    output = io.BytesIO()
+    try:
+        with wave.open(io.BytesIO(parts[0]), "rb") as first:
+            params = first.getparams()
+            frames = [first.readframes(first.getnframes())]
+        for part in parts[1:]:
+            with wave.open(io.BytesIO(part), "rb") as current:
+                if current.getparams()[:3] != params[:3]:
+                    raise ValueError("TTS chunks returned incompatible WAV formats")
+                frames.append(current.readframes(current.getnframes()))
+        with wave.open(output, "wb") as merged:
+            merged.setparams(params)
+            merged.writeframes(b"".join(frames))
+        return output.getvalue()
+    except (wave.Error, ValueError, EOFError) as exc:
+        print(f"[tts_utils] ERROR: could not merge TTS chunks: {exc}", file=sys.stderr)
+        return None
+
+
 def generate_tts(
     text: str,
     output_path: str,
@@ -576,16 +640,23 @@ def generate_tts(
     # Use preset model for named voices. The synthesize() function will
     # combine `style` with `tone` automatically and fall back to the
     # voice's preset if both are empty.
-    audio_bytes = synthesize(
-        text,
-        voice=voice,
-        style=style,
-        model=model,
-        tone=tone,
-        voice_sample=voice_sample,
-        optimize_text_preview=optimize_text_preview,
-        stream=stream,
-    )
+    chunks = _split_tts_text(text)
+    audio_parts = []
+    for chunk in chunks:
+        audio = synthesize(
+            chunk,
+            voice=voice,
+            style=style,
+            model=model,
+            tone=tone,
+            voice_sample=voice_sample,
+            optimize_text_preview=optimize_text_preview,
+            stream=stream,
+        )
+        if not audio:
+            return False
+        audio_parts.append(audio)
+    audio_bytes = _merge_wav_bytes(audio_parts)
     if not audio_bytes:
         return False
 

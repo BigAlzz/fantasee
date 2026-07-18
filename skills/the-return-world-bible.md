@@ -37,6 +37,36 @@ The rifts don't just open anywhere. They open where Neanderthal blood was spille
 
 ---
 
+### THE ANTARCTIC VEIL — The Hidden Prison
+
+The public account of Antarctica is incomplete. The Antarctic Treaty was also a
+containment agreement: a coalition of early human tribes and rogue spirits raised
+the **Ice Wall** approximately 40,000 years ago and wrapped the last sealed
+Neanderthal refuge in a cloaking field. The Scandinavian rift was one route of the
+First Crossing, but the Antarctic seal concealed a separate Earth-side pocket and
+its surviving population from later human history.
+
+The sealed interior is called the **Deep Cradle**, or **Tshuka-Vell**. It is not a
+replacement for Nevarrah; it is a compressed threshold-space connected to the
+old Gate Stone network and the dying world beyond it. Its defining features are:
+
+- **The Luminous Vault:** no ordinary sun or moon; overhead Arcaneite crystal
+  veins pulse through artificial day and night.
+- **Geothermal jungles:** volcanic heat sustains primordial rainforest, thermal
+  rivers, and surviving Pleistocene megafauna beneath the ice.
+- **The Crushed Horizons:** gravity bends toward rune-carved perimeter ice,
+  making the boundary feel like an endless vertical slope.
+- **The Ice Wall runes:** a planetary-scale prison and cloaking system whose
+  failure allows Weave energy, creatures, and people to cross into modern Earth.
+
+The breach is being accelerated by climate change, tectonic drilling, and
+electromagnetic satellite activity. Human high-energy infrastructure has also
+been drawing ambient Weave from the hidden ecosystem. The return is therefore
+both a homecoming and a response to an ecological power crisis: dismantling the
+human megacities may be the only way to keep the Deep Cradle alive.
+
+---
+
 ### NEVARRAH — The Dying World
 
 **Appearance:** A world of perpetual twilight. The sun is a white dwarf, small and cold. The sky shifts between deep purple and pale green. Bioluminescence is everywhere — fungi, flora, insects, even some animals. At night, the landscape glows.
@@ -200,7 +230,45 @@ They advocate for peaceful surrender of territory. They refuse to fight. They pr
 
 ---
 
+### THE ICE WALL CUSTODIANS — The Conspiracy Layer
+
+This is not a public faction and it is not fully controlled by the Concord. It is
+an overlapping network of treaty officials, dark-site researchers, and private
+energy contractors who kept the Antarctic truth buried.
+
+- **Apex Energy** used advanced mining and zero-point infrastructure near the
+  wall. Its executives knew the energy system was draining the Weave, but treated
+  the Deep Cradle as an inaccessible resource rather than a living homeland.
+- A radical Neanderthal shaman faction secretly traded access and ritual
+  knowledge to human corporate insiders. When the wall failed, selected defense
+  systems had been disabled from inside.
+- **Unit 734**, the Human Guardians, is the kind of deniable response team sent
+  to silent Antarctic outposts. Its mission brief says containment; the real
+  mission is to keep the treaty secret and recover usable rune technology.
+- The Concord's public science division denies the Ice Wall exists. Project
+  Chimera privately tracks the possibility that some modern humans carry a
+  genetic marker inherited from the original jailers.
+
+---
+
 ## PART III: THE RETURN — TIMELINE OF CONTACT
+
+**40,000 years ago — The Antarctic Seal**
+
+During the First Crossing, an alliance of early human tribes and rogue spirits
+used the last accessible surface magic to raise the Ice Wall and conceal the
+Deep Cradle. The seal preserved a population and a route into the wider Gate
+network, but turned refuge into imprisonment. The custodians erased the event
+from human memory and later recast Antarctica as an untouchable natural region.
+
+**Immediately before Year 0 — The McMurdo Breach**
+
+Climate instability, tectonic drilling, and satellite electromagnetic fields
+fracture the wall's runes. A dark-site listening post records seismic pulses that
+behave like a heartbeat. A blue luminous blizzard, a thermal spike, and an
+electromagnetic surge accompany the first visible breach. The outpost's lights,
+defense turrets, and backup generators fail when a Rune-Weaver strikes the ice.
+This incident is suppressed while the Concord prepares its public explanation.
 
 **Year 0 — The First Rift**
 *Location: Rondane National Park, Norway*
@@ -272,6 +340,39 @@ When a Neanderthal returns to Earth, they bring a small amount of Weave with the
 - Standing on a Gate Stone (fastest)
 - Channeling from their own life force (dangerous, permanent cost)
 
+### Antarctic Seal Mechanics
+
+The Ice Wall is a field of interlocking runes, not merely frozen matter. Its
+failure creates three linked effects: Weave leakage into the human atmosphere,
+electromagnetic interference that disables or corrupts high-tech systems, and
+localized geometry changes near the Crushed Horizons. Cryo-Weavers can exploit
+the same interface to flash-freeze cooling systems, short-circuit railgun
+mechanics, and grow jagged ice armor.
+
+The Deep Cradle's Arcaneite veins pulse in a day-night rhythm. When human power
+systems draw too heavily on the surrounding Weave, the veins dim, geothermal
+life freezes, and the Cradle enters a **Starvation Era**. These failures are the
+material reason the return becomes urgent rather than merely territorial.
+
+### Neanderthal Vanguard Doctrine
+
+The Stone-Born vanguard organizes by bloodline and spiritual connection rather
+than human-style formations:
+
+- **The First-Marked:** centuries-tested warchiefs carrying kinetic-charged
+  monolith weapons.
+- **Rune-Weavers:** battlefield tacticians who raise luminous barriers and
+  redirect hard-light or energy fire.
+- **The Unbroken:** rune-tattooed shock troops whose hardened bodies absorb
+  ordinary ballistic fire long enough to close for hand-to-hand combat.
+- **Stalkers:** scouts and infiltrators using active camouflage in snow, often
+  mounted on enhanced dire wolves or smilodons.
+
+Their principal combat disciplines are **Lithomancy** (stone density and
+kinetic shockwaves), **Cryo-Weaving** (frost, ice armor, and technological
+disruption), and **Anima-Bonding** (psychic synchronization with
+crystal-armored megafauna). These are military specializations, not new tribes.
+
 ### Types of Magic
 
 **Geomancy (Stone-Born):** Shaping earth, stone, and metal. Visualized as the earth responding to will. A geomancer can raise a wall by placing a hand on the ground and pulling upward — the stone follows their intent. Limited by mass and distance. A single geomancer can shape about a ton of material. Two working together can shape four tons, not two — synergy is a force multiplier.
@@ -308,6 +409,18 @@ Not good vs evil. Both sides have valid claims.
 - Scientists who see Neanderthals as research subjects → medics who treat them as patients
 - Populations that have contact (coexistence works) → populations that only see media reports (fear dominates)
 
+### The Antarctic Conspiracy Arc
+
+The return can unfold through four connected revelations:
+
+1. **The Prison:** the Ice Wall is an engineered seal, not a natural barrier.
+2. **The Power Crisis:** human zero-point systems have been draining the hidden
+   realm's ambient Weave for decades.
+3. **The Traitor Within:** human contractors and radical shamans disabled parts
+   of the defense grid to force a breach and profit from the exchange.
+4. **The Hybrid Prophecy:** a rare human genetic marker can recognize and rewrite
+   the blue runes, making its bearer a target for both species.
+
 ### Story Seeds
 
 1. **The Healer's Dilemma** — A Weave-Born healer in a Concord camp must choose between treating a dying human soldier (who participated in his people's imprisonment) or conserving his Weave for Neanderthal patients. Either choice betrays someone.
@@ -320,6 +433,18 @@ Not good vs evil. Both sides have valid claims.
 
 5. **The Warden's Secret** — The Deep Archive keeper has been alive since before the First Crossing. He has seen all three worlds. He knows why the Neanderthals really left Earth — and it wasn't just the cold. He carries a truth that could shatter both species' understanding of their history. He has never told anyone. He is dying.
 
+6. **The Ice Wall Witness** — A Human Guardian survives the McMurdo breach and
+   discovers that the defense grid was disabled before the first Neanderthal
+   vanguard arrived. The official report calls it equipment failure.
+
+7. **The Power Crisis** — An Apex Energy engineer proves that the world's clean
+   energy grid is extracting Weave from Tshuka-Vell. Saving the Deep Cradle means
+   shutting down the infrastructure that keeps billions of humans alive.
+
+8. **The Rune-Bearer** — A human tech engineer with the jailer genetic marker
+   touches a glowing blue rune and changes its meaning. The Concord wants a
+   specimen, the Stone-Born want a weapon, and the Weave-Born want a translator.
+
 ---
 
-**END OF WORLD BIBLE — v1.0**
+**END OF WORLD BIBLE — v1.1**

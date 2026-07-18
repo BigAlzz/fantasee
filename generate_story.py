@@ -22,15 +22,17 @@ import warnings
 import sys
 import time
 import traceback
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from story_storage import STORIES_ROOT, ensure_story_layout
 from fantasee_server.security import validate_provider_url
 from story_pipeline import initialize_pipeline, update_stage
 from story_quality import outline_feedback, review_scene_outline
 from fantasee_server.llm_adapter import GranularLLMAdapter, TokenBudget
+from fantasee_server.llm_tokens import llm_unlimited, scaled_llm_tokens
 
 
 def _llm_usage_sink(result) -> None:
@@ -66,6 +68,11 @@ def _positive_int_setting(name: str, default: int) -> int:
 
 # ── Emit progress updates (read by the backend) ────────────────────────
 
+_PIPELINE_PROGRESS_CALLBACK: ContextVar[Optional[Callable[[str, str, Optional[float]], None]]] = ContextVar(
+    "fantasee_pipeline_progress_callback",
+    default=None,
+)
+
 
 def emit(status: str, message: str, progress: float = None):
     """Emit a progress message as a JSON line to stdout."""
@@ -73,6 +80,13 @@ def emit(status: str, message: str, progress: float = None):
     if progress is not None:
         msg["progress"] = progress
     print(f"__PROGRESS__:{json.dumps(msg)}", flush=True)
+    callback = _PIPELINE_PROGRESS_CALLBACK.get()
+    if callback:
+        try:
+            callback(status, message, progress)
+        except Exception:
+            # Progress reporting must never take down the production pipeline.
+            pass
 
 
 # ── Resolve API keys from Hermes auth.json ──────────────────────────────
@@ -120,7 +134,8 @@ def call_llm(
         emit("error", f"Unsafe LLM provider URL: {exc}")
         return None
 
-    requested_max_tokens = max_tokens or 16384
+    max_completion_cap = scaled_llm_tokens(16384)
+    requested_max_tokens = scaled_llm_tokens(max_tokens or 16384)
     for attempt in range(3):
         try:
             payload = {
@@ -130,8 +145,9 @@ def call_llm(
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": temperature,
-                "max_completion_tokens": requested_max_tokens,
             }
+            if not llm_unlimited():
+                payload["max_completion_tokens"] = requested_max_tokens
             resp = requests.post(
                 f"{base_url}/chat/completions",
                 json=payload,
@@ -154,11 +170,11 @@ def call_llm(
                 finish_reason = choice.get("finish_reason") or "unknown"
                 if finish_reason == "length":
                     retry_floor = min(
-                        16384,
-                        _positive_int_setting("FANTASEE_LLM_LENGTH_RETRY_FLOOR", 8000),
+                        max_completion_cap,
+                        scaled_llm_tokens(_positive_int_setting("FANTASEE_LLM_LENGTH_RETRY_FLOOR", 8000)),
                     )
                     requested_max_tokens = min(
-                        16384,
+                        max_completion_cap,
                         max(requested_max_tokens * 2, retry_floor),
                     )
                 raise RuntimeError(
@@ -516,6 +532,17 @@ Example: "wide shot, low angle, a rusted greatsword in the foreground
 out of focus, a lone warrior mid-stride in the center, distant
 burning city in the background haze".
 
+VISUAL HOOK AND ESCALATION (critical): every prompt must make the viewer
+want to know what happens next. Name one decisive action, reveal, danger, or
+emotional reversal; include a foreground occluder, a midground subject in
+motion, and a background event or scale cue. Add a deliberate color contrast
+or striking light source, plus one memorable image idea specific to this
+story's world. Do not use a neutral standing pose, generic group portrait,
+empty room, repeated centered composition, or the phrase "cinematic lighting"
+as a substitute for an actual light source. Across a scene sequence, vary
+scale, camera height, movement, color temperature, and visual rhythm so the
+art has a rising visual argument rather than interchangeable illustrations.
+
 TONE GUIDE — match the narration and visual style to the requested tone:
 - dramatic:    weight on key moments, controlled intensity, never stage-acting
 - dark:        dread and shadow, slow deliberate pacing, longer pauses
@@ -686,26 +713,43 @@ GRANULAR_SCENE_SYSTEM = (
 GRANULAR_SCENE_SYSTEM += _STYLE_OVERRIDE
 
 
+def visual_style_instruction(style: str) -> str:
+    """Return bounded visual direction for the selected image preset."""
+    value = (style or "").lower()
+    if any(token in value for token in ("comic", "graphic novel", "motion comic")):
+        return (
+            "For this comic-book-panels direction, write each Visual Prompt as one "
+            "dynamic sequential-art panel: a decisive action or reveal, bold inked "
+            "contours, expressive body language, dramatic foreshortening, layered "
+            "foreground/midground/background, strong color contrast, and a specific "
+            "light source. No speech bubbles, captions, logos, or readable text. "
+            "Do not use a sterile standing portrait or a neutral lineup."
+        )
+    return ""
+
+
 def generate_story_outline_granular(
     concept: str, num_scenes: int, style: str, characters: str, tone: str,
     narration_style: str = "",
 ) -> Optional[list]:
     """Commission bounded context and one validated scene at a time."""
     emit("running", "Commissioning story bible in focused sections...", 0.04)
-    context_retry_floor = min(
-        16384,
-        _positive_int_setting("FANTASEE_LLM_LENGTH_RETRY_FLOOR", 8000),
-    )
+    context_retry_floor = _positive_int_setting("FANTASEE_LLM_LENGTH_RETRY_FLOOR", 8000)
     budget = TokenBudget(
-        limit=max(
+        limit=scaled_llm_tokens(max(
             context_retry_floor * 2 + num_scenes * 2400,
             3600 + num_scenes * 2400,
-        )
+        ))
     )
     adapter = GranularLLMAdapter(call_llm, budget=budget, usage_sink=_llm_usage_sink)
     narration_context = f"\nNarration direction: {narration_style}" if narration_style else ""
+    visual_direction = visual_style_instruction(style)
     context = f"Concept: {concept}\nStyle: {style}\nTone: {tone}{narration_context}\nCharacters: {characters or '(none)'}"
+    if visual_direction:
+        context += f"\nVisual direction: {visual_direction}"
     scene_system = GRANULAR_SCENE_SYSTEM
+    if visual_direction:
+        scene_system += "\n\nVISUAL DIRECTION:\n" + visual_direction
     style_text = load_story_style_prompt(narration_style) if narration_style else ""
     if style_text:
         scene_system += "\n\nMANDATORY NARRATION STYLE OVERRIDE:\n" + style_text
@@ -780,6 +824,8 @@ Concept: {concept}
 Style: {style}
 Tone: {tone}{char_section}
 
+{visual_style_instruction(style)}
+
 Generate exactly {num_scenes} scenes. Each scene MUST have a Narration field
 (voiceover text for TTS — 80-150 words, dramatic, present tense).
 Keep each visual prompt compact enough for an SD 1.5 CLIP encoder: 35-60 words,
@@ -794,12 +840,18 @@ Rotate the shot types across the {num_scenes} scenes so the
 player feels cinematic, not a slideshow of mugshots. Aim for a
 mix dominated by wide and medium shots, with close-ups reserved
 for the most important emotional beats. See the SHOT VARIETY
-block in the system prompt for details and keywords."""
+block in the system prompt for details and keywords.
+
+Make each scene visually arresting: include a decisive action or reveal,
+layered foreground/midground/background depth, a strong color contrast or
+specific light source, and a memorable world-specific visual hook. Avoid
+static standing poses, generic portraits, repeated centered framing, and
+generic "cinematic lighting" language."""
 
     scenes = []
     response = ""
     last_review = None
-    budget = TokenBudget(limit=max(4096, num_scenes * 2200))
+    budget = TokenBudget(limit=scaled_llm_tokens(max(4096, num_scenes * 2200)))
     adapter = GranularLLMAdapter(call_llm, budget=budget, usage_sink=_llm_usage_sink)
     outline_max_tokens = min(16384, max(2048, num_scenes * 900))
     for attempt in range(3):
@@ -1144,6 +1196,37 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
                  world_context: str = "",
                  background_audio: Optional[str] = None,
                  background_volume: Optional[float] = None,
+                 background_muted: bool = False,
+                 progress_callback: Optional[Callable[[str, str, Optional[float]], None]] = None):
+    token = _PIPELINE_PROGRESS_CALLBACK.set(progress_callback)
+    try:
+        return _run_pipeline(
+            concept=concept,
+            num_scenes=num_scenes,
+            style=style,
+            characters=characters,
+            tone=tone,
+            skip_images=skip_images,
+            images_per_scene=images_per_scene,
+            voice_preset=voice_preset,
+            narration_style=narration_style,
+            world_context=world_context,
+            background_audio=background_audio,
+            background_volume=background_volume,
+            background_muted=background_muted,
+        )
+    finally:
+        _PIPELINE_PROGRESS_CALLBACK.reset(token)
+
+
+def _run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy painterly",
+                 characters: str = "", tone: str = "dramatic",
+                 skip_images: bool = False, images_per_scene: int = 5,
+                 voice_preset: str = "Dean",
+                 narration_style: str = "",
+                 world_context: str = "",
+                 background_audio: Optional[str] = None,
+                 background_volume: Optional[float] = None,
                  background_muted: bool = False):
     """Run the full story generation pipeline.
 
@@ -1317,6 +1400,7 @@ Be evocative but concise."""
                     "output_prefix": prefix,
                     "seed": seed + img_idx,
                     "checkpoint": image_checkpoint,
+                    "style": style,
                 })
                 job_owners.append((s_idx, img_idx))
 
@@ -1353,6 +1437,7 @@ Be evocative but concise."""
                         output_dir=str(story_dir),
                         seed=seed + img_idx,
                         checkpoint=image_checkpoint,
+                        style=style,
                         timeout=600,
                     )
                     if filename:
@@ -1411,6 +1496,12 @@ Be evocative but concise."""
     update_stage(story_dir, "subtitles", "running", message="Aligning narration with Whisper")
     whisper_model = None
     whisper_missing = False
+    script_aligner = None
+    try:
+        from generate_subtitles import generate_subtitles as script_aligner
+    except ImportError:
+        # Keep the legacy Whisper segment path available on minimal installs.
+        pass
     subtitle_failures = []
     subtitles_generated = 0
     for i, s in enumerate(output_scenes):
@@ -1441,6 +1532,14 @@ Be evocative but concise."""
                     "start": round(seg["start"], 2),
                     "end": round(seg["end"], 2),
                 })
+
+            if script_aligner:
+                # Replace raw Whisper wording with approved narration text;
+                # the aligner retains timestamps and rejects long hallucinated gaps.
+                subs = script_aligner(
+                    str(audio_path),
+                    s.get("narration_text") or s.get("narration", ""),
+                )
 
             sub_filename = f"subs_{story_id}_s{s['scene']}.json"
             sub_path = story_dir / sub_filename

@@ -127,6 +127,7 @@ def test_settings_update_preserves_provider_fields_omitted_by_older_clients(tmp_
     assert response.status_code == 200
     saved = settings_api._load_settings()
     assert saved["default_tone"] == "mysterious"
+    assert saved["default_visual_style"] == settings_api.DEFAULTS["default_visual_style"]
     assert saved["tts_base_url"] == "https://voice.example/v1"
     assert saved["tts_api_key"] == "voice-secret-value"
     assert saved["unsplash_access_key"] == "unsplash-secret-value"

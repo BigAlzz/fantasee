@@ -32,6 +32,7 @@ OUTPUTS = STORIES_ROOT
 DEFAULT_WIDTH = 1920
 DEFAULT_HEIGHT = 1080
 CROSSFADE_DURATION = 0.8       # seconds of crossfade between images
+SCENE_TRANSITION_DURATION = 0.8 # seconds of fade-through-black between scenes
 ZOOM_MAX = 1.08                # max zoom factor (8% zoom in)
 FPS = 30
 AUDIO_BITRATE = "192k"
@@ -198,26 +199,30 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
         for i, img_path in enumerate(images):
             clip_dur = clip_durations[i]
             total_frames = int(clip_dur * fps)
-            zoom_per_frame = (ZOOM_MAX - 1.0) / max(total_frames, 1)
+            # Ease the camera in and out so Ken Burns motion does not jump at
+            # the start or end of a shot.  zoompan evaluates these expressions
+            # per frame; cosine easing gives zero velocity at both endpoints.
+            frame_denom = max(total_frames - 1, 1)
+            eased = f"(0.5-0.5*cos(PI*on/{frame_denom}))"
             direction = directions[i % len(directions)]
             clip_path = tmpdir / f"clip_{i:02d}.mp4"
             
             # Build zoompan expression based on direction
             if direction == "zoom_in":
-                z_expr = f"min(zoom+{zoom_per_frame:.8f},{ZOOM_MAX})"
+                z_expr = f"1+({ZOOM_MAX - 1.0:.4f})*{eased}"
                 x_expr = "iw/2-(iw/zoom/2)"
                 y_expr = "ih/2-(ih/zoom/2)"
             elif direction == "zoom_out":
-                z_expr = f"max({ZOOM_MAX}-on*{zoom_per_frame:.8f},1.0)"
+                z_expr = f"{ZOOM_MAX:.4f}-({ZOOM_MAX - 1.0:.4f})*{eased}"
                 x_expr = "iw/2-(iw/zoom/2)"
                 y_expr = "ih/2-(ih/zoom/2)"
             elif direction == "pan_right":
-                z_expr = str(ZOOM_MAX)
-                x_expr = f"(iw-iw/zoom)*on/{total_frames}"
+                z_expr = f"{ZOOM_MAX:.4f}"
+                x_expr = f"(iw-iw/zoom)*{eased}"
                 y_expr = "ih/2-(ih/zoom/2)"
             else:  # pan_left
-                z_expr = str(ZOOM_MAX)
-                x_expr = f"(iw-iw/zoom)*(1-on/{total_frames})"
+                z_expr = f"{ZOOM_MAX:.4f}"
+                x_expr = f"(iw-iw/zoom)*(1-{eased})"
                 y_expr = "ih/2-(ih/zoom/2)"
             
             # zoompan with d=1: outputs 1 frame per input frame
@@ -369,22 +374,62 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
 
 def concatenate_scenes(scene_videos: list[Path], slug: str,
                        output_dir: Path) -> Optional[Path]:
-    """Concatenate per-scene MP4s into a full story video."""
+    """Join scenes with a visible fade transition and matching audio overlap."""
     if not scene_videos:
         return None
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
-        concat_list = Path(tmpdir) / "concat.txt"
-        with open(concat_list, "w") as f:
-            for sv in scene_videos:
-                f.write(f"file '{sv}'\n")
-        
         out_path = output_dir / f"{slug}_full.mp4"
+        durations = []
+        for scene_video in scene_videos:
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(scene_video)],
+                capture_output=True, text=True, check=False,
+            )
+            try:
+                durations.append(float(probe.stdout.strip()))
+            except ValueError:
+                print(f"  ERROR: could not probe scene duration for {scene_video.name}")
+                return None
+
+        if len(scene_videos) == 1:
+            shutil.copy2(scene_videos[0], out_path)
+            return out_path
+
+        filter_inputs = []
+        for scene_video in scene_videos:
+            filter_inputs.extend(["-i", str(scene_video)])
+
+        filter_parts = []
+        previous_video = "0:v"
+        previous_audio = "0:a"
+        elapsed = durations[0]
+        for index in range(1, len(scene_videos)):
+            video_label = f"scene_v{index}"
+            audio_label = f"scene_a{index}"
+            offset = max(0.0, elapsed - SCENE_TRANSITION_DURATION)
+            filter_parts.append(
+                f"[{previous_video}][{index}:v]xfade=transition=fadeblack:"
+                f"duration={SCENE_TRANSITION_DURATION}:offset={offset:.3f}[{video_label}]"
+            )
+            filter_parts.append(
+                f"[{previous_audio}][{index}:a]acrossfade="
+                f"d={SCENE_TRANSITION_DURATION}:c1=tri:c2=tri[{audio_label}]"
+            )
+            previous_video = video_label
+            previous_audio = audio_label
+            elapsed += durations[index] - SCENE_TRANSITION_DURATION
+
+        filter_complex = ";\n".join(filter_parts)
         cmd = [
             "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", str(concat_list),
-            "-c", "copy",
+            *filter_inputs,
+            "-filter_complex", filter_complex,
+            "-map", f"[{previous_video}]",
+            "-map", f"[{previous_audio}]",
+            "-c:v", "libx264", "-preset", "fast", "-crf", str(VIDEO_CRF),
+            "-c:a", "aac", "-b:a", AUDIO_BITRATE,
             "-movflags", "+faststart",
             str(out_path)
         ]
@@ -410,7 +455,9 @@ def concatenate_scenes(scene_videos: list[Path], slug: str,
 
 
 def concatenate_vtts(scene_vtts: list[Path], slug: str,
-                     output_dir: Path) -> Optional[Path]:
+                     output_dir: Path,
+                     scene_durations: Optional[list[float]] = None,
+                     transition_duration: float = SCENE_TRANSITION_DURATION) -> Optional[Path]:
     """Combine per-scene VTT files into one with adjusted timestamps."""
     if not scene_vtts:
         return None
@@ -434,7 +481,7 @@ def concatenate_vtts(scene_vtts: list[Path], slug: str,
         s = t % 60
         return f"{h:02d}:{m:02d}:{s:06.3f}"
     
-    for vtt_path in scene_vtts:
+    for index, vtt_path in enumerate(scene_vtts):
         with open(vtt_path, "r", encoding="utf-8") as f:
             content = f.read()
         
@@ -454,8 +501,18 @@ def concatenate_vtts(scene_vtts: list[Path], slug: str,
                     max_end = max(max_end, end - time_offset)
                     break
         
-        # Add gap between scenes (0.5s)
-        time_offset += max_end + 0.5
+        # Scene video transitions overlap adjacent scenes.  Use the measured
+        # scene duration rather than subtitle coverage so a quiet final cue
+        # cannot move every following subtitle out of sync.
+        scene_duration = (
+            scene_durations[index]
+            if scene_durations and index < len(scene_durations)
+            else max_end
+        )
+        if index < len(scene_vtts) - 1:
+            time_offset += max(0.0, scene_duration - transition_duration)
+        else:
+            time_offset += scene_duration
     
     lines = ["WEBVTT", ""]
     for i, (start, end, text) in enumerate(all_cues):
@@ -537,6 +594,7 @@ def main():
     t_start = _time()
     scene_videos = []
     scene_vtts = []
+    scene_durations = []
     
     for scene_num in scene_range:
         assets = get_scene_assets(story_dir, args.slug, scene_num)
@@ -550,6 +608,7 @@ def main():
         
         if result:
             scene_videos.append(result)
+            scene_durations.append(float(assets["duration"]))
             vtt_path = story_dir / f"{args.slug}_s{scene_num:02d}.vtt"
             if vtt_path.exists():
                 scene_vtts.append(vtt_path)
@@ -561,7 +620,12 @@ def main():
         print("Concatenating scenes...")
         concatenate_scenes(scene_videos, args.slug, story_dir)
         if scene_vtts:
-            concatenate_vtts(scene_vtts, args.slug, story_dir)
+            concatenate_vtts(
+                scene_vtts,
+                args.slug,
+                story_dir,
+                scene_durations=scene_durations,
+            )
         for suffix in (".mp4", ".vtt"):
             full_path = story_dir / f"{args.slug}_full{suffix}"
             if full_path.exists():

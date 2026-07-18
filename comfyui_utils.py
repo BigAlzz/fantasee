@@ -143,6 +143,58 @@ CHECKPOINTS = {
     "anything": "anything-v5.safetensors",
 }
 
+# Style presets keep the creative direction close to the ComfyUI adapter.
+# They target installed SD 1.5-class checkpoints rather than requiring a
+# large new model. The comic preset creates readable action panels; a later
+# page-layout workflow can compose several panels without asking SD 1.5 to
+# typeset a whole page in one fragile prompt.
+IMAGE_STYLE_PRESETS = {
+    "comic book panels": {
+        "aliases": ("comic", "comic-book", "comic book", "graphic novel", "motion comic"),
+        "prompt_prefix": (
+            "dynamic comic-book action panel, bold ink contours, expressive poses, "
+            "dramatic foreshortening, layered foreground and background, "
+            "high-contrast color blocking"
+        ),
+        "negative_remove": ("comic, manga lineart, ", "cartoon, "),
+        "negative_add": (
+            "speech bubble, caption box, readable text, lettering, logo, "
+            "watermark, static character lineup, passport portrait"
+        ),
+    },
+}
+
+
+def image_style_preset(style: Optional[str] = None) -> Optional[dict]:
+    """Resolve a user-facing visual style to a local image preset."""
+    value = (style or "").strip().lower()
+    for preset in IMAGE_STYLE_PRESETS.values():
+        if value in preset["aliases"] or any(alias in value for alias in preset["aliases"]):
+            return preset
+    return None
+
+
+def apply_image_style(prompt: str, style: Optional[str] = None) -> str:
+    """Add a compact style lead before SD 1.5 prompt compaction."""
+    preset = image_style_preset(style)
+    if not preset:
+        return prompt
+    prefix = preset["prompt_prefix"]
+    if prefix.lower() in prompt.lower():
+        return prompt
+    return f"{prefix}. {prompt.strip()}".strip()
+
+
+def negative_prompt_for_style(negative_prompt: str, style: Optional[str] = None) -> str:
+    """Adjust the house negative prompt without contradicting a style preset."""
+    preset = image_style_preset(style)
+    if not preset:
+        return negative_prompt
+    cleaned = negative_prompt
+    for phrase in preset["negative_remove"]:
+        cleaned = cleaned.replace(phrase, "")
+    return f"{cleaned.rstrip(', ')} {preset['negative_add']}".strip()
+
 
 def checkpoint_for_style(style: Optional[str] = None) -> str:
     """Return the checkpoint filename best suited to a story style."""
@@ -1255,6 +1307,7 @@ def generate_image(
     timeout: int = 600,
     workflow_path: Optional[str] = None,
     append_positive_guard: bool = True,
+    style: Optional[str] = None,
     base_url: Optional[str] = None,
     worker_kind: Optional[str] = None,
     _degraded_retry: bool = False,
@@ -1346,11 +1399,12 @@ def generate_image(
     # Append the positive guard suffix (well-defined human nose etc.) so
     # medium / close-up shots don't drift into a pig snout. Skip if the
     # caller already baked equivalent language into their prompt.
-    final_prompt = prompt
+    final_prompt = apply_image_style(prompt, style)
+    final_negative_prompt = negative_prompt_for_style(negative_prompt, style)
     if append_positive_guard and DEFAULT_POSITIVE_GUARD_SUFFIX:
         # Guard against double-append if a caller already included it.
-        if DEFAULT_POSITIVE_GUARD_SUFFIX.strip() not in prompt:
-            final_prompt = (prompt.rstrip(". ") + ". " + DEFAULT_POSITIVE_GUARD_SUFFIX).strip()
+        if DEFAULT_POSITIVE_GUARD_SUFFIX.strip() not in final_prompt:
+            final_prompt = (final_prompt.rstrip(". ") + ". " + DEFAULT_POSITIVE_GUARD_SUFFIX).strip()
 
     workflow = inject_prompt(
         workflow,
@@ -1540,6 +1594,7 @@ def generate_image(
                     timeout=timeout,
                     workflow_path=workflow_path,
                     append_positive_guard=append_positive_guard,
+                    style=style,
                     base_url=fallback,
                     worker_kind=worker_kind,
                     _degraded_retry=_degraded_retry,
@@ -1566,6 +1621,7 @@ def generate_image(
                     timeout=timeout,
                     workflow_path=workflow_path,
                     append_positive_guard=append_positive_guard,
+                    style=style,
                     base_url=base,
                     worker_kind=worker_kind,
                     _degraded_retry=True,
@@ -1585,6 +1641,7 @@ def _generate_image_to_base(base_url: str, prompt: str, output_prefix: str,
                             width: Optional[int] = None, height: Optional[int] = None,
                             timeout: int = 600,
                             workflow_path: Optional[str] = None,
+                            style: Optional[str] = None,
                             worker_kind: Optional[str] = None) -> Optional[str]:
     """Generate a single image on a specific ComfyUI base URL.
 
@@ -1595,13 +1652,14 @@ def _generate_image_to_base(base_url: str, prompt: str, output_prefix: str,
         prompt=prompt,
         output_prefix=output_prefix,
         output_dir=output_dir,
-        negative_prompt=negative_prompt,
+        negative_prompt=final_negative_prompt,
         seed=seed,
         checkpoint=checkpoint,
         width=width,
         height=height,
         timeout=timeout,
         workflow_path=workflow_path,
+        style=style,
         base_url=base_url,
         worker_kind=worker_kind,
     )
@@ -1651,6 +1709,7 @@ def generate_images_parallel(
             height=job.get("height"),
             timeout=timeout,
             worker_kind=job.get("worker_kind"),
+            style=job.get("style"),
         )
 
     # Round-robin assign jobs to available bases so load is spread evenly
@@ -1684,6 +1743,7 @@ def generate_scene_images(
     checkpoint: str = "fantasy",
     images_per_scene: int = 5,
     quality: Optional[dict] = None,
+    style: Optional[str] = None,
 ) -> dict:
     """
     Generate images for multiple scenes.
@@ -1733,6 +1793,7 @@ def generate_scene_images(
                 checkpoint=ckpt_name,
                 width=quality.get("width") if quality else None,
                 height=quality.get("height") if quality else None,
+                style=style,
             )
             if filename:
                 images.append(filename)

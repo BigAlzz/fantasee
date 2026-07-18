@@ -112,6 +112,36 @@ def test_streaming_pcm_is_collected_as_24khz_mono_wav():
         assert audio.readframes(4) == pcm
 
 
+def test_long_narration_is_chunked_before_synthesis(monkeypatch):
+    calls = []
+
+    def fake_synthesize(text, **kwargs):
+        calls.append(text)
+        output = BytesIO()
+        with wave.open(output, "wb") as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(8000)
+            wav.writeframes(b"\x00\x00" * 8)
+        return output.getvalue()
+
+    captured = {}
+    monkeypatch.setattr(tts_utils, "synthesize", fake_synthesize)
+
+    def fake_write(audio, path, speed=None):
+        captured["audio"] = audio
+        return True
+
+    monkeypatch.setattr(tts_utils, "_write_tts_audio", fake_write)
+
+    text = " ".join(f"Sentence {index} carries a complete visual beat and a grounded human consequence." for index in range(8))
+    assert tts_utils.generate_tts(text, "ignored.wav") is True
+
+    assert len(calls) > 1
+    with wave.open(BytesIO(captured["audio"]), "rb") as wav:
+        assert wav.getnframes() == 8 * len(calls)
+
+
 def test_clone_sample_validation_rejects_wrong_format_and_size():
     with pytest.raises(Exception, match="MP3 or WAV"):
         _validate_voice_sample("data:text/plain;base64,Zm9v")

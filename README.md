@@ -92,6 +92,10 @@ the way a production is actually made:
 - ComfyUI image generation with API workflow injection, GPU-first selection,
   capability-aware workers, alternate-worker retry, face-quality prompt guards,
   and scene-art-first library cards.
+- **Comic book panels preset** with dynamic inked action, expressive poses,
+  foreshortening, layered depth, high-contrast color blocking, and no generated
+  speech bubbles or lettering. It is designed for the existing SD 1.5-class
+  checkpoints, so it does not require a large-model upgrade.
 - Semantic shot planning with shot purpose, framing, action, duration, visual
   context, candidate approval, locks, ordering, revision history, and targeted
   regeneration.
@@ -167,6 +171,23 @@ Workflow lookup order:
 4. `workflow.json` in the project root.
 
 The negative prompt node must contain one of `ugly`, `blurry`, `deformed`, or `low quality` in its placeholder text so `inject_prompt()` can identify it.
+
+### Comic direction on low-end models
+
+The Comic book panels director preset intentionally generates one readable
+action panel per story image. This keeps the existing shot timeline and Ken
+Burns renderer useful while giving each beat stronger graphic composition.
+The preset adds style direction before the SD 1.5 CLIP compaction limit and
+removes the house negative terms that would otherwise suppress comic linework.
+
+For a more controlled ComfyUI setup, add ControlNet only when the hardware can
+carry the extra model: lineart/HED or Canny for panel composition, OpenPose for
+action poses, and depth for foreground-to-background staging. ControlNet's
+official SD 1.5 implementation documents low-VRAM mode and composable controls;
+ComfyUI's workflow examples and ControlNet tutorial show the model and
+preprocessor wiring. IP-Adapter is a useful optional style/reference layer,
+but keep it at low-to-medium strength on SD 1.5 so it does not flatten the
+action into a sterile reference copy.
 
 ## Worker Databases
 

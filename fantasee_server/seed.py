@@ -29,7 +29,7 @@ Given a concept, generate exactly N distinct story seeds. Each seed must have:
 - "description": a 1-2 sentence pitch — the hook that makes this story
   unique compared to the other seeds
 - "style": visual style. Use one of: "fantasy painterly", "anime",
-  "dark fantasy", "cinematic", "illustration". Vary across seeds when
+  "comic book panels", "dark fantasy", "cinematic", "illustration". Vary across seeds when
   natural — don't repeat the same one for all N.
 - "tone": one of: "dramatic", "dark", "epic", "mysterious", "lighthearted",
   "romantic", "melancholic", "hopeful", "suspenseful", "whimsical",

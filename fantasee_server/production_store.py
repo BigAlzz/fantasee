@@ -322,6 +322,15 @@ class ProductionStore:
             raise ValueError(f"production run not found: {run_id}")
         return self.get_run(run_id)
 
+    def delete_run(self, run_id: str) -> bool:
+        """Remove a durable production run and its cascaded history."""
+        with self.connection:
+            cursor = self.connection.execute(
+                "DELETE FROM production_runs WHERE id = ?",
+                (run_id,),
+            )
+        return cursor.rowcount == 1
+
     def append_event(
         self, run_id: str, event_type: str, payload: dict[str, Any]
     ) -> ProductionEvent:
@@ -580,6 +589,17 @@ class ProductionStore:
             (story_id,),
         ).fetchall()
         return [self._asset_from_row(row) for row in rows]
+
+    def delete_story_records(self, story_id: str) -> dict[str, int]:
+        """Remove durable production records after a story's files are gone."""
+        counts: dict[str, int] = {}
+        with self.connection:
+            for table in ("production_assets", "production_shots", "production_releases", "production_locks"):
+                cursor = self.connection.execute(f"DELETE FROM {table} WHERE story_id = ?", (story_id,))
+                counts[table] = cursor.rowcount
+            cursor = self.connection.execute("DELETE FROM production_runs WHERE story_id = ?", (story_id,))
+            counts["production_runs"] = cursor.rowcount
+        return counts
 
     def record_release(
         self,

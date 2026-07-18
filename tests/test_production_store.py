@@ -27,6 +27,30 @@ def test_run_and_events_survive_store_restart(tmp_path):
     reopened.close()
 
 
+def test_delete_run_removes_the_run_and_its_cascade_history(tmp_path):
+    database_path = tmp_path / "production.db"
+
+    with ProductionStore(database_path) as store:
+        run = store.create_run(
+            story_id="story-1",
+            command="repair",
+            input_fingerprint="fingerprint-1",
+        )
+        store.append_event(run.id, "task.started", {"message": "queued"})
+        job = store.enqueue_job(
+            run.id,
+            job_type="generate.scene_outline",
+            payload={"scene": 1},
+            idempotency_key="scene-1-outline",
+        )
+
+        assert store.delete_run(run.id) is True
+        assert store.get_run(run.id) is None
+        assert store.list_events(run.id) == []
+        assert store.list_jobs(run.id) == []
+        assert store.get_job(job.id) is None
+
+
 def test_enqueue_job_is_idempotent_for_a_run(tmp_path):
     store = ProductionStore(tmp_path / "production.db")
     run = store.create_run(

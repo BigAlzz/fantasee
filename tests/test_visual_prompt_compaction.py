@@ -61,3 +61,18 @@ def test_default_workflow_compacts_prompt_to_standard_clip_limit():
 
     assert "Specific environmental detail remains visible" in submitted
     assert comfyui_utils._approx_token_count(submitted) <= 77
+
+
+def test_comic_book_preset_adds_dynamic_panel_direction_without_text():
+    prompt = "wide shot of Mira vaulting over a ruined barricade as blue fire erupts"
+
+    styled = comfyui_utils.apply_image_style(prompt, "comic book panels")
+    negative = comfyui_utils.negative_prompt_for_style(
+        comfyui_utils.DEFAULT_NEGATIVE,
+        "comic book panels",
+    )
+
+    assert styled.startswith("dynamic comic-book action panel")
+    assert "bold ink contours" in styled
+    assert "comic, manga lineart" not in negative
+    assert "speech bubble" in negative

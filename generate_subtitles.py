@@ -103,6 +103,7 @@ def _generate_subtitles_word_aligned(audio_path: str, narration_text: str) -> li
         return start, max(end, start + 0.5)
 
     segments = []
+    match_scores = []
     search_from = 0
     for sent_idx, sentence in enumerate(sentences):
         words = script_words(sentence)
@@ -131,15 +132,34 @@ def _generate_subtitles_word_aligned(audio_path: str, narration_text: str) -> li
                 start = whisper_words[best_start]["start"]
                 end = whisper_words[best_end - 1]["end"]
                 search_from = max(best_end, best_start + 1)
+                match_scores.append(best_score)
             else:
                 start, end = estimated_range(sent_idx)
+                match_scores.append(0.0)
         else:
             start, end = estimated_range(sent_idx)
+            match_scores.append(0.0)
         segments.append({
             "text": sentence,
             "start": round(max(0.0, start), 3),
             "end": round(max(start + 0.35, end), 3),
         })
+
+    def proportional_script_timing() -> list[dict]:
+        """Keep subtitle text truthful when recognition loses the narration."""
+        weights = [max(1, len(script_words(sentence))) for sentence in sentences]
+        total_weight = sum(weights) or len(sentences) or 1
+        cursor = 0.0
+        timed = []
+        for sentence, weight in zip(sentences, weights):
+            end = audio_end * ((cursor + weight) / total_weight)
+            timed.append({
+                "text": sentence,
+                "start": round(cursor * audio_end / total_weight, 3),
+                "end": round(max(end, cursor * audio_end / total_weight + 0.35), 3),
+            })
+            cursor += weight
+        return timed
 
     for i in range(len(segments) - 1):
         next_start = segments[i + 1]["start"]
@@ -152,6 +172,23 @@ def _generate_subtitles_word_aligned(audio_path: str, narration_text: str) -> li
     for seg in segments:
         seg["start"] = round(min(max(0.0, seg["start"]), audio_end), 3)
         seg["end"] = round(min(max(seg["end"], seg["start"] + 0.25), audio_end + 0.5), 3)
+
+    largest_gap = max(
+        (segments[index + 1]["start"] - segments[index]["end"] for index in range(len(segments) - 1)),
+        default=0.0,
+    )
+    coverage = segments[-1]["end"] / max(audio_end, 0.1) if segments else 0.0
+    average_match = sum(match_scores) / len(match_scores) if match_scores else 0.0
+    if (
+        largest_gap > max(8.0, audio_end * 0.1)
+        or coverage < 0.82
+        or average_match < 0.42
+    ):
+        print(
+            f"  WARNING: subtitle alignment lost the script (gap={largest_gap:.1f}s, coverage={coverage:.2f}, match={average_match:.2f}); using approved narration timing",
+            file=sys.stderr,
+        )
+        segments = proportional_script_timing()
 
     print(f"  Generated {len(segments)} subtitle segments", file=sys.stderr)
     for seg in segments:

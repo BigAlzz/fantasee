@@ -20,6 +20,7 @@ const directorPresets = [
   { id: "finn", label: "Finn realism", style: "cinematic grounded realism", tone: "grounded, tense, humane", scenes: 8, images: 7, voice: "Dean", narrationStyle: "" },
   { id: "dark-fable", label: "Dark fable", style: "moody painterly fantasy", tone: "ominous, intimate, restrained", scenes: 7, images: 6, voice: "Milo", narrationStyle: "" },
   { id: "bright-adventure", label: "Bright adventure", style: "cinematic storybook adventure", tone: "warm, kinetic, hopeful", scenes: 6, images: 5, voice: "Mia", narrationStyle: "" },
+  { id: "comic-panels", label: "Comic book panels", style: "comic book panels", tone: "kinetic, high-stakes, graphic, emotional", scenes: 7, images: 7, voice: "Dean", narrationStyle: "story-style-prompt" },
 ] as const;
 
 const styleOptions = [
@@ -29,6 +30,7 @@ const styleOptions = [
   ["neon noir animation", "Neon noir animation"],
   ["hand-painted dark folklore", "Hand-painted dark folklore"],
   ["warm documentary naturalism", "Warm documentary naturalism"],
+  ["comic book panels", "Comic book panels · dynamic sequential art"],
 ] as const;
 
 const toneOptions = [
@@ -108,27 +110,38 @@ const defaultWorldKnowledge: WorldKnowledgeBase = {
 };
 
 const humansVsNeanderthalsExample: WorldKnowledgeBase = {
-  title: "Humans vs Neanderthals",
-  premise: "In an Ice Age valley, two intelligent human lineages compete for shelter, memory, and a future neither can survive alone.",
-  rules: "Climate and food scarcity shape every alliance. Both lineages have language, ritual, craft, and internal political divisions. Do not reduce either group to a single culture or moral role.",
-  factions: "River Homo sapiens: mobile traders and astronomers. Ridge Neanderthals: settled stoneworkers and winter guardians. The Ash Council: elders who profit from keeping the lineages divided.",
+  title: "The Return — Humans vs Neanderthals",
+  premise: "Forty thousand years after the Neanderthals vanished from Earth, a hidden Antarctic Ice Wall fails. Magical Neanderthals return from the Deep Cradle and dying Nevarrah while technologically advanced humans discover that their energy grid has been draining the world the returnees are trying to save.",
+  rules: "The Ice Wall is an engineered prison and cloaking field, not a natural barrier. Its inner pocket, Tshuka-Vell (the Deep Cradle), contains the Luminous Vault, geothermal jungles, Arcaneite crystals, warped Crushed Horizons, and surviving Pleistocene megafauna. The Weave powers Neanderthal magic but does not naturally exist for humans. Climate change, drilling, and satellite electromagnetic activity fracture the wall; zero-point infrastructure can drain the hidden ecosystem. A rare human jailer marker may interact with and rewrite the blue runes. Neither species is morally uniform.",
+  factions: "Stone-Born: militaristic reconquest led by First-Marked warchiefs. Weave-Born: shamans seeking coexistence and a third path. Deep-Men: shadow-adapted refugees who prefer the dark. Scattered: survival communities and bridge-builders. The Concord: global containment and research authority. Free Frontier: local human-Neanderthal coexistence. The Veil: human religious surrender movement. Apex Energy and treaty custodians: a covert network that hid the Ice Wall and profited from Weave-draining power systems. Human Guardians Unit 734: deniable Antarctic containment team.",
   characters: [
     { id: "nara", name: "Nara", role: "Human scout", description: "Observant, impatient with inherited hatred, and carrying a map of safe winter passes.", voice: "Mia", style: "Intimate audiobook", age: "28", alignment: "Chaotic good", traits: "observant, impatient, protective", appearance: "Wind-burned face, dark braids threaded with blue stone, layered hide and woven reed cloak.", biography: "Raised between trading camps, Nara learned every safe pass before she learned which people she was supposed to fear.", motivation: "She wants to prove cooperation is practical before the valley's scarcity turns hope into a luxury." },
     { id: "var", name: "Var", role: "Neanderthal toolmaker", description: "Patient, physically imposing, and quietly funny; believes objects remember the hands that made them.", voice: "Milo", style: "Grounded and warm", age: "34", alignment: "True neutral", traits: "patient, inventive, quietly funny", appearance: "Broad shoulders, ash-grey curls, ochre-stained hands, a carved bone tool worn as a pendant.", biography: "Var inherited a workshop and a feud, then quietly turned both into places where people could be useful together.", motivation: "He wants to keep his settlement alive without becoming the weapon his elders expect." },
+    { id: "korrath", name: "Korrath Stone-Hand", role: "First-Marked Stone-Born warchief", description: "A broad, scarred commander carrying a volcanic monolith blade and a crystal-fused left hand. He believes war is inevitable and wants it to be brief.", voice: "Dean", style: "Deep, restrained authority", age: "47", alignment: "Conflicted militant", traits: "commanding, grieving, disciplined", appearance: "Gray-umber skin, ceremonial facial scars, long braids threaded with stone, glowing crystal hand.", biography: "Korrath leads the vanguard out of exile, carrying the memory of Earth as both home and wound.", motivation: "Reclaim Earth while preventing the Stone-Born from becoming the monsters humans already fear." },
+    { id: "selene", name: "Selene Weave-Born", role: "Weave-Born elder and mediator", description: "An ancient survivor of the First Crossing who knows the cost of forcing two worlds together.", voice: "Mia", style: "Intimate, luminous", age: "300", alignment: "Principled mediator", traits: "patient, burdened, farsighted", appearance: "White-silver eyes, weathered face, simple fungal-fiber robes, hands marked by old rift burns.", biography: "Selene remembers Earth, Nevarrah before the Wound, and the decision that turned refuge into imprisonment.", motivation: "Find a third path before the Ice Wall breach destroys both worlds." },
+    { id: "aris-thorne", name: "Dr. Aris Thorne", role: "Project Chimera geneticist", description: "A brilliant human researcher who sees the Weave and hybrid marker as solvable systems before he sees the people endangered by them.", voice: "Milo", style: "Grounded, clinical", age: "39", alignment: "Compromised human scientist", traits: "brilliant, curious, rationalizing", appearance: "Tired eyes, immaculate field coat, neural interface at the temple, blue rune fragments in his evidence case.", biography: "Thorne is trying to engineer a human who can channel the Weave and insists every boundary he crosses is temporary.", motivation: "Prove humanity can inherit magic without admitting the cost of the power grid." },
+    { id: "marcus-cole", name: "Captain Marcus Cole", role: "Concord rapid-response commander", description: "A professional soldier whose first engagement with the Stone-Born left him convinced that restraint exists on both sides.", voice: "Dean", style: "Weathered, controlled", age: "44", alignment: "Conflicted protector", traits: "tactical, loyal, haunted", appearance: "Powered Ironhide armor, field-worn face, scar across the jaw, rifle kept lowered when civilians are near.", biography: "Cole serves the Concord while hiding that Korrath spared his unit when he could have finished them.", motivation: "Keep civilians alive long enough for the truth about the Antarctic breach to become impossible to bury." },
   ],
   relationships: [
     { id: "nara-var", from: "Nara", to: "Var", label: "uneasy alliance", status: "forming" },
     { id: "nara-ash", from: "Nara", to: "Ash Council", label: "opposed by", status: "active" },
+    { id: "korrath-selene", from: "Korrath Stone-Hand", to: "Selene Weave-Born", label: "opposed by", status: "fractured" },
+    { id: "thorne-cole", from: "Dr. Aris Thorne", to: "Captain Marcus Cole", label: "depends on", status: "forming" },
+    { id: "apex-concord", from: "Apex Energy", to: "The Concord", label: "uneasy alliance", status: "active" },
+    { id: "runes-engineer", from: "Human rune-bearer", to: "Ice Wall custodians", label: "opposed by", status: "forming" },
   ],
   arcs: [
     { id: "shared-winter", title: "The Shared Winter", summary: "Nara and Var must protect a mixed settlement before the first deep freeze.", status: "planned", beats: "Discovery of the pass\nA failed exchange\nThe avalanche\nA shared fire\nThe council's betrayal" },
+    { id: "antarctic-breach", title: "The Antarctic Breach", summary: "A Human Guardian survives the McMurdo breach and finds the defense grid was disabled from inside.", status: "planned", beats: "Heartbeat in the ice\nThe blue blizzard\nThe silent outpost\nThe first vanguard\nThe treaty cover story" },
+    { id: "power-crisis", title: "The Power Crisis", summary: "An Apex Energy engineer proves that human zero-point power is starving Tshuka-Vell.", status: "planned", beats: "The dimming crystals\nThe impossible energy balance\nThe city-wide blackout\nA choice between grids\nThe Deep Cradle answers" },
+    { id: "hybrid-prophecy", title: "The Rune-Bearer", summary: "A human engineer with the jailer marker can rewrite the blue runes and becomes a target of both species.", status: "planned", beats: "The genetic match\nA rune responds\nThe Concord containment order\nStone-Born pursuit\nA new meaning for home" },
   ],
-  flowDiagram: "flowchart TD\n  A[Winter closes the valley] --> B[Nara finds Var's hidden pass]\n  B --> C[The Ash Council sabotages the exchange]\n  C --> D[Nara and Var rescue both camps]\n  D --> E[The old division is exposed]",
+  flowDiagram: "flowchart TD\n  A[Ice Wall fractures] --> B[McMurdo outpost goes dark]\n  B --> C[Neanderthal vanguard crosses]\n  C --> D[Humans discover the power drain]\n  D --> E[Human rune-bearer wakes the blue seal]\n  E --> F[Both species choose war or a shared Earth]",
 };
 
 const worldTemplates = [
   { id: "current", label: "Current world", detail: "Use the canon currently open in World Builder." },
-  { id: "humans-vs-neanderthals", label: "Humans vs Neanderthals", detail: "Ice Age survival, two lineages, one shared winter.", world: humansVsNeanderthalsExample },
+  { id: "humans-vs-neanderthals", label: "Humans vs Neanderthals", detail: "Antarctic Ice Wall, Deep Cradle, technology vs Weave.", world: humansVsNeanderthalsExample },
   { id: "blank", label: "Blank worldbuilder", detail: "Start a fresh universe with no inherited canon.", world: defaultWorldKnowledge },
 ] as const;
 
@@ -452,7 +465,7 @@ export function App() {
   });
   const [editorStory, setEditorStory] = useState<StoryDetail>();
   const [editorScene, setEditorScene] = useState(0);
-  const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic grounded realism", num_scenes: 8, images_per_scene: 7, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean", narration_style: "" });
+  const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "comic book panels", num_scenes: 5, images_per_scene: 5, characters: "", tone: "dramatic", voice_preset: "Dean", narration_style: "" });
   const [world, setWorld] = useState<WorldKnowledgeBase>(() => readWorldKnowledge());
   const [seeds, setSeeds] = useState<SeedSuggestion[]>([]);
   const [directionDrafts, setDirectionDrafts] = useState<ProductionDirection[]>([]);
@@ -460,6 +473,20 @@ export function App() {
   const [seedBusy, setSeedBusy] = useState(false);
   const [admissionPaused, setAdmissionPaused] = useState(false);
   const [renderingMode, setRenderingMode] = useState<RenderingMode>("gpu");
+
+  useEffect(() => {
+    void api.settings().then((settings) => {
+      setBrief((current) => current.story_concept.trim() ? current : {
+        ...current,
+        style: settings.default_visual_style || "comic book panels",
+        tone: settings.default_tone || current.tone,
+        num_scenes: settings.default_scenes || current.num_scenes,
+        images_per_scene: settings.default_images_per_scene || current.images_per_scene,
+        voice_preset: settings.tts_voice_preset || current.voice_preset,
+        narration_style: settings.narration_style || current.narration_style,
+      });
+    }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     try {
@@ -495,13 +522,10 @@ export function App() {
   };
 
   const refreshWorkers = async () => {
-    try {
-      const [workerResult, comfyResult] = await Promise.all([api.workers(), api.comfyWorkers()]);
-      setWorkers(workerResult.workers);
-      setComfyWorkers(comfyResult.workers || []);
-    } catch {
-      // Keep the last good worker sample visible while telemetry recovers.
-    }
+    const [workerResult, comfyResult] = await Promise.allSettled([api.workers(), api.comfyWorkers()]);
+    if (workerResult.status === "fulfilled") setWorkers(workerResult.value.workers);
+    if (comfyResult.status === "fulfilled") setComfyWorkers(comfyResult.value.workers || []);
+    // Keep each last good worker sample visible while the other endpoint recovers.
   };
 
   const refresh = async () => {
@@ -567,6 +591,12 @@ export function App() {
   const selectedStory = stories.find((story) => story.id === selectedStoryId);
   const detailStory = stories.find((story) => story.id === detailStoryId);
   const selectedRun = runs.find((run) => run.id === selectedRunId);
+  const regenerationTask = selectedStory
+    ? generationTasks
+      .filter((task) => task.kind === "regenerate" && task.story_id === selectedStory.id)
+      .sort((left, right) => Number(right.updated_at || right.created_at || 0) - Number(left.updated_at || left.created_at || 0))
+      .at(0)
+    : undefined;
   const visibleStories = stories.filter((story) => story.title.toLowerCase().includes(query.toLowerCase()));
   const activeWorkers = [...workers, ...comfyWorkers].filter((worker) => (worker as Worker).status !== "stale" && (worker as ComfyWorker).running !== false);
   const activeComfyWorkers = comfyWorkers.filter((worker) => worker.running !== false);
@@ -607,7 +637,7 @@ export function App() {
     const validInputs = inputs;
     setBusy(true);
     try {
-      const outcomes = await Promise.allSettled(validInputs.map((input) => api.generate({
+      const payloads = validInputs.map((input) => ({
         ...input,
         world_context: worldContextPrompt(worldContext),
         voice_assignments: JSON.stringify(worldContext.characters.map((character) => ({
@@ -618,21 +648,37 @@ export function App() {
           alignment: character.alignment,
           traits: character.traits,
         }))),
-      })));
-      const results = outcomes.flatMap((outcome) => outcome.status === "fulfilled" ? [outcome.value] : []);
-      const failures = outcomes.length - results.length;
-      if (!results.length) throw new Error("None of the selected productions could be queued.");
-      setSelectedRunId(results[results.length - 1].task_id);
+      }));
+      const result = payloads.length > 1
+        ? await api.generateQueue(payloads)
+        : await api.generate(payloads[0]);
+      const queuedId = "queue_id" in result ? result.queue_id : result.task_id;
       setCreateOpen(false);
       setDirectionDrafts([]);
       setSeeds([]);
-      setNotice(`${results.length} production${results.length === 1 ? "" : "s"} entered the durable queue${failures ? `; ${failures} failed to queue` : ""}.`);
+      setSelectedRunId(queuedId);
+      setNotice(`${payloads.length} production${payloads.length === 1 ? "" : "s"} entered the durable queue.`);
       await refresh();
     } catch (error) { setNotice(error instanceof Error ? error.message : "The production brief could not be queued."); }
     finally { setBusy(false); }
   };
 
   const queueBrief = async (worldContext = world) => queueProductions([brief], worldContext);
+
+  const regenerateSelectedStory = async () => {
+    if (!selectedStory) return;
+    if (!window.confirm(`Regenerate ${selectedStory.title} from its saved direction? The current production will be backed up before the new run starts.`)) return;
+    setBusy(true);
+    try {
+      const result = await api.regenerateStory(selectedStory.id, true);
+      setNotice(`${result.message} Detailed progress and completion evidence will update here as the run advances.`);
+      await refresh();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Story regeneration could not be started.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const submitBrief = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -682,8 +728,10 @@ export function App() {
 
   return <main className="studio-shell">
     <aside className="rail">
-      <div className="brand"><img src="branding/fantasee-studio-banner.png" alt="FantaSee Studio" /></div>
-      <nav>{nav.map(([Icon, label], index) => <button className={label === activeView ? "nav-item active" : "nav-item"} key={label} onClick={() => { setActiveView(label); setNotice(`${label} desk selected.`); }} aria-current={label === activeView ? "page" : undefined}><Icon size={19}/><span>{label}</span><i>{label === activeView ? "" : undefined}</i></button>)}</nav>
+      <div className="rail-header">
+        <div className="brand"><img src="branding/fantasee-studio-banner.png" alt="FantaSee Studio" /></div>
+        <nav>{nav.map(([Icon, label]) => <button className={label === activeView ? "nav-item active" : "nav-item"} key={label} onClick={() => { setActiveView(label); setNotice(`${label} desk selected.`); }} aria-current={label === activeView ? "page" : undefined}><Icon size={19}/><span>{label}</span><i>{label === activeView ? "" : undefined}</i></button>)}</nav>
+      </div>
       <section className="rail-activity" aria-label="Production activity"><div className="rail-section-title"><span>Production activity</span><small>{productionActivity.workingRoles} working</small></div><div className="rail-activity-stack">{productionActivity.activities.length ? productionActivity.activities.slice(0, 3).map((activity) => <ProductionActivityLane key={activity.id} activity={activity}/>) : <div className="rail-activity-empty"><span className="led muted"/><div><strong>No production roles active</strong><small>Queued work will appear here with its real stage.</small></div></div>}</div></section>
       <section className="rail-workers" aria-label="ComfyUI workers"><div className="rail-section-title"><span>Render hardware</span><small>{sidebarWorkers.length} GPU online</small></div><div className="rail-worker-stack">{sidebarWorkers.length ? sidebarWorkers.map((worker, index) => { const comfyUrl = (worker as ComfyWorker).url; return <WorkerLane key={`${workerIdentity(worker)}-${index}`} worker={worker} jobs={[]} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")} onKill={comfyUrl ? () => void runAction(() => api.killComfy(comfyUrl), "Selected ComfyUI worker stopped.") : undefined}/>; }) : <WorkerLane empty jobs={[]} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")}/>}</div></section>
       <div className="rail-status"><span><span className="led green"/> {notice}</span><small>{workerSummary}</small></div>
@@ -700,16 +748,17 @@ export function App() {
             <div><h1>{selectedStory.title}</h1><p>{selectedStory.description || "A new production, ready for its editorial pass."}</p><div className="story-meta">{selectedStory.scene_count || 0} scenes <span/> updated {timestamp(selectedStory.updated_at || selectedStory.created_at)}</div><div className="feature-actions"><button className="outline-button" onClick={() => void openEditor()}>Open in editor <ChevronRight size={16}/></button><button className="outline-button" disabled={!selectedStory.completion?.full_video_ok} onClick={() => void openCanonicalPlayer(selectedStory)}><Play size={15}/> Play release</button><button className="outline-button" disabled={busy} onClick={() => void runAction(() => api.generateStoryThumbnail(selectedStory.id), `Story card art requested for ${selectedStory.title}.`)}><Image size={15}/> {busy ? "Painting..." : "Generate card art"}</button></div></div>
           </article> : <div className="empty-state"><Sparkles size={28}/><h1>No stories yet</h1><p>Create a story to establish the first production run.</p></div>}
           <div className="section-heading"><h2>Story library</h2><span>{visibleStories.length} title{visibleStories.length === 1 ? "" : "s"}</span></div>
-          <LibraryCatalog stories={visibleStories} selectedStoryId={selectedStoryId} onOpenStory={(story) => { setSelectedStoryId(story.id); setDetailStoryId(story.id); }} />
+          <LibraryCatalog stories={visibleStories} selectedStoryId={selectedStoryId} onSelectStory={(story) => setSelectedStoryId(story.id)} onOpenStory={(story) => { setSelectedStoryId(story.id); setDetailStoryId(story.id); }} />
           <div className="story-list">{visibleStories.map((story) => <button key={story.id} className={story.id === selectedStoryId ? "story-row selected" : "story-row"} onClick={() => setSelectedStoryId(story.id)}>
             <span className="star">{story.id === selectedStoryId ? "+" : "o"}</span><span className="thumb">{hasUsableCover(story) ? <img src={story.cover_image_url || story.hero_image} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }}/> : null}<Image className="fallback-icon" size={15}/></span><strong>{story.title}</strong><span className={`story-health ${storyHealth(story).tone}`}>{storyHealth(story).text}</span><span>{story.scene_count || 0} scenes</span><span>{timestamp(story.updated_at || story.created_at)}</span><ChevronRight size={17}/>
           </button>)}</div>
         </section>
 
         <aside className="inspector metal-panel">
-          <div className="eyebrow"><span>Production run</span><span className={`run-state ${selectedRun?.status || "idle"}`}>{humanStatus(selectedRun?.status || "idle")}</span></div>
+          <div className="eyebrow"><span>Production run</span>{selectedStory && <button type="button" className="run-regenerate-button" disabled={busy || regenerationTask?.status === "running"} onClick={() => void regenerateSelectedStory()}><span className={`led ${regenerationTask?.status === "running" ? "blue live" : "amber"}`}/>{regenerationTask?.status === "running" ? "Regenerating" : "Regenerate"}</button>}<span className={`run-state ${selectedRun?.status || "idle"}`}>{humanStatus(selectedRun?.status || "idle")}</span></div>
           {selectedRun ? <><div className="run-summary"><span className={`led ${runLedTone(selectedRun.status)} ${runWorkerSummary(selectedRun).live ? "live" : ""}`}/> <small>{selectedRun.id}</small><h2>{selectedStory?.title || selectedRun.story_id || "Library maintenance"}</h2><p>{productionRunPhase(selectedRun)}</p><small className="run-summary-note">{productionRunNote(selectedRun)}</small><div className="run-worker-summary"><span className={`led ${runWorkerSummary(selectedRun).tone} ${runWorkerSummary(selectedRun).live ? "live" : ""}`}/><span>{runWorkerSummary(selectedRun).label}</span></div><div className="progress-track"><i style={{width: `${Math.round((selectedRun.progress || 0) * 100)}%`}}/></div><b>{Math.round((selectedRun.progress || 0) * 100)}% complete</b></div>
-          <div className="completion"><h3>Completion evidence</h3>{completionRows(selectedStory).map(([Icon, label, complete, detail]) => <div className="completion-row" key={label}><Icon size={18}/><span>{label}</span><small>{complete ? "verified" : "pending"} · {detail}</small><i className={complete ? "led green" : "led amber"}/></div>)}</div>
+          {regenerationTask && <div className={`regeneration-progress ${regenerationTask.status === "error" ? "error" : regenerationTask.status === "done" ? "complete" : "active"}`}><div><span className={`led ${regenerationTask.status === "error" ? "red" : regenerationTask.status === "done" ? "green" : "blue live"}`}/><strong>{regenerationTask.status === "done" ? "Regeneration complete" : regenerationTask.status === "error" ? "Regeneration stopped" : `Regenerating · ${Math.round((regenerationTask.progress || 0) * 100)}%`}</strong><small>{regenerationTask.stage || "pipeline"}</small></div><p>{regenerationTask.message || "The durable pipeline is reporting its next step."}</p></div>}
+          <div className="completion"><h3>Completion evidence</h3>{completionRows(selectedStory).map(([Icon, label, complete, detail]) => <div className="completion-row" key={label}><Icon size={18}/><span>{label}</span><small>{complete ? "verified" : regenerationTask?.status === "running" ? "building" : "pending"} · {detail}</small><i className={complete ? "led green live" : regenerationTask?.status === "running" ? "led blue live" : "led amber"}/></div>)}</div>
           <div className="run-controls"><h3>Run controls</h3><button disabled={busy} className="outline-button" onClick={() => void runAction(async () => { const result = await api.setProductionControl({ admission_paused: !admissionPaused }); setAdmissionPaused(result.admission_paused); }, admissionPaused ? "Queue admission resumed." : "Queue admission paused.")}>{admissionPaused ? "Resume queue admission" : "Pause new jobs"}</button><div className="queue-priority-panel"><span>Queue priority</span>{jobs.filter((job) => ["queued", "retryable"].includes(job.status)).map((job) => <div key={job.id}><small>{humanStatus(job.job_type)} · {job.priority ?? 0}</small><button className="micro-button" disabled={busy || (job.priority ?? 0) >= 100} onClick={() => void runAction(() => api.priorityJob(job.id, Math.min(100, (job.priority ?? 0) + 1)), `Raised priority for ${job.id}.`)} title="Raise priority"><ArrowUp size={12}/></button><button className="micro-button" disabled={busy || (job.priority ?? 0) <= 0} onClick={() => void runAction(() => api.priorityJob(job.id, Math.max(0, (job.priority ?? 0) - 1)), `Lowered priority for ${job.id}.`)} title="Lower priority"><ArrowDown size={12}/></button></div>)}</div><button disabled={busy || jobs.length === 0} className="danger" onClick={() => jobs[0] && void runAction(() => api.cancelJob(jobs[0].id), "Cancellation requested for the current job.")}><Pause size={17}/> Pause / cancel</button><button disabled={busy || jobs.length === 0} className="outline-button" onClick={() => jobs[0] && void runAction(() => api.retryJob(jobs[0].id), "The current job has been returned to the durable queue.")}><RefreshCw size={16}/> Retry</button></div>
           <details className="run-details"><summary><span>Job ledger</span><small>{jobs.length ? `${jobs.length} item${jobs.length === 1 ? "" : "s"}` : "empty"}</small></summary><div className="job-ledger">{jobs.length ? jobs.map((job) => <div className="job-row" key={job.id}><div><span className={`led ${runLedTone(job.status)} ${job.worker_id ? "live" : ""}`}/><strong>{humanStatus(job.job_type)}</strong><small className="job-story">{jobStoryName(job)}</small><small>{job.message || humanStatus(job.status)} · attempt {job.attempts + 1}</small><small className="job-worker"><span className={`led ${job.worker_id ? "green live" : runLedTone(job.status)}`}/>{jobWorkerLabel(job)}</small></div><div className="job-controls">{job.status !== "succeeded" && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.retryJob(job.id), `Job ${job.id} queued for retry.`)} title="Retry this job"><RefreshCw size={13}/></button>}{["queued", "running"].includes(job.status) && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.cancelJob(job.id), `Cancellation requested for job ${job.id}.`)} title="Cancel this job"><X size={13}/></button>}</div></div>) : <p className="ledger-empty">No durable jobs have been recorded for this run yet.</p>}</div></details><details className="run-details"><summary><span>Live event spool</span><small>{events.length ? `${events.length} events` : "empty"}</small></summary><div className="event-spool"><p className="event-spool-help">Newest is at the top. Blue is the latest report, amber is waiting, green is terminal success, and dim is history. A blue event is active only when the job ledger says running.</p><JobPriorityQueue jobs={jobs} busy={busy} onPriority={(job, priority) => void runAction(() => api.priorityJob(job.id, priority), `Updated priority for ${jobStoryName(job)}.`)} />{events.length ? events.slice().reverse().slice(0, 10).map((event) => { const indicator = eventIndicator(event, events[events.length - 1].sequence, selectedRun.status, jobs.some((job) => ["leased", "running"].includes(job.status))); return <div className="event-row" key={`${event.sequence}-${event.event_type}`}><span className={`led ${indicator.tone}`}/><small>#{event.sequence} {event.event_type} · {indicator.label}</small><strong>{String(event.payload.message || event.payload.stage || "Recorded production event")}</strong></div>; }) : <p className="ledger-empty">Waiting for durable progress events.</p>}</div></details></> : <div className="empty-state"><Radio size={25}/><p>No production run selected.</p></div>}
         {selectedRun && <RunControls renderingMode={renderingMode} admissionPaused={admissionPaused} busy={busy} jobs={jobs} onToggleAdmission={() => void runAction(async () => { const result = await api.setProductionControl({ admission_paused: !admissionPaused }); setAdmissionPaused(result.admission_paused); }, admissionPaused ? "Queue admission resumed." : "Queue admission paused.")} onRenderingMode={(mode) => void runAction(async () => { const result = await api.setProductionControl({ rendering_mode: mode }); setRenderingMode(result.rendering_mode); }, `Rendering mode set to ${mode === "basic" ? "Basic / CPU" : mode === "gpu" ? "GPU" : "Max / GPU + CPU"}.`)} onPriority={(job, priority) => void runAction(() => api.priorityJob(job.id, priority), `Updated priority for ${job.id}.`)} onCancel={() => jobs[0] && void runAction(() => api.cancelJob(jobs[0].id), "Cancellation requested for the current job.")} onRetry={() => jobs[0] && void runAction(() => api.retryJob(jobs[0].id), "The current job has been returned to the durable queue.")} />}
@@ -884,7 +933,7 @@ function SettingsWorkspace({ settings, busy, auditionBusy, auditionUrl, onChange
 
       <section className="provider-settings-card">
         <div className="provider-settings-heading"><span className="led green"/><div><h2>Production defaults</h2><small>Local engine and export</small></div></div>
-        <div className="settings-pair"><label>Default style<input value={settings.default_style} onChange={(event) => update({ default_style: event.target.value })}/></label><label>Default tone<input value={settings.default_tone} onChange={(event) => update({ default_tone: event.target.value })}/></label></div>
+        <div className="settings-pair"><label>Default visual style<input value={settings.default_visual_style} onChange={(event) => update({ default_visual_style: event.target.value })}/></label><label>Default tone<input value={settings.default_tone} onChange={(event) => update({ default_tone: event.target.value })}/></label></div>
         <label>ComfyUI workers<input value={settings.comfyui_urls} onChange={(event) => update({ comfyui_urls: event.target.value })}/></label>
         <label>Plex destination<input value={settings.plex_destination} onChange={(event) => update({ plex_destination: event.target.value })}/></label>
       </section>
@@ -1453,7 +1502,7 @@ function WorkerConsole({ workers, busy, onClose, onRefresh, onSpawn, onKill, onR
   const selected = workers.find((worker) => worker.url === selectedUrl);
   return <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="worker-console-title"><section className="worker-console metal-panel">
     <header className="editor-header"><div><span className="eyebrow-label">Production hardware</span><h1 id="worker-console-title">ComfyUI workers</h1><small>Select a live instance to inspect or stop it.</small></div><button className="icon-button" onClick={onClose} aria-label="Close worker controls"><X size={19}/></button></header>
-    <div className="worker-console-body"><div className="worker-selector">{workers.length ? workers.map((worker) => <button key={worker.url} className={worker.url === selectedUrl ? "worker-option selected" : "worker-option"} onClick={() => setSelectedUrl(worker.url)}><span className={`led ${worker.running === false ? "red" : "green"}`}/><strong>{workerLabel(worker)}</strong><small>{worker.url}</small><b>{worker.running === false ? "offline" : `${worker.queue_running || 0} running · ${worker.queue_remaining || 0} waiting`}</b><div className="worker-option-usage"><UsageLeds label="CPU" value={worker.telemetry?.cpu_percent} source={worker.telemetry?.cpu_source}/><UsageLeds label="GPU" value={worker.telemetry?.gpu_percent} source={worker.telemetry?.gpu_source || worker.telemetry?.source}/></div></button>) : <p className="ledger-empty">No ComfyUI workers are reporting.</p>}</div><aside className="worker-detail"><div className="eyebrow"><span>Selected instance</span><button className="micro-button" onClick={onRefresh} disabled={busy} aria-label="Refresh workers"><RefreshCw size={13}/></button></div>{selected ? <><h2>{workerLabel(selected)}</h2><p>{selected.url}</p><div className="worker-detail-usage"><UsageLeds label="CPU" value={selected.telemetry?.cpu_percent} source={selected.telemetry?.cpu_source}/><UsageLeds label="GPU" value={selected.telemetry?.gpu_percent} source={selected.telemetry?.gpu_source || selected.telemetry?.source}/></div><dl className="settings-ledger"><div><dt>Process</dt><dd>{selected.pid || "unknown"}</dd></div><div><dt>Queue</dt><dd>{selected.queue_running || 0} active / {selected.queue_remaining || 0} waiting</dd></div><div><dt>Device</dt><dd>{selected.device || selected.kind || "unknown"}</dd></div></dl><button className="danger" disabled={busy || selected.running === false || !selected.url} onClick={() => selected.url && onKill(selected.url)}><Square size={15}/> Kill selected worker</button></> : <p>Select a worker to see its process and queue.</p>}</aside></div>
+    <div className="worker-console-body"><div className="worker-selector">{workers.length ? workers.map((worker) => <button key={worker.url} className={worker.url === selectedUrl ? "worker-option selected" : "worker-option"} onClick={() => setSelectedUrl(worker.url)}><span className={`led ${worker.running === false ? "red" : "green"}`}/><strong>{workerLabel(worker)}</strong><small>{worker.url}</small><b>{worker.running === false ? "offline" : `${worker.queue_running || 0} running · ${worker.queue_remaining || 0} waiting`}</b><div className="worker-option-usage"><UsageLeds label="GPU" value={worker.telemetry?.gpu_percent} source={worker.telemetry?.gpu_source || worker.telemetry?.source}/><UsageLeds label="CPU" value={worker.telemetry?.cpu_percent} source={worker.telemetry?.cpu_source}/></div></button>) : <p className="ledger-empty">No ComfyUI workers are reporting.</p>}</div><aside className="worker-detail"><div className="eyebrow"><span>Selected instance</span><button className="micro-button" onClick={onRefresh} disabled={busy} aria-label="Refresh workers"><RefreshCw size={13}/></button></div>{selected ? <><h2>{workerLabel(selected)}</h2><p>{selected.url}</p><div className="worker-detail-usage"><UsageLeds label="GPU" value={selected.telemetry?.gpu_percent} source={selected.telemetry?.gpu_source || selected.telemetry?.source}/><UsageLeds label="CPU" value={selected.telemetry?.cpu_percent} source={selected.telemetry?.cpu_source}/></div><dl className="settings-ledger"><div><dt>Process</dt><dd>{selected.pid || "unknown"}</dd></div><div><dt>Queue</dt><dd>{selected.queue_running || 0} active / {selected.queue_remaining || 0} waiting</dd></div><div><dt>Device</dt><dd>{selected.device || selected.kind || "unknown"}</dd></div></dl><button className="danger" disabled={busy || selected.running === false || !selected.url} onClick={() => selected.url && onKill(selected.url)}><Square size={15}/> Kill selected worker</button></> : <p>Select a worker to see its process and queue.</p>}</aside></div>
     <footer className="modal-actions"><button className="outline-button" disabled={busy} onClick={() => onSpawn("cpu")}><Cpu size={15}/> Spawn CPU</button><button className="outline-button" disabled={busy} onClick={() => onSpawn("gpu")}><Sparkles size={15}/> Spawn GPU</button><button className="danger" disabled={busy} onClick={onRestart}>Restart all</button><button className="create" onClick={onClose}>Close</button></footer>
   </section></div>;
 }
@@ -1576,5 +1625,5 @@ function WorkerLane({ worker, jobs, busy, empty, onSpawn, onKill }: { worker?: W
   const telemetry = worker as ComfyWorker | undefined;
   const storyName = runningJob ? jobStoryName(runningJob) : comfyRunning ? "Artwork render" : "No story assigned";
   const taskMessage = runningJob?.message || (comfyRunning ? `${comfyWorker?.queue_running} ComfyUI workflow${comfyWorker?.queue_running === 1 ? "" : "s"} rendering` : empty ? "Awaiting assignment" : "Standing by for an artwork job");
-  return <article className="worker-lane metal-panel"><div className="worker-title"><span className={empty ? "led amber" : comfyRunning || runningJob ? "led blue live" : "led green"}/><h2>{empty ? "Worker bay available" : workerLabel(worker!)}</h2><small>{empty ? "awaiting assignment" : comfyRunning || runningJob ? "rendering" : "signal live · idle"}</small></div><div className="lane-task"><span>Assignment</span><strong title={storyName}>{empty ? "No worker in this lane" : storyName}</strong><small>{taskMessage} · queue {comfyWorker?.queue_remaining ?? jobs.filter((job) => ["queued", "running"].includes(job.status)).length}</small></div><div className="meter"><span>Progress</span><div className="progress-track"><i style={{width: `${progress}%`}}/></div><b>{comfyRunning && !runningJob ? "live" : `${progress}%`}</b></div><div className="worker-usage"><UsageLeds label="CPU" value={telemetry?.telemetry?.cpu_percent} source={telemetry?.telemetry?.cpu_source}/><UsageLeds label="GPU" value={telemetry?.telemetry?.gpu_percent} source={telemetry?.telemetry?.gpu_source || telemetry?.telemetry?.source}/></div><div className="lane-actions">{empty ? <button disabled={busy} onClick={onSpawn}><Plus size={17}/> Start GPU</button> : <><button disabled={busy} onClick={onSpawn} title="Start an additional worker"><Plus size={17}/></button>{onKill && <button disabled={busy} onClick={onKill} title="Stop this selected worker"><X size={17}/></button>}</>}</div></article>;
+  return <article className="worker-lane metal-panel"><div className="worker-title"><span className={empty ? "led amber" : comfyRunning || runningJob ? "led blue live" : "led green"}/><h2>{empty ? "Worker bay available" : workerLabel(worker!)}</h2><small>{empty ? "awaiting assignment" : comfyRunning || runningJob ? "rendering" : "signal live · idle"}</small></div><div className="lane-task"><span>Assignment</span><strong title={storyName}>{empty ? "No worker in this lane" : storyName}</strong><small>{taskMessage} · queue {comfyWorker?.queue_remaining ?? jobs.filter((job) => ["queued", "running"].includes(job.status)).length}</small></div><div className="meter"><span>Progress</span><div className="progress-track"><i style={{width: `${progress}%`}}/></div><b>{comfyRunning && !runningJob ? "live" : `${progress}%`}</b></div><div className="worker-usage"><UsageLeds label="GPU" value={telemetry?.telemetry?.gpu_percent} source={telemetry?.telemetry?.gpu_source || telemetry?.telemetry?.source}/><UsageLeds label="CPU" value={telemetry?.telemetry?.cpu_percent} source={telemetry?.telemetry?.cpu_source}/></div><div className="lane-actions">{empty ? <button disabled={busy} onClick={onSpawn}><Plus size={17}/> Start GPU</button> : <><button disabled={busy} onClick={onSpawn} title="Start an additional worker"><Plus size={17}/></button>{onKill && <button disabled={busy} onClick={onKill} title="Stop this selected worker"><X size={17}/></button>}</>}</div></article>;
 }

@@ -252,6 +252,7 @@ export type StudioSettings = {
   llm_base_url: string;
   llm_api_key?: string;
   llm_model: string;
+  llm_unlimited: boolean;
   tts_base_url: string;
   tts_api_key?: string;
   tts_model: string;
@@ -264,6 +265,7 @@ export type StudioSettings = {
   whisper_model_size: string;
   default_scenes: number;
   default_images_per_scene: number;
+  default_visual_style: string;
   default_style: string;
   default_tone: string;
   narration_style: string;
@@ -305,6 +307,7 @@ export const api = {
   spawn: (kind: "cpu" | "gpu") => request(`/api/comfyui/workers/spawn-${kind}`, { method: "POST" }),
   killComfy: (url: string) => request("/api/comfyui/workers/kill", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) }),
   generate: (input: GenerateInput) => request<{ task_id: string; message: string; deduplicated?: boolean }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  generateQueue: (items: GenerateInput[]) => request<{ queue_id: string; status: string; item_count: number; message: string }>("/api/generate/queue", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ items }) }),
   generateCharacterPortrait: (input: { character_id: string; name: string; role: string; description?: string; appearance?: string; alignment?: string; traits?: string; biography?: string; world_context?: string }) => request<{ url: string; filename: string }>("/api/world/character-portrait", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
   generateCharacterPortraits: (input: { world_context?: string; characters: Array<{ character_id: string; name: string; role: string; description?: string; appearance?: string; alignment?: string; traits?: string; biography?: string }> }) => request<{ portraits: Array<{ character_id: string; url: string; filename: string }>; failed: string[] }>("/api/world/character-portraits", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
   generateStoryThumbnail: (storyId: string) => request<{ url: string; filename: string }>(`/api/world/stories/${storyId}/thumbnail`, { method: "POST" }),

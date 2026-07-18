@@ -31,6 +31,6 @@ def test_bounded_llm_call_can_persist_attributed_token_usage(tmp_path):
         totals = store.token_usage_totals("run-1")
         calls = store.list_token_usage("run-1")
 
-    assert totals["reserved"] == 30
+    assert totals["reserved"] == 60
     assert totals["actual"] > 0
     assert calls[0].call_name == "scene.01.narration"

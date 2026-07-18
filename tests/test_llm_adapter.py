@@ -1,7 +1,8 @@
 from fantasee_server.llm_adapter import GranularLLMAdapter, TokenBudget
 
 
-def test_adapter_tracks_small_call_spend_and_rejects_budget_overrun():
+def test_adapter_tracks_small_call_spend_and_rejects_budget_overrun(monkeypatch):
+    monkeypatch.delenv("FANTASEE_LLM_UNLIMITED", raising=False)
     calls = []
 
     def fake_call(system, prompt, temperature=0.7, max_tokens=None):

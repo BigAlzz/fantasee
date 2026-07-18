@@ -112,12 +112,19 @@ def discover_generated_stories() -> list[dict]:
                     data.setdefault("chapters", [])
                     # Use story artwork for library cards. Title slides are
                     # metadata, not story content, so they remain a fallback.
+                    thumbnail = data.get("story_thumbnail")
+                    if thumbnail and (child / str(thumbnail).lstrip("/")).is_file():
+                        data["hero_image_url"] = generated_asset_url(child.name, str(thumbnail))
+                        data["hero_image"] = thumbnail
+                        data["cover_image_url"] = data["hero_image_url"]
                     scene_hero = next(
                         (filename for scene in scenes for filename in (scene.get("image_filenames", []) or [])
                          if filename and (child / str(filename).lstrip("/")).is_file()),
                         None,
                     )
-                    if scene_hero:
+                    if thumbnail and (child / str(thumbnail).lstrip("/")).is_file():
+                        pass
+                    elif scene_hero:
                         data["hero_image_url"] = generated_asset_url(child.name, scene_hero)
                         data["hero_image"] = scene_hero
                         data["cover_image_url"] = data["hero_image_url"]
@@ -140,7 +147,11 @@ def discover_generated_stories() -> list[dict]:
                     for scene in scenes:
                         # Convert filenames to URLs
                         imgs = scene.get("image_filenames", [])
-                        scene["image_urls"] = [generated_asset_url(child.name, f) for f in imgs if f]
+                        scene["image_urls"] = [
+                            generated_asset_url(child.name, f)
+                            for f in imgs
+                            if f and (child / str(f).lstrip("/")).is_file()
+                        ]
                         audio = scene.get("audio_filename", "")
                         scene["audio_url"] = generated_asset_url(child.name, audio) if audio else None
                         subs = scene.get("subtitle_file", "")
