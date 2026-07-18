@@ -113,7 +113,7 @@ def call_llm(
         return None
 
     payload = {
-        "model": MIIMO_MODEL,
+        "model": os.environ.get("FANTASEE_LLM_MODEL", MIIMO_MODEL),
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},

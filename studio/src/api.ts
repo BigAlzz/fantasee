@@ -236,8 +236,13 @@ export type StudioSettings = {
   llm_base_url: string;
   llm_api_key?: string;
   llm_model: string;
+  tts_base_url: string;
+  tts_api_key?: string;
+  tts_model: string;
   tts_voice_preset: string;
   tts_speed: number;
+  unsplash_base_url: string;
+  unsplash_access_key?: string;
   plex_destination: string;
   background_audio_dir: string;
   whisper_model_size: string;
@@ -311,5 +316,6 @@ export const api = {
   renderStory: (storyId: string) => request<{ status: string; message?: string; rendered_count?: number }>(`/api/stories/${storyId}/render`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) }),
   exportPlex: (storyId: string) => request<{ status: string; message?: string; task_id?: string }>(`/api/stories/${storyId}/export-plex`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) }),
   settings: () => request<StudioSettings>("/api/settings"),
+  llmModels: (input?: { base_url?: string; api_key?: string }) => request<{ ok: boolean; models: string[]; error?: string }>("/api/settings/llm-models", input ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) } : undefined),
   updateSettings: (settings: StudioSettings) => request<{ ok: boolean; settings: StudioSettings }>("/api/settings", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(settings) }),
 };

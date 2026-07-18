@@ -60,6 +60,15 @@ DEFAULTS: dict = {
     "llm_api_key": "",
     "llm_model": "mimo-v2.5-pro",
 
+    # TTS provider (falls back to the LLM credential when its own key is blank)
+    "tts_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
+    "tts_api_key": "",
+    "tts_model": "mimo-v2.5-tts",
+
+    # Unsplash stock image provider
+    "unsplash_base_url": "https://api.unsplash.com",
+    "unsplash_access_key": "",
+
     # TTS — uses the same Xiaomi MiMo TTS endpoint (mimo-v2.5-tts models)
     # Voice presets: Dean, Milo, Mia, Chloe. Most voice aliases map to Mia.
     "tts_voice_preset": "Dean",
@@ -96,8 +105,15 @@ class Settings(BaseModel):
     llm_model: str = Field(default="mimo-v2.5-pro", description="LLM model name")
 
     # TTS
+    tts_base_url: str = Field(default="https://token-plan-sgp.xiaomimimo.com/v1", description="TTS API base URL")
+    tts_api_key: str = Field(default="", description="TTS API key (stored locally, never sent to browser)")
+    tts_model: str = Field(default="mimo-v2.5-tts", description="Default TTS model name")
     tts_voice_preset: str = Field(default="Dean", description="Default TTS voice preset (Dean, Milo, Mia, Chloe)")
     tts_speed: float = Field(default=1.3, ge=0.5, le=3.0, description="TTS playback speed (0.5-3.0)")
+
+    # Unsplash
+    unsplash_base_url: str = Field(default="https://api.unsplash.com", description="Unsplash API base URL")
+    unsplash_access_key: str = Field(default="", description="Unsplash access key (stored locally, never sent to browser)")
 
     # Plex
     plex_destination: str = Field(default=r"D:\Downloads\Plex", description="Plex export destination directory")
@@ -186,10 +202,30 @@ def apply_settings_to_env(settings: dict) -> None:
         kind="llm",
         resolve_dns=False,
     )
+    tts_base_url = validate_provider_url(
+        settings.get("tts_base_url", DEFAULTS["tts_base_url"]),
+        kind="tts",
+        resolve_dns=False,
+    )
+    unsplash_base_url = validate_provider_url(
+        settings.get("unsplash_base_url", DEFAULTS["unsplash_base_url"]),
+        kind="unsplash",
+        resolve_dns=False,
+    )
     os.environ["COMFYUI_URLS"] = comfyui_urls
     os.environ["FANTASEE_AUTO_SPAWN_CPU"] = "0" if not settings.get("comfyui_auto_spawn", True) else "1"
     os.environ["XIAOMI_BASE_URL"] = llm_base_url
     os.environ["XIAOMI_API_KEY"] = settings.get("llm_api_key", DEFAULTS["llm_api_key"])
+    os.environ["FANTASEE_LLM_MODEL"] = settings.get("llm_model", DEFAULTS["llm_model"])
+    os.environ["FANTASEE_TTS_BASE_URL"] = tts_base_url
+    os.environ["FANTASEE_TTS_API_KEY"] = (
+        settings.get("tts_api_key") or settings.get("llm_api_key", DEFAULTS["llm_api_key"])
+    )
+    os.environ["FANTASEE_TTS_MODEL"] = settings.get("tts_model", DEFAULTS["tts_model"])
+    os.environ["FANTASEE_UNSPLASH_BASE_URL"] = unsplash_base_url
+    os.environ["FANTASEE_UNSPLASH_ACCESS_KEY"] = settings.get(
+        "unsplash_access_key", DEFAULTS["unsplash_access_key"]
+    )
     os.environ["FANTASEE_PLEX_DEST"] = settings.get("plex_destination", DEFAULTS["plex_destination"])
     background_audio_dir = str(settings.get("background_audio_dir", DEFAULTS["background_audio_dir"])).strip()
     if background_audio_dir:
@@ -203,7 +239,7 @@ def apply_settings_to_env(settings: dict) -> None:
 def _mask_settings(data: dict) -> dict:
     """Return settings safe for a browser or operator response."""
     masked = dict(data)
-    for key in ("llm_api_key", "tts_api_key"):
+    for key in ("llm_api_key", "tts_api_key", "unsplash_access_key"):
         if masked.get(key):
             val = str(masked[key])
             masked[key] = f"{val[:4]}...{val[-4:]}" if len(val) > 8 else "****"
@@ -235,19 +271,21 @@ def get_settings_raw():
 @router.put("")
 def update_settings(body: Settings):
     """Update settings. Saves to disk and pushes into env vars."""
-    data = body.model_dump()
+    current = _load_settings()
+    data = {**current, **body.model_dump(exclude_unset=True)}
 
     try:
         data["comfyui_urls"] = validate_provider_urls(data["comfyui_urls"])
         data["llm_base_url"] = validate_provider_url(data["llm_base_url"], kind="llm")
+        data["tts_base_url"] = validate_provider_url(data["tts_base_url"], kind="tts")
+        data["unsplash_base_url"] = validate_provider_url(data["unsplash_base_url"], kind="unsplash")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Don't overwrite keys with masked values
-    current = _load_settings()
-    for key in ("llm_api_key",):
+    for key in ("llm_api_key", "tts_api_key", "unsplash_access_key"):
         val = data.get(key, "")
-        if val and ("..." in val or "••••" in val):
+        if val and ("..." in val or "••••" in val or val == "****"):
             data[key] = current.get(key, "")
         elif not val:
             data[key] = current.get(key, "")
@@ -294,42 +332,52 @@ def list_narration_styles():
     return {"styles": styles}
 
 
-@router.get("/llm-models")
-def list_llm_models():
-    """Fetch available models from the configured LLM endpoint.
+class ProviderDiscoveryRequest(BaseModel):
+    base_url: str = ""
+    api_key: str = ""
 
-    Returns the model list so the frontend can populate a dropdown.
-    The endpoint reads the current XIAOMI_BASE_URL and XIAOMI_API_KEY
-    from the environment (which were pushed from settings on startup).
-    """
+
+def _list_llm_models(base_url: str, api_key: str) -> dict:
     import requests as req
-    base_url = os.environ.get("XIAOMI_BASE_URL", DEFAULTS["llm_base_url"])
-    api_key = os.environ.get("XIAOMI_API_KEY", "")
-
-    if not api_key:
-        # Try loading from saved settings as fallback
-        settings = _load_settings()
-        api_key = settings.get("llm_api_key", "")
 
     try:
         base_url = validate_provider_url(base_url, kind="llm")
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-        r = req.get(
+        response = req.get(
             f"{base_url}/models",
             headers=headers,
             timeout=10,
             allow_redirects=False,
         )
-        if r.status_code == 200:
-            data = r.json()
-            # Handle both { data: [...] } and [...] response formats
-            models = data.get("data", data) if isinstance(data, dict) else data
-            ids = [m["id"] for m in models if isinstance(m, dict) and m.get("id")]
-            return {"ok": True, "models": ids}
-        else:
-            return {"ok": False, "error": f"HTTP {r.status_code}", "models": []}
-    except Exception as e:
-        return {"ok": False, "error": str(e), "models": []}
+        if response.status_code != 200:
+            return {"ok": False, "error": f"HTTP {response.status_code}", "models": []}
+        data = response.json()
+        models = data.get("data", data) if isinstance(data, dict) else data
+        ids = [item["id"] for item in models if isinstance(item, dict) and item.get("id")]
+        return {"ok": True, "models": ids}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "models": []}
+
+
+def _discovery_credentials(body: ProviderDiscoveryRequest | None = None) -> tuple[str, str]:
+    saved = _load_settings()
+    base_url = body.base_url.strip() if body and body.base_url.strip() else saved["llm_base_url"]
+    api_key = body.api_key.strip() if body else ""
+    if not api_key or "..." in api_key or api_key == "****":
+        api_key = saved.get("llm_api_key", "")
+    return base_url, api_key
+
+
+@router.get("/llm-models")
+def list_llm_models():
+    """Fetch models from the saved LLM provider."""
+    return _list_llm_models(*_discovery_credentials())
+
+
+@router.post("/llm-models")
+def discover_llm_models(body: ProviderDiscoveryRequest):
+    """Fetch models from provider values currently entered in Settings."""
+    return _list_llm_models(*_discovery_credentials(body))
 
 
 @router.post("/test-connection")

@@ -793,9 +793,78 @@ function StudioDesk({ view, stories, runs, workers, selectedStory, jobs, busy, b
     {view === "Assets" && <AssetWorkspace stories={stories} selectedStory={selectedStory} releases={releases} migration={migration} migrationLoading={migrationLoading} onSelectStory={onSelectStory} onPreviewRelease={onPreviewRelease} />}
     {view === "Story Studio" && <StoryStudioWorkspace brief={brief} onBriefChange={onBriefChange} world={world} onWorldChange={onWorldChange} seeds={seeds} seedBusy={seedBusy} onSuggestSeeds={onSuggestSeeds} onQueueBrief={onQueueBrief} />}
     {view === "Voice Studio" && <VoiceStudioWorkspace settings={settings} brief={brief} onBriefChange={onBriefChange} world={world} onWorldChange={onWorldChange} settingsBusy={settingsBusy} auditionBusy={auditionBusy} auditionUrl={auditionUrl} onSettingsChange={setSettings} onAudition={auditionVoice} onSave={saveSettings} />}
-    {view === "Settings" && <><h1>Keep the chain honest.</h1><p className="desk-intro">These controls are persisted locally and applied to new production work. Existing approved media is never silently rewritten.</p>{settings ? <div className="settings-form"><label>Voice<select value={settings.tts_voice_preset} onChange={(event) => setSettings({ ...settings, tts_voice_preset: event.target.value })}><option>Dean</option><option>Milo</option><option>Mia</option><option>Chloe</option></select></label><div className="voice-audition"><button className="outline-button" disabled={auditionBusy} onClick={() => void auditionVoice()}>{auditionBusy ? "Generating audition..." : "Audition voice"}</button>{auditionUrl && <audio controls autoPlay src={auditionUrl} />}</div><label>Speed<input type="number" min="0.5" max="3" step="0.05" value={settings.tts_speed} onChange={(event) => setSettings({ ...settings, tts_speed: Number(event.target.value) })}/></label><label>Default style<input value={settings.default_style} onChange={(event) => setSettings({ ...settings, default_style: event.target.value })}/></label><label>Default tone<input value={settings.default_tone} onChange={(event) => setSettings({ ...settings, default_tone: event.target.value })}/></label><label className="wide">ComfyUI workers<input value={settings.comfyui_urls} onChange={(event) => setSettings({ ...settings, comfyui_urls: event.target.value })}/></label><label className="wide">Plex destination<input value={settings.plex_destination} onChange={(event) => setSettings({ ...settings, plex_destination: event.target.value })}/></label><div className="settings-actions"><button className="outline-button" disabled={settingsBusy} onClick={() => void api.settings().then(setSettings)}>Reload</button><button className="create" disabled={settingsBusy} onClick={() => void saveSettings()}>Save settings</button></div></div> : <p className="ledger-empty">Loading validated settings...</p>}</>}
+    {view === "Settings" && <SettingsWorkspace settings={settings} busy={settingsBusy} auditionBusy={auditionBusy} auditionUrl={auditionUrl} onChange={setSettings} onAudition={() => void auditionVoice()} onReload={() => void api.settings().then(setSettings)} onSave={() => void saveSettings()} />}
     {view === "Settings" && settings && <BackgroundAudioSettings settings={settings} onChange={setSettings} busy={settingsBusy} onSave={() => void saveSettings()} />}
   </section>;
+}
+
+function SettingsWorkspace({ settings, busy, auditionBusy, auditionUrl, onChange, onAudition, onReload, onSave }: { settings?: StudioSettings; busy: boolean; auditionBusy: boolean; auditionUrl?: string; onChange: (settings: StudioSettings) => void; onAudition: () => void; onReload: () => void; onSave: () => void }) {
+  const [llmModels, setLlmModels] = useState<string[]>([]);
+  const [modelsBusy, setModelsBusy] = useState(false);
+  const [modelsMessage, setModelsMessage] = useState("");
+
+  useEffect(() => {
+    if (settings?.llm_model) setLlmModels((current) => current.includes(settings.llm_model) ? current : [settings.llm_model, ...current]);
+  }, [settings?.llm_model]);
+
+  if (!settings) return <><h1>Keep the chain honest.</h1><p className="ledger-empty">Loading validated settings...</p></>;
+
+  const update = (patch: Partial<StudioSettings>) => onChange({ ...settings, ...patch });
+  const editableSecret = (value?: string) => value && !value.includes("...") && value !== "****" ? value : "";
+  const discoverModels = async () => {
+    setModelsBusy(true);
+    setModelsMessage("");
+    try {
+      const result = await api.llmModels({ base_url: settings.llm_base_url, api_key: settings.llm_api_key || "" });
+      if (!result.ok) throw new Error(result.error || "Provider did not return a model list");
+      const models = Array.from(new Set([settings.llm_model, ...result.models].filter(Boolean)));
+      setLlmModels(models);
+      setModelsMessage(`${result.models.length} models returned by provider`);
+    } catch (error) {
+      setModelsMessage(error instanceof Error ? error.message : "Could not load provider models");
+    } finally {
+      setModelsBusy(false);
+    }
+  };
+
+  return <>
+    <h1>Keep the chain honest.</h1>
+    <p className="desk-intro">Provider endpoints and credentials are persisted locally and applied to new production work. Credentials are masked after saving.</p>
+    <div className="provider-settings-grid">
+      <section className="provider-settings-card">
+        <div className="provider-settings-heading"><span className="led green"/><div><h2>Language model</h2><small>OpenAI-compatible provider</small></div></div>
+        <label>LLM endpoint<input value={settings.llm_base_url} onChange={(event) => update({ llm_base_url: event.target.value })} placeholder="https://provider.example/v1" /></label>
+        <label>LLM API key<input type="password" autoComplete="off" value={editableSecret(settings.llm_api_key)} placeholder={settings.llm_api_key || "Enter provider key"} onChange={(event) => update({ llm_api_key: event.target.value })} /></label>
+        <label>LLM model<select value={settings.llm_model} onChange={(event) => update({ llm_model: event.target.value })}>{Array.from(new Set([settings.llm_model, ...llmModels].filter(Boolean))).map((model) => <option key={model} value={model}>{model}</option>)}</select></label>
+        <button type="button" className="outline-button provider-discovery" disabled={modelsBusy} onClick={() => void discoverModels()}><RefreshCw size={14}/>{modelsBusy ? "Loading models..." : "Load models from provider"}</button>
+        {modelsMessage && <p className="provider-message" role="status">{modelsMessage}</p>}
+      </section>
+
+      <section className="provider-settings-card">
+        <div className="provider-settings-heading"><span className="led green"/><div><h2>Text to speech</h2><small>Independent narration provider</small></div></div>
+        <label>TTS endpoint<input value={settings.tts_base_url} onChange={(event) => update({ tts_base_url: event.target.value })} placeholder="https://voice-provider.example/v1" /></label>
+        <label>TTS API key<input type="password" autoComplete="off" value={editableSecret(settings.tts_api_key)} placeholder={settings.tts_api_key || "Blank uses the LLM key"} onChange={(event) => update({ tts_api_key: event.target.value })} /></label>
+        <label>TTS model<input value={settings.tts_model} onChange={(event) => update({ tts_model: event.target.value })} placeholder="mimo-v2.5-tts" /></label>
+        <div className="settings-pair"><label>Voice<select value={settings.tts_voice_preset} onChange={(event) => update({ tts_voice_preset: event.target.value })}><option>Dean</option><option>Milo</option><option>Mia</option><option>Chloe</option></select></label><label>Speed<input type="number" min="0.5" max="3" step="0.05" value={settings.tts_speed} onChange={(event) => update({ tts_speed: Number(event.target.value) })}/></label></div>
+        <div className="voice-audition"><button className="outline-button" disabled={auditionBusy} onClick={onAudition}>{auditionBusy ? "Generating audition..." : "Audition voice"}</button>{auditionUrl && <audio controls autoPlay src={auditionUrl} />}</div>
+      </section>
+
+      <section className="provider-settings-card">
+        <div className="provider-settings-heading"><span className="led amber"/><div><h2>Additional images</h2><small>Unsplash provider</small></div></div>
+        <label>Unsplash endpoint<input value={settings.unsplash_base_url} onChange={(event) => update({ unsplash_base_url: event.target.value })} placeholder="https://api.unsplash.com" /></label>
+        <label>Unsplash access key<input type="password" autoComplete="off" value={editableSecret(settings.unsplash_access_key)} placeholder={settings.unsplash_access_key || "Enter Unsplash access key"} onChange={(event) => update({ unsplash_access_key: event.target.value })} /></label>
+        <p className="provider-note">Stored for the additional-image source. Generated ComfyUI artwork remains a separate provider.</p>
+      </section>
+
+      <section className="provider-settings-card">
+        <div className="provider-settings-heading"><span className="led green"/><div><h2>Production defaults</h2><small>Local engine and export</small></div></div>
+        <div className="settings-pair"><label>Default style<input value={settings.default_style} onChange={(event) => update({ default_style: event.target.value })}/></label><label>Default tone<input value={settings.default_tone} onChange={(event) => update({ default_tone: event.target.value })}/></label></div>
+        <label>ComfyUI workers<input value={settings.comfyui_urls} onChange={(event) => update({ comfyui_urls: event.target.value })}/></label>
+        <label>Plex destination<input value={settings.plex_destination} onChange={(event) => update({ plex_destination: event.target.value })}/></label>
+      </section>
+    </div>
+    <div className="settings-actions provider-settings-actions"><button className="outline-button" disabled={busy} onClick={onReload}>Reload</button><button className="create" disabled={busy} onClick={onSave}>Save settings</button></div>
+  </>;
 }
 
 function ProductionWorkspace({ runs, stories, selectedStory, jobs, busy, onSelectRun, onAction }: { runs: ProductionRun[]; stories: Story[]; selectedStory?: Story; jobs: ProductionJob[]; busy: boolean; onSelectRun: (id: string) => void; onAction: (action: () => Promise<unknown>, message: string) => void }) {

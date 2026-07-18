@@ -11,7 +11,7 @@ from urllib.parse import SplitResult, urlsplit, urlunsplit
 from fastapi import HTTPException, Request, WebSocket
 
 
-DEFAULT_PROVIDER_HOSTS = frozenset({"token-plan-sgp.xiaomimimo.com"})
+DEFAULT_PROVIDER_HOSTS = frozenset({"token-plan-sgp.xiaomimimo.com", "api.unsplash.com"})
 LOOPBACK_HOSTS = frozenset({"localhost"})
 MAX_PROVIDER_URL_LENGTH = 2048
 

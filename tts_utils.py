@@ -237,7 +237,7 @@ def get_style_for(voice: str, tone: str = "normal") -> str:
 
 def _get_api_key() -> str:
     """Resolve the Xiaomi API key from environment or .env file."""
-    key = os.environ.get("XIAOMI_API_KEY", "")
+    key = os.environ.get("FANTASEE_TTS_API_KEY", "") or os.environ.get("XIAOMI_API_KEY", "")
     if key and not key.startswith("***"):
         return key
 
@@ -260,8 +260,8 @@ def _get_api_key() -> str:
 def _get_base_url() -> str:
     """Resolve the Xiaomi API base URL."""
     return os.environ.get(
-        "XIAOMI_BASE_URL",
-        "https://token-plan-sgp.xiaomimimo.com/v1",
+        "FANTASEE_TTS_BASE_URL",
+        os.environ.get("XIAOMI_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1"),
     )
 
 
@@ -367,7 +367,11 @@ def synthesize(
 
     # Build payload
     payload = {
-        "model": TTS_MODELS.get(model, model),
+        "model": (
+            os.environ.get("FANTASEE_TTS_MODEL", TTS_MODELS["preset"])
+            if model == "preset"
+            else TTS_MODELS.get(model, model)
+        ),
         "messages": messages,
     }
     if voice_design:

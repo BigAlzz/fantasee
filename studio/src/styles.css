@@ -134,6 +134,21 @@ nav { display:grid; gap:4px; } .nav-item { position:relative; border:1px solid t
 .settings-form label.wide,.settings-actions { grid-column:1 / -1; }
 .settings-form input,.settings-form select { border:1px solid #5d523f; background:#090b0b; color:#e3d7c2; padding:10px; font:13px Bahnschrift,"DIN Alternate",sans-serif; }
 .settings-actions { display:flex; gap:9px; justify-content:flex-end; margin-top:4px; }
+.provider-settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; max-width:980px; margin-top:24px; }
+.provider-settings-card { display:grid; align-content:start; gap:12px; padding:18px; border:1px solid #514832; background:linear-gradient(145deg,#171a16,#0b0d0c); }
+.provider-settings-heading { display:flex; align-items:center; gap:10px; padding-bottom:11px; border-bottom:1px solid #403a2d; }
+.provider-settings-heading h2 { margin:0; color:#e3d6bd; font:20px "Iowan Old Style",Georgia,serif; font-weight:500; }
+.provider-settings-heading small { display:block; margin-top:3px; color:#8f897d; font-size:9px; letter-spacing:.1em; text-transform:uppercase; }
+.provider-settings-card label { display:grid; gap:6px; color:#c7ac77; font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
+.provider-settings-card input,.provider-settings-card select { width:100%; min-height:39px; border:1px solid #5d523f; outline:0; background:#090b0b; color:#e3d7c2; padding:9px 10px; font:13px Bahnschrift,"DIN Alternate",sans-serif; text-transform:none; }
+.provider-settings-card input:focus,.provider-settings-card select:focus { border-color:#c58a42; box-shadow:0 0 0 2px #c58a4233; }
+.settings-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.provider-discovery { justify-content:center; width:100%; margin:1px 0 0; }
+.provider-message,.provider-note { margin:0; color:#a69d8f; font-size:10px; line-height:1.45; }
+.provider-message { color:#cdb374; }
+.provider-settings-actions { max-width:980px; margin-top:16px; }
+@media (max-width:900px) { .provider-settings-grid { grid-template-columns:1fr; }.provider-settings-actions { max-width:none; } }
+@media (max-width:520px) { .settings-pair { grid-template-columns:1fr; } }
 .desk-row-button { width:100%; cursor:pointer; text-align:left; font:inherit; color:inherit; }
 .desk-row-button:hover,.desk-row-button:focus { border-color:#b47f3c; background:#211b13; }
 .story-row { grid-template-columns:22px 58px minmax(140px,1fr) minmax(90px,1.1fr) 70px 120px 24px; }

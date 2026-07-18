@@ -58,6 +58,30 @@ def test_voice_design_payload_uses_description_and_option(monkeypatch):
     assert seen["json"]["audio"]["format"] == "wav"
 
 
+def test_preset_tts_uses_its_independent_runtime_provider(monkeypatch):
+    seen = {}
+
+    def fake_post(url, **kwargs):
+        seen["url"] = url
+        seen.update(kwargs)
+        return FakeResponse(_audio_payload())
+
+    monkeypatch.setenv("XIAOMI_API_KEY", "shared-llm-key")
+    monkeypatch.setenv("XIAOMI_BASE_URL", "https://llm.example/v1")
+    monkeypatch.setenv("FANTASEE_TTS_API_KEY", "tts-only-key")
+    monkeypatch.setenv("FANTASEE_TTS_BASE_URL", "https://voice.example/v1")
+    monkeypatch.setenv("FANTASEE_TTS_MODEL", "voice-natural")
+    monkeypatch.setattr(tts_utils, "validate_provider_url", lambda url, kind: url)
+    monkeypatch.setattr(tts_utils.requests, "post", fake_post)
+
+    result = tts_utils.synthesize("The door opens.", model="preset")
+
+    assert result == b"RIFF fake wav bytes"
+    assert seen["url"] == "https://voice.example/v1/chat/completions"
+    assert seen["headers"]["Authorization"] == "Bearer tts-only-key"
+    assert seen["json"]["model"] == "voice-natural"
+
+
 def test_voice_clone_payload_requires_and_forwards_data_uri(monkeypatch):
     seen = {}
     sample = "data:audio/wav;base64," + base64.b64encode(b"sample").decode("ascii")

@@ -31,3 +31,27 @@ def test_call_llm_retries_empty_content_before_returning(monkeypatch):
 
     assert result == "READY"
     assert len(calls) == 2
+
+
+def test_call_llm_uses_the_runtime_selected_model(monkeypatch):
+    seen = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"choices": [{"message": {"content": "READY"}, "finish_reason": "stop"}]}
+
+    def fake_post(*_args, **kwargs):
+        seen.update(kwargs)
+        return FakeResponse()
+
+    monkeypatch.setenv("FANTASEE_LLM_MODEL", "operator-selected-model")
+    monkeypatch.setattr(generate_story.requests, "post", fake_post)
+    monkeypatch.setattr(generate_story, "MIIMO_API_KEY", "test-key")
+    monkeypatch.setattr(generate_story, "MIIMO_BASE_URL", "https://example.com/v1")
+    monkeypatch.setattr(generate_story, "validate_provider_url", lambda url, kind: url)
+
+    assert generate_story.call_llm("system", "prompt", max_tokens=64) == "READY"
+    assert seen["json"]["model"] == "operator-selected-model"
