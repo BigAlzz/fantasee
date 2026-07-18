@@ -22,10 +22,13 @@ from tests._helpers import PROJECT_ROOT, temp_dir
 
 class TestBackgroundListing(unittest.TestCase):
     def test_lists_real_background_tracks(self):
-        """The shipped Background/ folder should have at least one audio file."""
-        tracks = list_background_tracks(PROJECT_ROOT / "Background")
-        # Don't hard-code the count — the folder grows over time.
-        self.assertGreater(len(tracks), 0, "Background/ folder is empty — fixture missing")
+        """A configured background folder is indexed without bundled media."""
+        # Operator-selected tracks are runtime data and are intentionally
+        # ignored by git, so the clean-checkout test supplies a tiny fixture.
+        with temp_dir() as tmp:
+            (tmp / "cinematic-atmosphere-fixture.mp3").write_bytes(b"")
+            tracks = list_background_tracks(tmp)
+        self.assertGreater(len(tracks), 0, "background fixture was not indexed")
         for t in tracks:
             self.assertTrue(t.suffix.lower() in {".mp3", ".wav", ".m4a", ".ogg", ".flac"})
 
