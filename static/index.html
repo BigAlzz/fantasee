@@ -2205,7 +2205,7 @@ input.seed-slider::-moz-range-thumb {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   GENERATION PROGRESS PANEL
+   GENERATION PROGRESS PANEL — Polished UI
    ══════════════════════════════════════════════════════════════════════ */
 .progress-panel {
   display: none;
@@ -2213,66 +2213,316 @@ input.seed-slider::-moz-range-thumb {
   bottom: 24px;
   right: 24px;
   z-index: var(--z-progress-panel);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
-  width: 360px;
-  max-height: 400px;
+  background: #0f0f1a;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  width: 380px;
+  max-height: 520px;
   overflow: hidden;
 }
-.progress-panel.active { display: block; }
-.progress-panel-header {
-  padding: 14px 18px;
-  font-size: 13px;
+.progress-panel.active { display: flex; flex-direction: column; }
+
+/* ── Gen Header ─────────────────────────────────────────────────── */
+.gen-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.gen-header-left {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.gen-btn-outline {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.8);
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, color 0.15s;
+  line-height: 1.6;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.gen-btn-outline:hover {
+  border-color: rgba(255,255,255,0.4);
+  color: #fff;
+}
+.gen-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.gen-header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.gen-header-details {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.gen-pill {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+}
+.gen-pill-divider {
+  font-size: 11px;
+  color: rgba(255,255,255,0.15);
+}
+.gen-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.gen-pill-btn {
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 11px;
   font-weight: 600;
-  border-bottom: 1px solid var(--border);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.gen-ready {
+  background: #38a169;
+  color: #fff;
+}
+
+/* ── Rainbow Ring ───────────────────────────────────────────────── */
+.gen-ring {
+  flex-shrink: 0;
+}
+.gen-ring svg {
+  display: block;
+}
+
+/* ── Stage Tags ─────────────────────────────────────────────────── */
+.gen-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.gen-stage-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.3);
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+.gen-stage-tag.done {
+  background: rgba(56,161,105,0.12);
+  color: #38a169;
+  border-color: rgba(56,161,105,0.2);
+}
+.gen-stage-tag.done::before {
+  content: "✓ ";
+  font-weight: 700;
+}
+.gen-stage-tag.running {
+  background: rgba(237,137,54,0.1);
+  color: #ed8936;
+  border-color: rgba(237,137,54,0.15);
+  animation: pulse 1.5s infinite;
+}
+.gen-stage-tag.error {
+  background: rgba(229,62,62,0.12);
+  color: #e53e3e;
+  border-color: rgba(229,62,62,0.2);
+}
+
+/* ── Active Task Card ───────────────────────────────────────────── */
+.gen-active-card {
+  margin: 10px 18px;
+  padding: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+}
+.gen-active-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.gen-active-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #e53e3e;
+}
+.gen-active-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Metrics Row ────────────────────────────────────────────────── */
+.gen-active-metrics {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.gen-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.gen-metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e53e3e;
+  line-height: 1;
+}
+.gen-metric-label {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+}
+
+/* ── Act Progress Bar ───────────────────────────────────────────── */
+.gen-act-bar {
+  margin-top: 2px;
+}
+.gen-act-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.gen-act-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+.gen-act-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e53e3e;
+}
+.gen-act-count {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+.gen-act-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.gen-act-fill {
+  height: 100%;
+  background: #e53e3e;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+  min-width: 2px;
+}
+
+/* ── Task List ──────────────────────────────────────────────────── */
+.gen-list-wrap {
+  padding: 0 18px 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+.gen-list-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 6px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  margin-top: 2px;
 }
+.gen-list-count {
+  color: rgba(255,255,255,0.2);
+}
+
+/* ── Task Items (kept for compatibility) ────────────────────────── */
 .progress-list {
-  padding: 8px;
-  max-height: 300px;
+  max-height: 260px;
   overflow-y: auto;
 }
+.progress-list::-webkit-scrollbar {
+  width: 4px;
+}
+.progress-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.progress-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+}
 .progress-item {
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-  margin-bottom: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  transition: background 0.15s;
+}
+.progress-item:hover {
+  background: rgba(255,255,255,0.04);
 }
 .progress-status {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.progress-status.queued { background: var(--text-muted); }
-.progress-status.running { background: var(--warn-running); animation: pulse 1.5s infinite; }
-.progress-status.done { background: var(--success); }
-.progress-status.error { background: var(--accent); }
+.progress-status.queued { background: rgba(255,255,255,0.15); }
+.progress-status.running { background: #ed8936; animation: pulse 1.5s infinite; }
+.progress-status.done { background: #38a169; }
+.progress-status.error { background: #e53e3e; }
 .progress-item-info { flex: 1; min-width: 0; }
-.progress-item-title { font-size: 13px; font-weight: 500; }
-.progress-item-msg { font-size: 11px; color: var(--text-muted); }
-.progress-item-sub { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
-.progress-item-child { color: var(--text-muted); margin-right: 4px; font-weight: 400; }
-.progress-item-child-row { padding-left: 24px; opacity: 0.85; }
+.progress-item-title { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.8); }
+.progress-item-msg { font-size: 10px; color: rgba(255,255,255,0.3); }
+.progress-item-sub { font-size: 10px; color: rgba(255,255,255,0.2); margin-left: 4px; }
+.progress-item-child { color: rgba(255,255,255,0.2); margin-right: 4px; font-weight: 400; }
+.progress-item-child-row { padding-left: 20px; opacity: 0.7; }
 
 .progress-bar-outer {
   width: 100%;
-  height: 4px;
-  background: rgba(255,255,255,0.1);
+  height: 3px;
+  background: rgba(255,255,255,0.06);
   border-radius: 2px;
   overflow: hidden;
+  margin-top: 4px;
 }
 .progress-bar-inner {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-glow-end));
-  /* transform-only */
+  background: linear-gradient(90deg, #ed8936, #e53e3e);
   transform: scaleX(var(--pct, 0));
   transform-origin: left center;
   transition: transform 0.4s ease;
@@ -3496,17 +3746,94 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════
-     PROGRESS PANEL
+     PROGRESS PANEL — Polished generation UI
      ══════════════════════════════════════════════════════════════════════ -->
 <div class="progress-panel" id="progress-panel" role="status" aria-live="polite" aria-label="Generation tasks">
-  <div class="progress-panel-header">
-    <span>Generation Tasks</span>
-    <button type="button" style="font-size:12px;color:var(--text-muted)"
-            data-action="toggle-progress" aria-label="Hide progress panel">&#x2013;</button>
+  <!-- Project Header Card -->
+  <div class="gen-header">
+    <div class="gen-header-left">
+      <button type="button" class="gen-btn-outline" data-action="toggle-progress" aria-label="Hide progress panel">Tasks</button>
+      <div class="gen-header-meta">
+        <span class="gen-header-title" id="gen-header-title">Generation Tasks</span>
+        <span class="gen-header-details" id="gen-header-details">
+          <span class="gen-pill" id="gen-task-count">0 running</span>
+          <span class="gen-pill-divider">|</span>
+          <span class="gen-pill" id="gen-stage-label">stage</span>
+          <span class="gen-pill-divider">|</span>
+          <span class="gen-pill" id="gen-queue-size">0 queued</span>
+        </span>
+      </div>
+    </div>
+    <div class="gen-header-right">
+      <button type="button" class="gen-pill-btn gen-ready" id="gen-ready-btn" style="display:none">READY</button>
+      <div class="gen-ring" id="gen-ring-container">
+        <svg width="44" height="44" viewBox="0 0 44 44" id="gen-ring-svg">
+          <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="3"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#e53e3e" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-red" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#dd6b20" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-orange" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#d69e2e" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-yellow" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#38a169" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-green" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#3182ce" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-blue" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#805ad5" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-purple" opacity="0"/>
+          <text x="22" y="22" text-anchor="middle" dominant-baseline="central" fill="rgba(255,255,255,0.5)" font-size="10" font-weight="700" id="ring-pct-text">0%</text>
+        </svg>
+      </div>
+    </div>
   </div>
-  <div class="progress-list" id="progress-list">
-    <div class="empty-state" style="padding:20px">
-      <p style="font-size:13px">No active generation tasks.</p>
+
+  <!-- Stage Tags -->
+  <div class="gen-stages" id="gen-stages">
+    <span class="gen-stage-tag" data-stage="outline">Outline</span>
+    <span class="gen-stage-tag" data-stage="bible">Bible</span>
+    <span class="gen-stage-tag" data-stage="visual">Visual Style</span>
+    <span class="gen-stage-tag" data-stage="art">Art Director</span>
+    <span class="gen-stage-tag" data-stage="illustrations">Illustrations</span>
+    <span class="gen-stage-tag" data-stage="editor">Editor</span>
+    <span class="gen-stage-tag" data-stage="voice">Voice</span>
+  </div>
+
+  <!-- Active Task Card -->
+  <div class="gen-active-card" id="gen-active-card" style="display:none">
+    <div class="gen-active-top">
+      <span class="gen-active-label" id="gen-active-label">Active</span>
+      <span class="gen-active-title" id="gen-active-title">—</span>
+    </div>
+    <div class="gen-active-metrics">
+      <div class="gen-metric">
+        <span class="gen-metric-value" id="gen-metric-narrations">0</span>
+        <span class="gen-metric-label">narrations</span>
+      </div>
+      <div class="gen-metric">
+        <span class="gen-metric-value" id="gen-metric-images">0</span>
+        <span class="gen-metric-label">images</span>
+      </div>
+      <div class="gen-metric">
+        <span class="gen-metric-value" id="gen-metric-progress">0%</span>
+        <span class="gen-metric-label">this task</span>
+      </div>
+    </div>
+    <!-- Act progress bar -->
+    <div class="gen-act-bar" id="gen-act-bar" style="display:none">
+      <div class="gen-act-label">
+        <span class="gen-act-name"><span class="gen-act-dot"></span> Current Act</span>
+        <span class="gen-act-count" id="gen-act-count">0 / 0</span>
+      </div>
+      <div class="gen-act-track">
+        <div class="gen-act-fill" id="gen-act-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task List -->
+  <div class="gen-list-wrap">
+    <div class="gen-list-header">
+      <span>All Tasks</span>
+      <span class="gen-list-count" id="gen-list-count">0</span>
+    </div>
+    <div class="progress-list" id="progress-list">
+      <div class="empty-state" style="padding:20px">
+        <p style="font-size:13px;color:rgba(255,255,255,0.3)">No active generation tasks.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -6979,11 +7306,84 @@ function updateProgressDisplay() {
   if (!state.tasks.length) {
     list.innerHTML = `
       <div class="empty-state" style="padding:20px">
-        <p style="font-size:13px">No active generation tasks.</p>
+        <p style="font-size:13px;color:rgba(255,255,255,0.3)">No active generation tasks.</p>
       </div>
     `;
+    // Reset header
+    document.getElementById('gen-header-title').textContent = 'Generation Tasks';
+    document.getElementById('gen-task-count').textContent = '0 running';
+    document.getElementById('gen-queue-size').textContent = '0 queued';
+    document.getElementById('gen-stage-label').textContent = 'stage';
+    document.getElementById('gen-list-count').textContent = '0';
+    document.getElementById('gen-active-card').style.display = 'none';
+    document.getElementById('gen-ready-btn').style.display = 'none';
+    _updateRing(0);
+    _updateStageTags([]);
     return;
   }
+
+  // ── Compute aggregates ──────────────────────────────────────────────
+  const running = state.tasks.filter(t => t.status === 'running');
+  const queued = state.tasks.filter(t => t.status === 'queued');
+  const done = state.tasks.filter(t => t.status === 'done');
+  const errored = state.tasks.filter(t => t.status === 'error');
+  const total = state.tasks.length;
+  const pct = total > 0 ? Math.round((done.length / total) * 100) : 0;
+
+  // ── Header ──────────────────────────────────────────────────────────
+  document.getElementById('gen-header-title').textContent =
+    running.length > 0 ? 'Generation Running' : done.length === total ? 'All Complete' : 'Generation Tasks';
+  document.getElementById('gen-task-count').textContent =
+    running.length > 0 ? `${running.length} running` : '0 running';
+  document.getElementById('gen-queue-size').textContent =
+    queued.length > 0 ? `${queued.length} queued` : errored.length > 0 ? `${errored.length} failed` : `${done.length} done`;
+
+  // Pick the first running task's message as stage label
+  const activeTask = running[0] || state.tasks[0];
+  const stageLabel = activeTask ? (activeTask.message || activeTask.status || '—') : '—';
+  document.getElementById('gen-stage-label').textContent = stageLabel.length > 30 ? stageLabel.slice(0, 30) + '…' : stageLabel;
+  document.getElementById('gen-list-count').textContent = String(total);
+
+  // ── Rainbow ring ────────────────────────────────────────────────────
+  _updateRing(pct);
+
+  // ── Stage tags ──────────────────────────────────────────────────────
+  const stages = ['outline','bible','visual','art','illustrations','editor','voice'];
+  const statusMap = { queued, running, done, error: errored };
+  // Map tasks to their closest stage
+  const activeStatuses = [];
+  if (running.length > 0) activeStatuses.push('running');
+  if (done.length > 0) activeStatuses.push('done');
+  if (errored.length > 0) activeStatuses.push('error');
+  _updateStageTags(stages, activeStatuses);
+
+  // ── Active task card ────────────────────────────────────────────────
+  const activeCard = document.getElementById('gen-active-card');
+  const readyBtn = document.getElementById('gen-ready-btn');
+  if (activeTask) {
+    activeCard.style.display = 'block';
+    const title = activeTask.title || activeTask.story_id || activeTask.concept || `Task ${(activeTask.id || '').slice(0, 6)}`;
+    document.getElementById('gen-active-title').textContent = title.length > 40 ? title.slice(0, 40) + '…' : title;
+    const p = Math.round((activeTask.progress || 0) * 100);
+    document.getElementById('gen-metric-narrations').textContent = activeTask.num_scenes || activeTask.scene_count || '—';
+    document.getElementById('gen-metric-images').textContent = activeTask.images_per_scene || '—';
+    document.getElementById('gen-metric-progress').textContent = p + '%';
+    // Act bar: show if we have scene data
+    const actBar = document.getElementById('gen-act-bar');
+    if (activeTask.num_scenes) {
+      actBar.style.display = 'block';
+      document.getElementById('gen-act-count').textContent = `${p}% complete`;
+      document.getElementById('gen-act-fill').style.width = p + '%';
+    } else {
+      actBar.style.display = 'none';
+    }
+    readyBtn.style.display = done.length === total ? 'block' : 'none';
+  } else {
+    activeCard.style.display = 'none';
+    readyBtn.style.display = 'none';
+  }
+
+  // ── Task list (original) ────────────────────────────────────────────
   // Group sub-tasks under their parent queue
   const isQueueTask = (t) => (
     !t.parent && (
@@ -7005,14 +7405,12 @@ function updateProgressDisplay() {
     const pct = Math.round((t.progress || 0) * 100);
     const isQueue = isQueueTask(t);
     const bar = isQueue
-      ? `<div class="progress-bar-outer" style="margin-top:4px"><div class="progress-bar-inner" style="--pct:${(t.progress || 0)}"></div></div>`
+      ? `<div class="progress-bar-outer"><div class="progress-bar-inner" style="--pct:${(t.progress || 0)}"></div></div>`
       : '';
     const sub = isQueue && t.item_count
       ? `<span class="progress-item-sub">${t.item_count} stories</span>`
       : '';
     const titlePrefix = isChild ? '<span class="progress-item-child">↳</span> ' : '';
-    // Prefer the resolved story title; fall back to a preview of the
-    // concept; finally use a short id. Never show "undefined".
     const title = isQueue
       ? (t.kind === 'library_maintenance' ? 'Library maintenance' : 'Generation queue')
       : (t.title || t.story_id || t.concept || `Task ${(t.id || '').slice(0, 6) || '—'}`);
@@ -7029,18 +7427,65 @@ function updateProgressDisplay() {
   };
 
   const html = [];
-  // Render top-level single tasks first
-  for (const t of topLevel) {
-    html.push(renderItem(t));
-  }
-  // Then queue tasks with their sub-tasks indented
+  for (const t of topLevel) html.push(renderItem(t));
   for (const q of queueTasks) {
     html.push(renderItem(q));
-    for (const c of childrenOf(q.id)) {
-      html.push(renderItem(c, true));
-    }
+    for (const c of childrenOf(q.id)) html.push(renderItem(c, true));
   }
   list.innerHTML = html.join('');
+}
+
+/** Update the rainbow segmented progress ring. */
+function _updateRing(pct) {
+  const segments = [
+    { el: document.getElementById('ring-segment-red'), offset: 0 },
+    { el: document.getElementById('ring-segment-orange'), offset: 0 },
+    { el: document.getElementById('ring-segment-yellow'), offset: 0 },
+    { el: document.getElementById('ring-segment-green'), offset: 0 },
+    { el: document.getElementById('ring-segment-blue'), offset: 0 },
+    { el: document.getElementById('ring-segment-purple'), offset: 0 },
+  ];
+  const circumference = 2 * Math.PI * 18; // r=18
+  const totalLength = circumference;
+  const segLen = totalLength / segments.length; // ~18.85 per segment
+
+  // Fill segments sequentially up to pct
+  let remaining = (pct / 100) * totalLength;
+  for (let i = 0; i < segments.length; i++) {
+    const el = segments[i].el;
+    if (!el) continue;
+    if (remaining <= 0) {
+      el.style.opacity = '0';
+      el.setAttribute('stroke-dasharray', `0 ${totalLength}`);
+    } else {
+      const fill = Math.min(remaining, segLen);
+      el.style.opacity = '1';
+      el.setAttribute('stroke-dasharray', `${fill} ${totalLength - fill}`);
+      remaining -= fill;
+    }
+  }
+
+  const text = document.getElementById('ring-pct-text');
+  if (text) text.textContent = pct + '%';
+}
+
+/** Update stage tags with green checks / orange running / red errors. */
+function _updateStageTags(stages, activeStatuses) {
+  const tags = document.querySelectorAll('.gen-stage-tag');
+  tags.forEach(tag => {
+    tag.className = 'gen-stage-tag';
+    const stage = tag.dataset.stage;
+    // Simple heuristic: first stages = done, middle = running, later = queued
+    const idx = stages.indexOf(stage);
+    if (idx < 0) return;
+    if (activeStatuses.includes('done') && idx < 3) {
+      tag.classList.add('done');
+    } else if (activeStatuses.includes('running') && idx === 3) {
+      tag.classList.add('running');
+    } else if (activeStatuses.includes('error') && idx > 4) {
+      tag.classList.add('error');
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════
