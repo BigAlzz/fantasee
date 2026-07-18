@@ -250,7 +250,7 @@ export function App() {
         <label className="brief-field wide">Narrator<input value={brief.voice_preset} onChange={(event) => setBrief({ ...brief, voice_preset: event.target.value })}/></label>
         <div className="modal-actions"><button type="button" className="outline-button" onClick={() => setCreateOpen(false)}>Cancel</button><button className="create" disabled={busy} type="submit"><Plus size={17}/> Queue production</button></div>
       </form></div>}
-      {editorOpen && <StoryEditor story={editorStory} sceneIndex={editorScene} busy={busy} onClose={() => setEditorOpen(false)} onSelectScene={setEditorScene} onAction={(action, message) => void runAction(action, message)} />}
+      {editorOpen && <><StoryEditor story={editorStory} sceneIndex={editorScene} busy={busy} onClose={() => setEditorOpen(false)} onSelectScene={setEditorScene} onAction={(action, message) => void runAction(action, message)} /><SceneWaveformDock story={editorStory} sceneIndex={editorScene} /></>}
       {playerOpen && selectedStory && <ReleasePlayer story={selectedStory} release={playerRelease} onClose={() => { setPlayerOpen(false); setPlayerRelease(undefined); }} />}
       {workersOpen && <WorkerConsole workers={comfyWorkers} busy={busy} onClose={() => setWorkersOpen(false)} onRefresh={() => void refresh()} onSpawn={(kind) => void runAction(() => api.spawn(kind), `${kind.toUpperCase()} ComfyUI worker started.`)} onKill={(url) => void runAction(() => api.killComfy(url), "Selected ComfyUI worker stopped.")} />}
     </section>
@@ -298,6 +298,11 @@ function ReleasePlayer({ story, release, onClose }: { story: Story; release?: Pr
   const video = release ? api.releaseVideo(story.id, release.id) : `/generated/${story.id}/${story.id}_full.mp4`;
   const subtitles = release ? api.releaseSubtitles(story.id, release.id) : `/generated/${story.id}/${story.id}_full.vtt`;
   return <div className="modal-scrim player-scrim" role="dialog" aria-modal="true" aria-labelledby="release-player-title"><section className="release-player metal-panel"><header className="editor-header"><div><span className="eyebrow-label">{release ? "Archived release preview" : "Canonical release"}</span><h1 id="release-player-title">{story.title}</h1><small>{release ? `${humanStatus(release.release_type)} · ${humanStatus(release.status)}` : "MP4 + timeline subtitles"}</small></div><button className="icon-button" onClick={onClose} aria-label="Close player"><X size={19}/></button></header><video controls autoPlay preload="metadata"><source src={video} type="video/mp4"/><track kind="subtitles" src={subtitles} srcLang="en" label="English" default /></video><NarrationWaveform src={video} /><p className="player-note">{release ? "This is a historical artifact. Previewing it does not restore it or change the current completion evidence." : "Playback uses the rendered release and its canonical subtitle timeline. If the release is stale, return to the editor and rebuild the approved timeline."}</p></section></div>;
+}
+
+function SceneWaveformDock({ story, sceneIndex }: { story?: StoryDetail; sceneIndex: number }) {
+  const scene = story?.scenes[sceneIndex];
+  return <aside className="scene-waveform-dock" aria-label="Scene narration waveform"><div><span>Scene narration</span><small>{scene?.audio_duration ? `${scene.audio_duration.toFixed(1)}s` : "pending"}</small></div>{scene?.audio_filename ? <NarrationWaveform src={`/generated/${story!.id}/${scene.audio_filename}`} /> : <small>Generate narration to inspect its waveform.</small>}</aside>;
 }
 
 function NarrationWaveform({ src }: { src?: string }) {
