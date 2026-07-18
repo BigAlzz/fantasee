@@ -20,6 +20,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -47,12 +48,18 @@ from fantasee_server.state import (
 
 router = APIRouter(tags=["generated-stories"])
 
+STUDIO_DIR = Path(__file__).resolve().parents[2] / "studio" / "dist"
+
 
 # ── Generated-asset serving ───────────────────────────────────────
 
 @router.get("/")
 def serve_index():
     """Serve the bundled frontend SPA at the root URL."""
+    if os.environ.get("FANTASEE_STUDIO_DEFAULT", "0").strip().lower() in {"1", "true", "yes", "on"}:
+        studio_index = STUDIO_DIR / "index.html"
+        if studio_index.is_file():
+            return FileResponse(str(studio_index))
     return FileResponse(str(STATIC_DIR / "index.html"))
 
 

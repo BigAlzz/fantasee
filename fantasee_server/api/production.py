@@ -4,9 +4,12 @@ from fastapi import APIRouter, Body, HTTPException
 
 import os
 import time
+from pathlib import Path
 
 from fantasee_server.production_runtime import get_persisted_task, list_persisted_tasks, production_database_path
 from fantasee_server.production_store import ProductionStore
+from story_storage import validate_story_id
+from fastapi.responses import FileResponse
 
 
 router = APIRouter(tags=["production"])
@@ -99,6 +102,32 @@ def list_story_releases(story_id: str):
     with ProductionStore(production_database_path()) as store:
         releases = store.list_releases(story_id)
     return {"releases": [release.__dict__ for release in releases]}
+
+
+def _release_asset(story_id: str, release_id: str, suffixes: tuple[str, ...]) -> Path:
+    validate_story_id(story_id)
+    with ProductionStore(production_database_path()) as store:
+        release = store.get_release(release_id)
+    if release is None or release.story_id != story_id:
+        raise HTTPException(status_code=404, detail="Release not found")
+    root = Path(release.path).expanduser().resolve()
+    candidates = [root] if root.is_file() else sorted(
+        (path for path in root.glob("*") if path.is_file() and path.suffix.lower() in suffixes),
+        key=lambda path: path.name.lower(),
+    ) if root.is_dir() else []
+    if not candidates:
+        raise HTTPException(status_code=404, detail="Release asset is no longer available")
+    return candidates[0]
+
+
+@router.get("/api/stories/{story_id}/releases/{release_id}/video")
+def serve_release_video(story_id: str, release_id: str):
+    return FileResponse(str(_release_asset(story_id, release_id, (".mp4", ".webm", ".mkv"))), media_type="video/mp4")
+
+
+@router.get("/api/stories/{story_id}/releases/{release_id}/subtitles")
+def serve_release_subtitles(story_id: str, release_id: str):
+    return FileResponse(str(_release_asset(story_id, release_id, (".vtt", ".srt"))), media_type="text/vtt")
 
 
 @router.post("/api/production/jobs/{job_id}/retry")

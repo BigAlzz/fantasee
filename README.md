@@ -13,6 +13,11 @@ python server.py
 
 Open `http://127.0.0.1:8765`.
 
+The rebuild Studio is available at `http://127.0.0.1:8765/studio/`. To make
+the Studio the default root experience while retaining the legacy fallback,
+set `FANTASEE_STUDIO_DEFAULT=1` before starting the server. Remove the setting
+or set it to `0` to return to the legacy root.
+
 For the normal GPU-first local workflow:
 
 ```bat
