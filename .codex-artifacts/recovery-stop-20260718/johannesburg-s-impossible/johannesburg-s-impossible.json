@@ -1,0 +1,25 @@
+{
+  "id": "johannesburg-s-impossible",
+  "title": "Johannesburg's Impossible Reply",
+  "subtitle": "A lost radio operator in Johannesburg hears one impossible r",
+  "description": "A lost radio operator in Johannesburg hears one impossible reply from the future.",
+  "tags": [
+    "cinematic grounded realism",
+    "tense, intimate, hopeful",
+    "generated"
+  ],
+  "tone": "tense, intimate, hopeful",
+  "voice_preset": "Dean",
+  "narration_style": "",
+  "characters": "",
+  "world_context": "",
+  "voice_assignments": "",
+  "generated": true,
+  "status": "regenerating",
+  "background_audio": "musictown-light-and-reflective-piano-orchestra-1-22211 (1).mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "chapters": [],
+  "storage_root": "stories",
+  "scenes": []
+}

@@ -1,0 +1,30 @@
+{
+  "id": "knight-s-design",
+  "title": "Knight's Design",
+  "subtitle": "A modern military engineer dies in a drone strike and wakes ",
+  "description": "A modern military engineer dies in a drone strike and wakes up as a disgraced knight in a medieval kingdom on the brink of collapse. Armed with knowledge of fortification design, ballistics, supply ch",
+  "tags": [
+    "manhwa",
+    "manhwa",
+    "generated"
+  ],
+  "tone": "manhwa",
+  "voice_preset": "Dean",
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

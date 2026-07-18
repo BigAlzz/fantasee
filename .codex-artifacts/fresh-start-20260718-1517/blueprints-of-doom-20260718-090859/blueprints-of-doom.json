@@ -1,0 +1,35 @@
+{
+  "id": "blueprints-of-doom",
+  "title": "Blueprints of Doom",
+  "subtitle": "The Cost of Invention\nEvery blueprint he touches reveals not",
+  "description": "The Cost of Invention\nEvery blueprint he touches reveals not just the design but the inevitable doom it will bring, forcing him to navigate a medieval kingdom where progress is a double-edged sword th",
+  "tags": [
+    "dark fantasy",
+    "suspenseful",
+    "generated"
+  ],
+  "tone": "suspenseful",
+  "voice_preset": "Dean",
+  "tts_speed": 1.2,
+  "story_concept": "The Cost of Invention\nEvery blueprint he touches reveals not just the design but the inevitable doom it will bring, forcing him to navigate a medieval kingdom where progress is a double-edged sword that could resurrect the very machines that destroyed his future world.",
+  "style": "dark fantasy",
+  "num_scenes": 8,
+  "images_per_scene": 7,
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

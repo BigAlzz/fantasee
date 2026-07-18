@@ -1,0 +1,30 @@
+{
+  "id": "c4-and-curses-the-undead-siege",
+  "title": "C4 and Curses: The Undead Siege",
+  "subtitle": "A special forces combat engineer wakes up in a medieval king",
+  "description": "A special forces combat engineer wakes up in a medieval kingdom besieged by undead hordes rising from ancient cursed battlefields. His knowledge of explosives, demolition, and military engineering is",
+  "tags": [
+    "manhwa",
+    "manhwa",
+    "generated"
+  ],
+  "tone": "manhwa",
+  "voice_preset": "Dean",
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

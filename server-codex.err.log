@@ -1,0 +1,14 @@
+INFO:     Started server process [21776]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8765 (Press CTRL+C to quit)
+[comfyui_utils] Submitted prompt_id=34e01929-a9c3-4fc2-945d-5385c8ec9b8c to http://127.0.0.1:8188, waiting...
+[comfyui_utils] Image ready in 231.4s on http://127.0.0.1:8188: primal-shadows-over_s01_The_First_Line_01_00001_.png
+[comfyui_utils] Copied to: C:\dev\fantasee\stories\primal-shadows-over\primal-shadows-over_s01_The_First_Line_01_00001_.png
+[comfyui_utils] Submitted prompt_id=ac15b789-966f-486f-aa7e-3b04768daf33 to http://127.0.0.1:8188, waiting...
+[comfyui_utils] Image ready in 354.9s on http://127.0.0.1:8188: primal-shadows-over_s01_The_First_Line_02_00001_.png
+[comfyui_utils] Copied to: C:\dev\fantasee\stories\primal-shadows-over\primal-shadows-over_s01_The_First_Line_02_00001_.png
+[comfyui_utils] Submitted prompt_id=7b2081dd-ca82-44fe-aaea-c4bb271d2538 to http://127.0.0.1:8188, waiting...
+[comfyui_utils] Image ready in 342.7s on http://127.0.0.1:8188: primal-shadows-over_s01_The_First_Line_03_00001_.png
+[comfyui_utils] Copied to: C:\dev\fantasee\stories\primal-shadows-over\primal-shadows-over_s01_The_First_Line_03_00001_.png
+[comfyui_utils] Submitted prompt_id=2f319b6c-ea26-443b-82af-c09b67917371 to http://127.0.0.1:8188, waiting...

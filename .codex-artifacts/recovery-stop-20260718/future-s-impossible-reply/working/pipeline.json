@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "story_id": "future-s-impossible-reply",
+  "status": "running",
+  "current_stage": "images",
+  "started_at": "2026-07-18T14:02:52.621318+00:00",
+  "updated_at": "2026-07-18T14:04:07.891716+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T14:02:56.898347+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T14:04:07.877053+00:00",
+      "message": "Scene outline passed structural quality review",
+      "details": {
+        "score": 0.88,
+        "issues": 1
+      }
+    },
+    "images": {
+      "status": "running",
+      "attempts": 1,
+      "updated_at": "2026-07-18T14:04:07.891701+00:00",
+      "message": "Generating scene images"
+    },
+    "audio": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

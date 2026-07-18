@@ -1,0 +1,15 @@
+{
+  "valid": true,
+  "score": 0.88,
+  "scene_count": 1,
+  "shot_types": [],
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_01",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    }
+  ],
+  "blocking_issues": 0
+}

@@ -1,0 +1,30 @@
+{
+  "id": "cyber-sorceress-vs-dark-grid",
+  "title": "Cyber Sorceress vs. Dark Grid",
+  "subtitle": "A female cybersecurity expert from the NSA is pulled into a ",
+  "description": "A female cybersecurity expert from the NSA is pulled into a medieval world where an ancient magical kingdom is being destroyed by a sentient dark network -- a corrupted magical grid that spreads like",
+  "tags": [
+    "manhwa",
+    "manhwa",
+    "generated"
+  ],
+  "tone": "manhwa",
+  "voice_preset": "Dean",
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

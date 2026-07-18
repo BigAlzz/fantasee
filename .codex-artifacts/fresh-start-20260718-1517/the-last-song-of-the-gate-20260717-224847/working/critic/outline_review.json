@@ -1,0 +1,37 @@
+{
+  "valid": true,
+  "score": 0.85,
+  "scene_count": 10,
+  "shot_types": [
+    "wide shot",
+    "wide shot",
+    "medium shot",
+    "over-the-shoulder shot",
+    "low angle",
+    "close-up",
+    "wide shot",
+    "high angle",
+    "extreme close-up"
+  ],
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "long_sentence",
+      "scene": "scene_04",
+      "message": "Keep narration sentences under 25 words except for deliberate reflective breaths."
+    },
+    {
+      "severity": "warning",
+      "code": "internal_feeling",
+      "scene": "scene_06",
+      "message": "Narration violates the canonical style rule: internal feeling."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_10",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    }
+  ],
+  "blocking_issues": 0
+}

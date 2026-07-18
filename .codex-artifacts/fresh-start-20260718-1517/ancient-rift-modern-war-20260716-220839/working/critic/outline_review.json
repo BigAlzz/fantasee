@@ -1,0 +1,50 @@
+{
+  "valid": true,
+  "score": 0.75,
+  "scene_count": 10,
+  "shot_types": [
+    "extreme wide shot",
+    "wide shot",
+    "medium shot",
+    "low angle",
+    "over-the-shoulder shot",
+    "medium shot",
+    "high angle",
+    "dutch angle",
+    "medium close-up",
+    "extreme wide shot"
+  ],
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "narration_short",
+      "scene": "scene_01",
+      "message": "Narration has 128 words; target is at least 160."
+    },
+    {
+      "severity": "warning",
+      "code": "narration_short",
+      "scene": "scene_02",
+      "message": "Narration has 128 words; target is at least 160."
+    },
+    {
+      "severity": "warning",
+      "code": "narration_short",
+      "scene": "scene_03",
+      "message": "Narration has 139 words; target is at least 160."
+    },
+    {
+      "severity": "warning",
+      "code": "narration_short",
+      "scene": "scene_04",
+      "message": "Narration has 144 words; target is at least 160."
+    },
+    {
+      "severity": "warning",
+      "code": "internal_feeling",
+      "scene": "scene_08",
+      "message": "Narration violates the canonical style rule: internal feeling."
+    }
+  ],
+  "blocking_issues": 0
+}

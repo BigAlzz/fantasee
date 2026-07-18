@@ -1,0 +1,8 @@
+[     245ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:8765/favicon.ico:0
+[   19960ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:8765/generated/the-last-beacon-of-hope/the-last-beacon-of-hope_s01_Ash_and_Silence_01_00002_.png:0
+[   62231ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/stories:0
+[   62231ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/runs:0
+[   62231ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/workers:0
+[   62234ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/comfyui/workers:0
+[  613072ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://127.0.0.1:8765/api/stories:0
+[  613074ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://127.0.0.1:8765/api/comfyui/workers:0

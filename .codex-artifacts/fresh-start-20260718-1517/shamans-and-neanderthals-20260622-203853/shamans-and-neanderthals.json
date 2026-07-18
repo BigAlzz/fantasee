@@ -1,0 +1,247 @@
+{
+  "id": "shamans-and-neanderthals",
+  "title": "Clash of Ancient Shamans and Mystics",
+  "subtitle": "Clash of Ancient Minds\n\nIn a world where magic is awakening,",
+  "description": "Beneath a sky torn by primordial magic, the scent of fear is sharper than any spearpoint. Two ancient lines of mystics\u2014the human shamans with their spirit-song and the Neanderthals with their bone-and-earth sorcery\u2014must forge a truce against the whispered thing rising from the world's wound. Yet every shared ritual is a battlefield, and the very power that could save them may be the first to drive them to war.",
+  "tags": [
+    "dark fantasy",
+    "suspenseful",
+    "generated"
+  ],
+  "tone": "suspenseful",
+  "voice_preset": "Dean",
+  "generated": true,
+  "status": "complete",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "chapters": [
+    {
+      "scene": "01",
+      "title": "Scene 1",
+      "start": 0.0,
+      "end": 9.92
+    },
+    {
+      "scene": "02",
+      "title": "Scene 2",
+      "start": 10.42,
+      "end": 76.66
+    },
+    {
+      "scene": "03",
+      "title": "Scene 3",
+      "start": 77.16,
+      "end": 78.44
+    },
+    {
+      "scene": "04",
+      "title": "Scene 4",
+      "start": 78.94,
+      "end": 82.14
+    },
+    {
+      "scene": "05",
+      "title": "Scene 5",
+      "start": 82.64,
+      "end": 159.44
+    },
+    {
+      "scene": "06",
+      "title": "Scene 6",
+      "start": 159.94,
+      "end": 183.78
+    },
+    {
+      "scene": "07",
+      "title": "Scene 7",
+      "start": 184.28,
+      "end": 239.16
+    },
+    {
+      "scene": "08",
+      "title": "Scene 8",
+      "start": 239.66,
+      "end": 243.02
+    },
+    {
+      "scene": "09",
+      "title": "Scene 9",
+      "start": 243.52,
+      "end": 249.12
+    },
+    {
+      "scene": "10",
+      "title": "Scene 10",
+      "start": 249.62,
+      "end": 315.86
+    }
+  ],
+  "storage_root": "stories",
+  "scenes": [
+    {
+      "scene": "01",
+      "title": "Scene 1",
+      "prompt": "# Clash of Ancient Minds \u2014 Scene Breakdown",
+      "narrative": "# Clash of Ancient Minds \u2014 Scene Breakdown",
+      "narration": "# Clash of Ancient Minds \u2014 Scene Breakdown",
+      "narration_text": "# Clash of Ancient Minds \u2014 Scene Breakdown",
+      "seed": 27445226,
+      "image_filenames": [
+        "clash-of-ancient-shamans-and_s01_Scene_1_01_00001_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s01.wav",
+      "audio_duration": 9.92,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s01.json"
+    },
+    {
+      "scene": "02",
+      "title": "Scene 2",
+      "prompt": "**CHARACTERS:**\n- **Kael** \u2014 Human shaman, lean and weathered, mid-30s, tribal spiral tattoos covering his forearms and neck, dark hair in tight braids woven with raven feathers, sharp cheekbones, a well-defined human nose, amber eyes, wearing layered deerskin robes and a belt of carved bone charms.\n- **Brennok** \u2014 Neanderthal mystic, broad and powerfully built, heavy brow ridge sheltering deep-set grey eyes, a wide well-defined human nose, thick reddish-brown beard bound with copper wire, wearing a mammoth-hide cloak draped over one shoulder and antler-crown headdress, pale scars across his knuckles.\n- **The Hollow** \u2014 A creeping corruption of black rot-magic, manifesting as writhing tendrils of black ichor and cracked earth, with pale shapes moving beneath its surface.",
+      "narrative": "**CHARACTERS:**\n- **Kael** \u2014 Human shaman, lean and weathered, mid-30s, tribal spiral tattoos covering his forearms and neck, dark hair in tight braids woven with raven feathers, sharp cheekbones, a w",
+      "narration": "**CHARACTERS:**\n- **Kael** \u2014 Human shaman, lean and weathered, mid-30s, tribal spiral tattoos covering his forearms and neck, dark hair in tight braids woven with raven feathers, sharp cheekbones, a well-defined human nose, amber eyes, wearing layered deerskin robes and a belt of carved bone charms.\n- **Brennok** \u2014 Neanderthal mystic, broad and powerfully built, heavy brow ridge sheltering deep-set grey eyes, a wide well-defined human nose, thick reddish-brown beard bound with copper wire, wearing a mammoth-hide cloak draped over one shoulder and antler-crown headdress, pale scars across his knuckles.\n- **The Hollow** \u2014 A creeping corruption of black rot-magic, manifesting as writhing tendrils of black ichor and cracked earth, with pale shapes moving beneath its surface.",
+      "narration_text": "**CHARACTERS:**\n- **Kael** \u2014 Human shaman, lean and weathered, mid-30s, tribal spiral tattoos covering his forearms and neck, dark hair in tight braids woven with raven feathers, sharp cheekbones, a well-defined human nose, amber eyes, wearing layered deerskin robes and a belt of carved bone charms.\n- **Brennok** \u2014 Neanderthal mystic, broad and powerfully built, heavy brow ridge sheltering deep-set grey eyes, a wide well-defined human nose, thick reddish-brown beard bound with copper wire, wearing a mammoth-hide cloak draped over one shoulder and antler-crown headdress, pale scars across his knuckles.\n- **The Hollow** \u2014 A creeping corruption of black rot-magic, manifesting as writhing tendrils of black ichor and cracked earth, with pale shapes moving beneath its surface.",
+      "seed": 2946839096,
+      "image_filenames": [
+        "clash-of-ancient-shamans-and_s02_Scene_2_01_00001_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s02.wav",
+      "audio_duration": 66.24,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s02.json"
+    },
+    {
+      "scene": "03",
+      "title": "Scene 3",
+      "prompt": "---",
+      "narrative": "---",
+      "narration": "---",
+      "narration_text": "---",
+      "seed": 2834489644,
+      "image_filenames": [
+        "shamans-and-neanderthals_s03_Scene_3_01_00002_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s03.wav",
+      "audio_duration": 1.28,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s03.json"
+    },
+    {
+      "scene": "04",
+      "title": "Scene 4",
+      "prompt": "## SCENE 1\n**Title: The Dying Grove**",
+      "narrative": "## SCENE 1\n**Title: The Dying Grove**",
+      "narration": "## SCENE 1\n**Title: The Dying Grove**",
+      "narration_text": "## SCENE 1\n**Title: The Dying Grove**",
+      "seed": 3882709916,
+      "image_filenames": [
+        "shamans-and-neanderthals_s04_Scene_4_01_00002_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s04.wav",
+      "audio_duration": 3.2,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s04.json"
+    },
+    {
+      "scene": "05",
+      "title": "Scene 5",
+      "prompt": "**Visual Prompt:** A wide, overhead-to-ground establishing shot of a once-sacred forest grove at twilight. The trees are half-dead, their bark split and weeping black sap that pools in the roots. Pale fungal growths climb the trunks. In the center, Kael the human shaman kneels beside a stone altar, his lean frame hunched, braided dark hair falling forward over his face as he touches the corrupted earth. His deerskin robes are smeared with soot. Spiral tattoos on his forearms glow faint amber against the dying light. The camera is low, looking up slightly through the twisted roots, giving the grove a cathedral-like claustrophobia. The color palette is muted charcoal, sickly ochre, and faint amber from the tattoo-glow. Heavy fog clings to the ground. The atmosphere is suffocating and ancient.",
+      "narrative": "**Visual Prompt:** A wide, overhead-to-ground establishing shot of a once-sacred forest grove at twilight. The trees are half-dead, their bark split and weeping black sap that pools in the roots. Pale",
+      "narration": "**Visual Prompt:** A wide, overhead-to-ground establishing shot of a once-sacred forest grove at twilight. The trees are half-dead, their bark split and weeping black sap that pools in the roots. Pale fungal growths climb the trunks. In the center, Kael the human shaman kneels beside a stone altar, his lean frame hunched, braided dark hair falling forward over his face as he touches the corrupted earth. His deerskin robes are smeared with soot. Spiral tattoos on his forearms glow faint amber against the dying light. The camera is low, looking up slightly through the twisted roots, giving the grove a cathedral-like claustrophobia. The color palette is muted charcoal, sickly ochre, and faint amber from the tattoo-glow. Heavy fog clings to the ground. The atmosphere is suffocating and ancient.",
+      "narration_text": "**Visual Prompt:** A wide, overhead-to-ground establishing shot of a once-sacred forest grove at twilight. The trees are half-dead, their bark split and weeping black sap that pools in the roots. Pale fungal growths climb the trunks. In the center, Kael the human shaman kneels beside a stone altar, his lean frame hunched, braided dark hair falling forward over his face as he touches the corrupted earth. His deerskin robes are smeared with soot. Spiral tattoos on his forearms glow faint amber against the dying light. The camera is low, looking up slightly through the twisted roots, giving the grove a cathedral-like claustrophobia. The color palette is muted charcoal, sickly ochre, and faint amber from the tattoo-glow. Heavy fog clings to the ground. The atmosphere is suffocating and ancient.",
+      "seed": 2627419937,
+      "image_filenames": [
+        "clash-of-ancient-shamans-and_s05_Scene_5_01_00001_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s05.wav",
+      "audio_duration": 76.8,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s05.json"
+    },
+    {
+      "scene": "06",
+      "title": "Scene 6",
+      "prompt": "**Narrative:** Kael arrives at the Thornveil Grove, a sacred site of his people, only to find it rotting from within. The trees are dying. The spirit-stones are cracked. Something old and hungry has burrowed into the land itself \u2014 and the spirits he once communed with are silent.",
+      "narrative": "**Narrative:** Kael arrives at the Thornveil Grove, a sacred site of his people, only to find it rotting from within. The trees are dying. The spirit-stones are cracked. Something old and hungry has b",
+      "narration": "**Narrative:** Kael arrives at the Thornveil Grove, a sacred site of his people, only to find it rotting from within. The trees are dying. The spirit-stones are cracked. Something old and hungry has burrowed into the land itself \u2014 and the spirits he once communed with are silent.",
+      "narration_text": "**Narrative:** Kael arrives at the Thornveil Grove, a sacred site of his people, only to find it rotting from within. The trees are dying. The spirit-stones are cracked. Something old and hungry has burrowed into the land itself \u2014 and the spirits he once communed with are silent.",
+      "seed": 1063333409,
+      "image_filenames": [
+        "clash-of-ancient-shamans-and_s06_Scene_6_01_00001_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s06.wav",
+      "audio_duration": 23.84,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s06.json"
+    },
+    {
+      "scene": "07",
+      "title": "Scene 7",
+      "prompt": "**Narration:** The grove was not supposed to look like this. Kael remembered the song his grandmother taught him \u2014 the one that coaxed blossoms from frozen stone. He hums it now, kneeling at the altar, pressing his palms flat against the earth. Nothing answers. The ground is cold. Not winter-cold. Dead-cold. The kind of cold that lives in places where nothing will ever grow again. He pulls his hand back. His fingertips are black. The rot has teeth, and it has already begun to bite. He whispers a word only shamans know. The silence that follows is worse than any scream.",
+      "narrative": "**Narration:** The grove was not supposed to look like this. Kael remembered the song his grandmother taught him \u2014 the one that coaxed blossoms from frozen stone. He hums it now, kneeling at the altar",
+      "narration": "**Narration:** The grove was not supposed to look like this. Kael remembered the song his grandmother taught him \u2014 the one that coaxed blossoms from frozen stone. He hums it now, kneeling at the altar, pressing his palms flat against the earth. Nothing answers. The ground is cold. Not winter-cold. Dead-cold. The kind of cold that lives in places where nothing will ever grow again. He pulls his hand back. His fingertips are black. The rot has teeth, and it has already begun to bite. He whispers a word only shamans know. The silence that follows is worse than any scream.",
+      "narration_text": "**Narration:** The grove was not supposed to look like this. Kael remembered the song his grandmother taught him \u2014 the one that coaxed blossoms from frozen stone. He hums it now, kneeling at the altar, pressing his palms flat against the earth. Nothing answers. The ground is cold. Not winter-cold. Dead-cold. The kind of cold that lives in places where nothing will ever grow again. He pulls his hand back. His fingertips are black. The rot has teeth, and it has already begun to bite. He whispers a word only shamans know. The silence that follows is worse than any scream.",
+      "seed": 2640483640,
+      "image_filenames": [
+        "clash-of-ancient-shamans-and_s07_Scene_7_01_00001_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s07.wav",
+      "audio_duration": 54.88,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s07.json"
+    },
+    {
+      "scene": "08",
+      "title": "Scene 8",
+      "prompt": "---",
+      "narrative": "---",
+      "narration": "---",
+      "narration_text": "---",
+      "seed": 3933395041,
+      "image_filenames": [
+        "shamans-and-neanderthals_s08_Scene_8_01_00002_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s08.wav",
+      "audio_duration": 3.36,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s08.json"
+    },
+    {
+      "scene": "09",
+      "title": "Scene 9",
+      "prompt": "## SCENE 2\n**Title: Smoke on the Ridge**",
+      "narrative": "## SCENE 2\n**Title: Smoke on the Ridge**",
+      "narration": "## SCENE 2\n**Title: Smoke on the Ridge**",
+      "narration_text": "## SCENE 2\n**Title: Smoke on the Ridge**",
+      "seed": 2252136206,
+      "image_filenames": [
+        "clash-of-ancient-shamans-and_s09_Scene_9_01_00001_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s09.wav",
+      "audio_duration": 5.6,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s09.json"
+    },
+    {
+      "scene": "10",
+      "title": "Scene 10",
+      "prompt": "**Visual Prompt:** A dramatic panoramic shot from a high ridge overlooking a vast tundra valley at dusk. In the foreground, Brennok the Neanderthal mystic stands at the cliff edge, his massive silhouette framed against a sky bruised purple and grey. His mammoth-hide cloak billows in a harsh wind. His antler-crown headdress is half-shadowed, the carved bone catching the last light. One scarred hand grips a gnarled staff topped with a pale crystal that pulses weakly with sickly green light. Far below in the valley, fires burn in scattered Neanderthal settlements \u2014 but beyond them, a creeping wall of blackness advances across the land like spilled ink spreading through water. The camera is behind Brennok at a low angle, emphasizing his immense frame against the encroaching dark. Palette: deep indigo, storm-grey, embers, and encroaching black.",
+      "narrative": "**Visual Prompt:** A dramatic panoramic shot from a high ridge overlooking a vast tundra valley at dusk. In the foreground, Brennok the Neanderthal mystic stands at the cliff edge, his massive silhoue",
+      "narration": "**Visual Prompt:** A dramatic panoramic shot from a high ridge overlooking a vast tundra valley at dusk. In the foreground, Brennok the Neanderthal mystic stands at the cliff edge, his massive silhouette framed against a sky bruised purple and grey. His mammoth-hide cloak billows in a harsh wind. His antler-crown headdress is half-shadowed, the carved bone catching the last light. One scarred hand grips a gnarled staff topped with a pale crystal that pulses weakly with sickly green light. Far below in the valley, fires burn in scattered Neanderthal settlements \u2014 but beyond them, a creeping wall of blackness advances across the land like spilled ink spreading through water. The camera is behind Brennok at a low angle, emphasizing his immense frame against the encroaching dark. Palette: deep indigo, storm-grey, embers, and encroaching black.",
+      "narration_text": "**Visual Prompt:** A dramatic panoramic shot from a high ridge overlooking a vast tundra valley at dusk. In the foreground, Brennok the Neanderthal mystic stands at the cliff edge, his massive silhouette framed against a sky bruised purple and grey. His mammoth-hide cloak billows in a harsh wind. His antler-crown headdress is half-shadowed, the carved bone catching the last light. One scarred hand grips a gnarled staff topped with a pale crystal that pulses weakly with sickly green light. Far below in the valley, fires burn in scattered Neanderthal settlements \u2014 but beyond them, a creeping wall of blackness advances across the land like spilled ink spreading through water. The camera is behind Brennok at a low angle, emphasizing his immense frame against the encroaching dark. Palette: deep indigo, storm-grey, embers, and encroaching black.",
+      "seed": 484749610,
+      "image_filenames": [
+        "clash-of-ancient-shamans-and_s10_Scene_10_01_00001_.png"
+      ],
+      "audio_filename": "tts_clash-of-ancient-shamans-and_s10.wav",
+      "audio_duration": 66.24,
+      "subtitle_file": "subs_clash-of-ancient-shamans-and_s10.json"
+    }
+  ],
+  "critic_rating": 3.2,
+  "critic_stars": 3,
+  "critic_badge": "Decent",
+  "has_review": true
+}

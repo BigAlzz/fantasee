@@ -1,0 +1,34 @@
+{
+  "id": "the-last-crossing",
+  "title": "The Last Crossing",
+  "subtitle": "A Neanderthal elder named Selene, 300 years old, carried on ",
+  "description": "A Neanderthal elder named Selene, 300 years old, carried on a litter by two students, arrives at a Gate Stone on a dying world. She has not walked in 200 years. She sang the First Crossing \u2014 the ritua",
+  "tags": [
+    "dark gothic",
+    "epic",
+    "generated"
+  ],
+  "tone": "epic",
+  "voice_preset": "Milo",
+  "story_concept": "A Neanderthal elder named Selene, 300 years old, carried on a litter by two students, arrives at a Gate Stone on a dying world. She has not walked in 200 years. She sang the First Crossing \u2014 the ritual that brought her people from Earth to Nevarrah \u2014 and it broke her spine. Now she must sing again. The world is ending. 50,000 refugees stand behind her. The Gate Stone is cold. The Weave is thin. She opens her mouth and begins to sing. The song costs her everything she has left. The rift opens. The people walk through. She does not follow. She remains on the dying world, alone, singing the gate open until the last child is through. Then the song stops. The gate closes. The world goes quiet.",
+  "style": "dark gothic",
+  "num_scenes": 10,
+  "images_per_scene": 5,
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

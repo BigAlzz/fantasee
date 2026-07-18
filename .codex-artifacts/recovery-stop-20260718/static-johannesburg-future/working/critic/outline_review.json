@@ -1,0 +1,21 @@
+{
+  "valid": false,
+  "score": 0.75,
+  "scene_count": 1,
+  "shot_types": [],
+  "issues": [
+    {
+      "severity": "blocking",
+      "code": "missing_field",
+      "scene": "scene_01",
+      "message": "Every scene needs a title, visual prompt, narrative, and narration."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_01",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    }
+  ],
+  "blocking_issues": 1
+}

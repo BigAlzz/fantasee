@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "story_id": "medieval-blueprints-of-doom",
+  "status": "running",
+  "current_stage": "render",
+  "started_at": "2026-07-18T07:56:28.113032+00:00",
+  "updated_at": "2026-07-18T08:10:02.194667+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T07:56:37.852063+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T07:56:37.860689+00:00",
+      "message": "Generating and reviewing the scene outline"
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

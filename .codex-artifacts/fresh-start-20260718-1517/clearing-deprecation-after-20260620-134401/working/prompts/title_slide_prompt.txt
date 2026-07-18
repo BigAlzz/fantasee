@@ -1,0 +1,4 @@
+Title: Clearing Deprecation After Restart
+Tone: dramatic
+Style: fantasy painterly
+Concept: Quick test to confirm Pydantic deprecation is gone after server restart

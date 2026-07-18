@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "story_id": "alien-stand-at-hillside",
+  "status": "running",
+  "current_stage": "story",
+  "started_at": "2026-07-18T12:27:46.709295+00:00",
+  "updated_at": "2026-07-18T12:27:46.711457+00:00",
+  "stages": {
+    "story": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "story_id": "the-last-song-of-the-gate",
+  "status": "running",
+  "current_stage": "render",
+  "started_at": "2026-07-17T20:43:01.420589+00:00",
+  "updated_at": "2026-07-17T20:48:47.131851+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T20:43:10.946430+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T20:47:56.541538+00:00",
+      "message": "Scene outline passed structural quality review",
+      "details": {
+        "score": 0.85,
+        "issues": 3
+      }
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T20:47:56.562821+00:00",
+      "message": "Generating scene images"
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "story_id": "the-last-beacon-of-hope",
+  "status": "running",
+  "current_stage": "render",
+  "started_at": "2026-07-17T09:36:58.085077+00:00",
+  "updated_at": "2026-07-17T09:40:19.782757+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T09:37:06.728394+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T09:38:09.055921+00:00",
+      "message": "Scene outline passed structural quality review",
+      "details": {
+        "score": 1.0,
+        "issues": 0
+      }
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T09:38:09.071175+00:00",
+      "message": "Generating scene images"
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

@@ -1,0 +1,33 @@
+[     343ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:8765/favicon.ico:0
+[  278300ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/stories:0
+[  278300ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/runs:0
+[  278300ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/workers:0
+[  278304ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/comfyui/workers:0
+[  986304ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/stories:0
+[  986305ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/runs:0
+[  986305ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/workers:0
+[  986306ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/comfyui/workers:0
+[ 1514207ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://127.0.0.1:8765/api/stories:0
+[ 1780685ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://127.0.0.1:8765/api/stories:0
+[ 1790306ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/stories:0
+[ 1790307ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/runs:0
+[ 1790307ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/workers:0
+[ 1790307ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/comfyui/workers:0
+[ 2605091ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://127.0.0.1:8765/api/stories:0
+[ 2605091ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_RESET @ http://127.0.0.1:8765/api/comfyui/workers:0
+[ 4538299ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/stories:0
+[ 4538300ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/runs:0
+[ 4538301ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/workers:0
+[ 4538302ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/comfyui/workers:0
+[25478290ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/stories:0
+[25478306ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/runs:0
+[25478306ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/workers:0
+[25478306ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/comfyui/workers:0
+[25874306ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/stories:0
+[25874308ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/runs:0
+[25874309ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/workers:0
+[25874309ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/comfyui/workers:0
+[26138315ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/stories:0
+[26138317ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/runs:0
+[26138318ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/production/workers:0
+[26138318ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8765/api/comfyui/workers:0
