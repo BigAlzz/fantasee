@@ -1,14 +1,17 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import {
   Archive, ArrowDown, ArrowUp, ChevronRight, Clapperboard, Cpu, Gauge, Image, Library,
   LoaderCircle, MoreHorizontal, Music2, Pause, Play, Plus, Radio, RefreshCw,
-  Search, Settings, Sparkles, Square,
+  Search, Settings, Sparkles, Square, Trash2, Wand2,
   Volume1, Volume2, X,
 } from "lucide-react";
 import { api, type BackgroundTrack, type ComfyWorker, type GenerateInput, type MigrationReadiness, type ProductionEvent, type ProductionJob, type ProductionRelease, type ProductionRun, type RenderingMode, type SavedVoiceProfile, type Scene, type SeedSuggestion, type SemanticShot, type ShotAsset, type Story, type StoryDetail, type StudioSettings, type SubtitleCue, type TimelineShot, type TtsGenerateInput, type TtsModel, type Worker, type WorldArc, type WorldCharacter, type WorldKnowledgeBase, type WorldRelationship } from "./api";
+import { StoryStudioWorkspace } from "./StoryStudio";
+import { LibraryCatalog } from "./LibraryCatalog";
+import { StoryDetails } from "./StoryDetails";
 
 const nav = [
-  [Library, "Library"], [Clapperboard, "Productions"], [Sparkles, "Story Studio"], [Volume2, "Voice Studio"], [Archive, "Assets"], [Settings, "Settings"],
+  [Library, "Library"], [Sparkles, "Story Studio"], [Volume2, "Voice Studio"], [Clapperboard, "Production Runs"], [Archive, "Assets"], [Settings, "Settings"],
 ] as const;
 
 const directorPresets = [
@@ -73,6 +76,23 @@ const releaseEditionOptions = [
 type ReleaseEditionId = typeof releaseEditionOptions[number]["id"];
 
 type StudioUiState = { activeView?: string; selectedStoryId?: string; selectedRunId?: string; query?: string };
+type ProductionDirection = { id: string; title: string; description: string; selected: boolean; input: GenerateInput };
+
+function directionFromSeed(seed: SeedSuggestion, index: number, base: GenerateInput): ProductionDirection {
+  return {
+    id: `direction-${index + 1}`,
+    title: seed.title,
+    description: seed.description,
+    selected: true,
+    input: {
+      ...base,
+      story_concept: `${seed.title}\n${seed.description}`,
+      style: seed.style || base.style,
+      tone: seed.tone || base.tone,
+      characters: seed.characters || base.characters,
+    },
+  };
+}
 
 const defaultWorldKnowledge: WorldKnowledgeBase = {
   title: "",
@@ -91,8 +111,8 @@ const humansVsNeanderthalsExample: WorldKnowledgeBase = {
   rules: "Climate and food scarcity shape every alliance. Both lineages have language, ritual, craft, and internal political divisions. Do not reduce either group to a single culture or moral role.",
   factions: "River Homo sapiens: mobile traders and astronomers. Ridge Neanderthals: settled stoneworkers and winter guardians. The Ash Council: elders who profit from keeping the lineages divided.",
   characters: [
-    { id: "nara", name: "Nara", role: "Human scout", description: "Observant, impatient with inherited hatred, and carrying a map of safe winter passes.", voice: "Mia", style: "Intimate audiobook" },
-    { id: "var", name: "Var", role: "Neanderthal toolmaker", description: "Patient, physically imposing, and quietly funny; believes objects remember the hands that made them.", voice: "Milo", style: "Grounded and warm" },
+    { id: "nara", name: "Nara", role: "Human scout", description: "Observant, impatient with inherited hatred, and carrying a map of safe winter passes.", voice: "Mia", style: "Intimate audiobook", age: "28", alignment: "Chaotic good", traits: "observant, impatient, protective", appearance: "Wind-burned face, dark braids threaded with blue stone, layered hide and woven reed cloak.", biography: "Raised between trading camps, Nara learned every safe pass before she learned which people she was supposed to fear.", motivation: "She wants to prove cooperation is practical before the valley's scarcity turns hope into a luxury." },
+    { id: "var", name: "Var", role: "Neanderthal toolmaker", description: "Patient, physically imposing, and quietly funny; believes objects remember the hands that made them.", voice: "Milo", style: "Grounded and warm", age: "34", alignment: "True neutral", traits: "patient, inventive, quietly funny", appearance: "Broad shoulders, ash-grey curls, ochre-stained hands, a carved bone tool worn as a pendant.", biography: "Var inherited a workshop and a feud, then quietly turned both into places where people could be useful together.", motivation: "He wants to keep his settlement alive without becoming the weapon his elders expect." },
   ],
   relationships: [
     { id: "nara-var", from: "Nara", to: "Var", label: "uneasy alliance", status: "forming" },
@@ -103,6 +123,12 @@ const humansVsNeanderthalsExample: WorldKnowledgeBase = {
   ],
   flowDiagram: "flowchart TD\n  A[Winter closes the valley] --> B[Nara finds Var's hidden pass]\n  B --> C[The Ash Council sabotages the exchange]\n  C --> D[Nara and Var rescue both camps]\n  D --> E[The old division is exposed]",
 };
+
+const worldTemplates = [
+  { id: "current", label: "Current world", detail: "Use the canon currently open in World Builder." },
+  { id: "humans-vs-neanderthals", label: "Humans vs Neanderthals", detail: "Ice Age survival, two lineages, one shared winter.", world: humansVsNeanderthalsExample },
+  { id: "blank", label: "Blank worldbuilder", detail: "Start a fresh universe with no inherited canon.", world: defaultWorldKnowledge },
+] as const;
 
 function readWorldKnowledge(): WorldKnowledgeBase {
   if (typeof window === "undefined") return defaultWorldKnowledge;
@@ -115,7 +141,16 @@ function readWorldKnowledge(): WorldKnowledgeBase {
 }
 
 function worldContextPrompt(world: WorldKnowledgeBase) {
-  const characters = world.characters.map((character) => `${character.name} (${character.role}): ${character.description}`).join("\n") || "(none yet)";
+  const characters = world.characters.map((character) => [
+    `${character.name} (${character.role})`,
+    character.age ? `Age/era: ${character.age}` : "",
+    character.alignment ? `Alignment: ${character.alignment}` : "",
+    character.traits ? `Traits: ${character.traits}` : "",
+    `Biography: ${character.biography || character.description}`,
+    character.appearance ? `Appearance: ${character.appearance}` : "",
+    character.motivation ? `Motivation: ${character.motivation}` : "",
+    `Voice: ${character.voice}; style: ${character.style}`,
+  ].filter(Boolean).join(" | ")).join("\n") || "(none yet)";
   const relationships = world.relationships.map((relationship) => `${relationship.from} -> ${relationship.to}: ${relationship.label} [${relationship.status}]`).join("\n") || "(none yet)";
   const arcs = world.arcs.map((arc) => `${arc.title} [${arc.status}]: ${arc.summary}\nBeats: ${arc.beats}`).join("\n") || "(none yet)";
   return [
@@ -219,6 +254,72 @@ function jobStoryName(job: ProductionJob) {
   return job.story_name || job.story_id || "Story context pending";
 }
 
+function productionRunPhase(run: ProductionRun) {
+  const status = String(run.status || "").toLowerCase();
+  const stage = String(run.stage || "").toLowerCase();
+  const message = String(run.message || "").toLowerCase();
+  const failed = ["error", "failed", "cancelled"].includes(status);
+  const active = ["running", "leased"].includes(status);
+  const queued = ["queued", "retryable"].includes(status);
+  const finished = ["done", "succeeded", "complete"].includes(status);
+  const renderStage = stage.includes("render") || message.includes("render");
+  const outlineStage = stage.includes("outline") || message.includes("outline");
+  const sceneStage = stage.includes("scene");
+  const bibleStage = stage.includes("bible");
+
+  if (finished) {
+    if (renderStage) return "Rendered and complete";
+    return "Completed";
+  }
+  if (failed) {
+    if (renderStage) return "Failed during render";
+    if (outlineStage) return "Failed before scene outline";
+    if (sceneStage) return "Failed while generating scenes";
+    if (bibleStage) return "Failed while writing the story bible";
+    return "Failed before render";
+  }
+  if (active) {
+    if (renderStage) return "Rendering video";
+    if (outlineStage) return "Building the scene outline";
+    if (bibleStage) return "Writing the story bible";
+    if (sceneStage) return "Generating scenes";
+    return "Generating story";
+  }
+  if (queued) {
+    if (renderStage) return "Queued for render";
+    if (outlineStage) return "Queued for outline";
+    if (sceneStage) return "Queued for scenes";
+    return "Waiting in queue";
+  }
+  return humanStatus(run.status || run.kind);
+}
+
+function productionRunNote(run: ProductionRun) {
+  const status = String(run.status || "").toLowerCase();
+  const phase = productionRunPhase(run);
+  const renderStage = String(run.stage || "").toLowerCase().includes("render") || String(run.message || "").toLowerCase().includes("render");
+  const outlineStage = String(run.stage || "").toLowerCase().includes("outline") || String(run.message || "").toLowerCase().includes("outline");
+
+  if (["done", "succeeded", "complete"].includes(status)) {
+    return renderStage ? "The render is finished and ready for release checks." : "The run finished and can feed the next release step.";
+  }
+  if (["error", "failed", "cancelled"].includes(status)) {
+    if (renderStage) return `${phase}. The pipeline reached render work before stopping.`;
+    if (outlineStage) return `${phase}. The run stopped before MP4 rendering started.`;
+    return `${phase}. The run did not reach the render stage.`;
+  }
+  if (["running", "leased"].includes(status)) {
+    if (renderStage) return "The pipeline is rendering video now.";
+    if (outlineStage) return "The pipeline is still building story structure, not rendering yet.";
+    return "The pipeline is still generating story assets, not rendering yet.";
+  }
+  if (["queued", "retryable"].includes(status)) {
+    if (renderStage) return "Queued for the render stage.";
+    return "Waiting for a worker to pick up the next stage.";
+  }
+  return "The run is waiting for the next durable update.";
+}
+
 function eventIndicator(event: ProductionEvent, latestSequence: number, runStatus: string, hasActiveJob: boolean) {
   const payloadStatus = String(event.payload.status || "").toLowerCase();
   if (event.event_type === "task.finished") {
@@ -290,6 +391,32 @@ function metricPercent(value?: number | null) {
   return typeof value === "number" && Number.isFinite(value) ? Math.round(Math.max(0, Math.min(100, value))) : undefined;
 }
 
+function runLedTone(status: string) {
+  if (["done", "succeeded"].includes(status)) return "green";
+  if (["error", "failed", "cancelled"].includes(status)) return "red";
+  if (["running", "leased"].includes(status)) return "blue";
+  return "amber";
+}
+
+function runWorkerSummary(run: ProductionRun) {
+  const workers = run.worker_ids?.length
+    ? run.worker_ids
+    : run.worker_id
+      ? [run.worker_id]
+      : [];
+  if (workers.length) return { label: `Working · ${workers.join(", ")}`, tone: "green", live: true };
+  if (["running", "leased"].includes(run.status)) return { label: "Working · Studio pipeline", tone: "blue", live: true };
+  if (["queued", "retryable"].includes(run.status)) return { label: "Waiting for a worker", tone: "amber", live: false };
+  return { label: "No active worker", tone: runLedTone(run.status), live: false };
+}
+
+function jobWorkerLabel(job: ProductionJob) {
+  if (job.worker_id) return `Working · ${job.worker_id}`;
+  if (["queued", "retryable"].includes(job.status)) return "Waiting for a worker";
+  if (["leased", "running"].includes(job.status)) return "Worker identity pending";
+  return "No active worker";
+}
+
 function UsageLeds({ label, value, source }: { label: string; value?: number | null; source?: string }) {
   const percent = metricPercent(value);
   const ledCount = percent === undefined ? 0 : Math.round(percent / 100 * 18);
@@ -303,6 +430,7 @@ export function App() {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [comfyWorkers, setComfyWorkers] = useState<ComfyWorker[]>([]);
   const [selectedStoryId, setSelectedStoryId] = useState<string | undefined>(() => readStudioUiState().selectedStoryId);
+  const [detailStoryId, setDetailStoryId] = useState<string>();
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(() => readStudioUiState().selectedRunId);
   const [jobs, setJobs] = useState<ProductionJob[]>([]);
   const [events, setEvents] = useState<ProductionEvent[]>([]);
@@ -310,19 +438,22 @@ export function App() {
   const [notice, setNotice] = useState("Connecting to the production ledger...");
   const [busy, setBusy] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [worldTemplateId, setWorldTemplateId] = useState("current");
   const [editorOpen, setEditorOpen] = useState(false);
   const [playerOpen, setPlayerOpen] = useState(false);
   const [playerRelease, setPlayerRelease] = useState<ProductionRelease>();
   const [workersOpen, setWorkersOpen] = useState(false);
   const [activeView, setActiveView] = useState(() => {
     const savedView = readStudioUiState().activeView;
-    return savedView === "Workers" ? "Library" : savedView || "Library";
+    return savedView === "Workers" ? "Library" : savedView === "Productions" ? "Production Runs" : savedView || "Library";
   });
   const [editorStory, setEditorStory] = useState<StoryDetail>();
   const [editorScene, setEditorScene] = useState(0);
   const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic grounded realism", num_scenes: 8, images_per_scene: 7, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean", narration_style: "" });
   const [world, setWorld] = useState<WorldKnowledgeBase>(() => readWorldKnowledge());
   const [seeds, setSeeds] = useState<SeedSuggestion[]>([]);
+  const [directionDrafts, setDirectionDrafts] = useState<ProductionDirection[]>([]);
+  const [activeDirectionId, setActiveDirectionId] = useState<string>();
   const [seedBusy, setSeedBusy] = useState(false);
   const [admissionPaused, setAdmissionPaused] = useState(false);
   const [renderingMode, setRenderingMode] = useState<RenderingMode>("gpu");
@@ -380,7 +511,7 @@ export function App() {
 
   useEffect(() => {
     void refresh();
-    const interval = window.setInterval(() => void refresh(), 12_000);
+    const interval = window.setInterval(() => void refresh(), 4_000);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -430,11 +561,15 @@ export function App() {
   }, [createOpen, editorOpen, playerOpen, workersOpen]);
 
   const selectedStory = stories.find((story) => story.id === selectedStoryId);
+  const detailStory = stories.find((story) => story.id === detailStoryId);
   const selectedRun = runs.find((run) => run.id === selectedRunId);
   const visibleStories = stories.filter((story) => story.title.toLowerCase().includes(query.toLowerCase()));
   const activeWorkers = [...workers, ...comfyWorkers].filter((worker) => (worker as Worker).status !== "stale" && (worker as ComfyWorker).running !== false);
   const activeComfyWorkers = comfyWorkers.filter((worker) => worker.running !== false);
   const sidebarWorkers = activeComfyWorkers;
+  const workingWorkerCount = workers.filter((worker) => worker.status === "running" && Boolean(worker.current_job_id)).length
+    + comfyWorkers.filter((worker) => worker.running !== false && (worker.queue_running || 0) > 0).length;
+  const workerSummary = `${activeWorkers.length} online · ${workingWorkerCount} working`;
 
   const runAction = async (action: () => Promise<unknown>, message: string) => {
     setBusy(true);
@@ -455,32 +590,59 @@ export function App() {
     }
   };
 
-  const queueBrief = async () => {
-    if (brief.story_concept.trim().length < 10) { setNotice("Give the director at least a sentence of story intent."); return; }
+  const queueProductions = async (inputs: GenerateInput[], worldContext = world) => {
+    if (inputs.some((input) => input.story_concept.trim().length < 10)) { setNotice("Give each selected direction at least a sentence of story intent."); return; }
+    const validInputs = inputs;
     setBusy(true);
     try {
-      const result = await api.generate({
-        ...brief,
-        world_context: worldContextPrompt(world),
-        voice_assignments: JSON.stringify(world.characters.map(({ name, voice, style }) => ({ name, voice, style }))),
-      });
-      setSelectedRunId(result.task_id);
+      const outcomes = await Promise.allSettled(validInputs.map((input) => api.generate({
+        ...input,
+        world_context: worldContextPrompt(worldContext),
+        voice_assignments: JSON.stringify(worldContext.characters.map((character) => ({
+          name: character.name,
+          role: character.role,
+          voice: character.voice,
+          style: character.style,
+          alignment: character.alignment,
+          traits: character.traits,
+        }))),
+      })));
+      const results = outcomes.flatMap((outcome) => outcome.status === "fulfilled" ? [outcome.value] : []);
+      const failures = outcomes.length - results.length;
+      if (!results.length) throw new Error("None of the selected productions could be queued.");
+      setSelectedRunId(results[results.length - 1].task_id);
       setCreateOpen(false);
-      setNotice(`Production ${result.task_id} has entered the durable queue.`);
+      setDirectionDrafts([]);
+      setSeeds([]);
+      setNotice(`${results.length} production${results.length === 1 ? "" : "s"} entered the durable queue${failures ? `; ${failures} failed to queue` : ""}.`);
       await refresh();
     } catch (error) { setNotice(error instanceof Error ? error.message : "The production brief could not be queued."); }
     finally { setBusy(false); }
   };
 
+  const queueBrief = async (worldContext = world) => queueProductions([brief], worldContext);
+
   const submitBrief = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await queueBrief();
+    const template = worldTemplates.find((item) => item.id === worldTemplateId);
+    const templateWorld = template && "world" in template ? template.world : undefined;
+    const selectedWorld = templateWorld || world;
+    if (templateWorld) setWorld({ ...templateWorld });
+    const selectedDirections = directionDrafts.filter((direction) => direction.selected).map((direction) => direction.input);
+    await queueProductions(selectedDirections.length ? selectedDirections : [brief], selectedWorld);
   };
 
   const suggestSeeds = async () => {
     if (brief.story_concept.trim().length < 10) { setNotice("Give the seed picker at least a sentence of story intent."); return; }
     setSeedBusy(true);
-    try { const result = await api.seedSuggestions(brief); setSeeds(result.seeds); setNotice("The director returned three small story directions."); }
+    try {
+      const result = await api.seedSuggestions(brief);
+      const drafts = result.seeds.map((seed, index) => directionFromSeed(seed, index, brief));
+      setSeeds(result.seeds);
+      setDirectionDrafts(drafts);
+      setActiveDirectionId(drafts[0]?.id);
+      setNotice("Three story directions are ready. Select, tune, and queue any combination.");
+    }
     catch (error) { setNotice(error instanceof Error ? error.message : "Seed suggestions could not be generated."); }
     finally { setSeedBusy(false); }
   };
@@ -497,20 +659,22 @@ export function App() {
     <aside className="rail">
       <div className="brand"><img src="branding/fantasee-studio-banner.png" alt="FantaSee Studio" /></div>
       <nav>{nav.map(([Icon, label], index) => <button className={label === activeView ? "nav-item active" : "nav-item"} key={label} onClick={() => { setActiveView(label); setNotice(`${label} desk selected.`); }} aria-current={label === activeView ? "page" : undefined}><Icon size={19}/><span>{label}</span><i>{label === activeView ? "" : undefined}</i></button>)}</nav>
-      <section className="rail-workers" aria-label="ComfyUI workers"><div className="rail-section-title"><span>ComfyUI workers</span><small>{sidebarWorkers.length} live</small></div><div className="rail-worker-stack">{sidebarWorkers.length ? sidebarWorkers.map((worker, index) => { const comfyUrl = (worker as ComfyWorker).url; return <WorkerLane key={`${workerIdentity(worker)}-${index}`} worker={worker} jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")} onKill={comfyUrl ? () => void runAction(() => api.killComfy(comfyUrl), "Selected ComfyUI worker stopped.") : undefined}/>; }) : <WorkerLane empty jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")}/>}</div></section>
+      <section className="rail-workers" aria-label="ComfyUI workers"><div className="rail-section-title"><span>ComfyUI workers</span><small>{sidebarWorkers.length} online</small></div><div className="rail-worker-stack">{sidebarWorkers.length ? sidebarWorkers.map((worker, index) => { const comfyUrl = (worker as ComfyWorker).url; return <WorkerLane key={`${workerIdentity(worker)}-${index}`} worker={worker} jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")} onKill={comfyUrl ? () => void runAction(() => api.killComfy(comfyUrl), "Selected ComfyUI worker stopped.") : undefined}/>; }) : <WorkerLane empty jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")}/>}</div></section>
+      <div className="rail-status"><span><span className="led green"/> {notice}</span><small>{workerSummary}</small></div>
     </aside>
 
     <section className="workspace">
       <header className="command-bar"><label><Search size={19}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search stories..." /></label><div><button className="icon-button" onClick={() => void refresh()} aria-label="Refresh"><RefreshCw size={18}/></button><button className="create" onClick={() => setCreateOpen(true)}><Plus size={17}/> Create story</button><button className="icon-button" onClick={() => setWorkersOpen(true)} aria-label="Open worker controls" title="Worker controls"><MoreHorizontal size={19}/></button></div></header>
-      <div className="status-strip"><span className="led green"/> {notice} <span>•</span> {activeWorkers.length} active worker{activeWorkers.length === 1 ? "" : "s"}</div>
-      {activeView === "Library" ? <><div className="content-grid">
+      <div className="status-strip"><span className="led green"/> {notice} <span>•</span> {workerSummary}</div>
+      {activeView === "Library" ? <><div className={detailStory ? "library-details-layer open" : "library-details-layer"}>{detailStory && <StoryDetails story={detailStory} onBack={() => setDetailStoryId(undefined)} onOpenEditor={() => void openEditor()} onPlay={() => setPlayerOpen(true)} onDeleted={() => { setDetailStoryId(undefined); setSelectedStoryId(undefined); void refresh(); }} />}</div><div className="content-grid">
         <section className="library-module metal-panel">
           <div className="eyebrow"><span>Featured story</span><span>Newest first</span></div>
           {selectedStory ? <article className="feature">
             <div className="cover">{hasUsableCover(selectedStory) ? <img src={selectedStory.cover_image_url || selectedStory.hero_image} alt=""/> : <Sparkles size={34}/>}</div>
-            <div><h1>{selectedStory.title}</h1><p>{selectedStory.description || "A new production, ready for its editorial pass."}</p><div className="story-meta">{selectedStory.scene_count || 0} scenes <span/> updated {timestamp(selectedStory.updated_at || selectedStory.created_at)}</div><div className="feature-actions"><button className="outline-button" onClick={() => void openEditor()}>Open in editor <ChevronRight size={16}/></button><button className="outline-button" disabled={!selectedStory.completion?.full_video_ok} onClick={() => setPlayerOpen(true)}><Play size={15}/> Play release</button></div></div>
+            <div><h1>{selectedStory.title}</h1><p>{selectedStory.description || "A new production, ready for its editorial pass."}</p><div className="story-meta">{selectedStory.scene_count || 0} scenes <span/> updated {timestamp(selectedStory.updated_at || selectedStory.created_at)}</div><div className="feature-actions"><button className="outline-button" onClick={() => void openEditor()}>Open in editor <ChevronRight size={16}/></button><button className="outline-button" disabled={!selectedStory.completion?.full_video_ok} onClick={() => setPlayerOpen(true)}><Play size={15}/> Play release</button><button className="outline-button" disabled={busy} onClick={() => void runAction(() => api.generateStoryThumbnail(selectedStory.id), `Story card art requested for ${selectedStory.title}.`)}><Image size={15}/> {busy ? "Painting..." : "Generate card art"}</button></div></div>
           </article> : <div className="empty-state"><Sparkles size={28}/><h1>No stories yet</h1><p>Create a story to establish the first production run.</p></div>}
           <div className="section-heading"><h2>Story library</h2><span>{visibleStories.length} title{visibleStories.length === 1 ? "" : "s"}</span></div>
+          <LibraryCatalog stories={visibleStories} selectedStoryId={selectedStoryId} onOpenStory={(story) => { setSelectedStoryId(story.id); setDetailStoryId(story.id); }} />
           <div className="story-list">{visibleStories.map((story) => <button key={story.id} className={story.id === selectedStoryId ? "story-row selected" : "story-row"} onClick={() => setSelectedStoryId(story.id)}>
             <span className="star">{story.id === selectedStoryId ? "+" : "o"}</span><span className="thumb">{hasUsableCover(story) ? <img src={story.cover_image_url || story.hero_image} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }}/> : null}<Image className="fallback-icon" size={15}/></span><strong>{story.title}</strong><span className={`story-health ${storyHealth(story).tone}`}>{storyHealth(story).text}</span><span>{story.scene_count || 0} scenes</span><span>{timestamp(story.updated_at || story.created_at)}</span><ChevronRight size={17}/>
           </button>)}</div>
@@ -518,10 +682,10 @@ export function App() {
 
         <aside className="inspector metal-panel">
           <div className="eyebrow"><span>Production run</span><span className={`run-state ${selectedRun?.status || "idle"}`}>{humanStatus(selectedRun?.status || "idle")}</span></div>
-          {selectedRun ? <><div className="run-summary"><span className="led red"/> <small>{selectedRun.id}</small><h2>{selectedStory?.title || selectedRun.story_id || "Library maintenance"}</h2><p>{selectedRun.stage}: {selectedRun.message}</p><div className="progress-track"><i style={{width: `${Math.round((selectedRun.progress || 0) * 100)}%`}}/></div><b>{Math.round((selectedRun.progress || 0) * 100)}% complete</b></div>
+          {selectedRun ? <><div className="run-summary"><span className={`led ${runLedTone(selectedRun.status)} ${runWorkerSummary(selectedRun).live ? "live" : ""}`}/> <small>{selectedRun.id}</small><h2>{selectedStory?.title || selectedRun.story_id || "Library maintenance"}</h2><p>{productionRunPhase(selectedRun)}</p><small className="run-summary-note">{productionRunNote(selectedRun)}</small><div className="run-worker-summary"><span className={`led ${runWorkerSummary(selectedRun).tone} ${runWorkerSummary(selectedRun).live ? "live" : ""}`}/><span>{runWorkerSummary(selectedRun).label}</span></div><div className="progress-track"><i style={{width: `${Math.round((selectedRun.progress || 0) * 100)}%`}}/></div><b>{Math.round((selectedRun.progress || 0) * 100)}% complete</b></div>
           <div className="completion"><h3>Completion evidence</h3>{completionRows(selectedStory).map(([Icon, label, complete, detail]) => <div className="completion-row" key={label}><Icon size={18}/><span>{label}</span><small>{complete ? "verified" : "pending"} · {detail}</small><i className={complete ? "led green" : "led amber"}/></div>)}</div>
-          <div className="run-controls"><h3>Run controls</h3><button disabled={busy} className="outline-button" onClick={() => void runAction(async () => { const result = await api.setProductionControl({ admission_paused: !admissionPaused }); setAdmissionPaused(result.admission_paused); }, admissionPaused ? "Queue admission resumed." : "Queue admission paused.")}>{admissionPaused ? "Resume queue admission" : "Pause queue admission"}</button><div className="queue-priority-panel"><span>Queue priority</span>{jobs.filter((job) => ["queued", "retryable"].includes(job.status)).map((job) => <div key={job.id}><small>{humanStatus(job.job_type)} · {job.priority ?? 0}</small><button className="micro-button" disabled={busy || (job.priority ?? 0) >= 100} onClick={() => void runAction(() => api.priorityJob(job.id, Math.min(100, (job.priority ?? 0) + 1)), `Raised priority for ${job.id}.`)} title="Raise priority"><ArrowUp size={12}/></button><button className="micro-button" disabled={busy || (job.priority ?? 0) <= 0} onClick={() => void runAction(() => api.priorityJob(job.id, Math.max(0, (job.priority ?? 0) - 1)), `Lowered priority for ${job.id}.`)} title="Lower priority"><ArrowDown size={12}/></button></div>)}</div><button disabled={busy || jobs.length === 0} className="danger" onClick={() => jobs[0] && void runAction(() => api.cancelJob(jobs[0].id), "Cancellation requested for the current job.")}><Pause size={17}/> Pause / cancel</button><button disabled={busy || jobs.length === 0} className="outline-button" onClick={() => jobs[0] && void runAction(() => api.retryJob(jobs[0].id), "The current job has been returned to the durable queue.")}><RefreshCw size={16}/> Retry</button></div>
-          <div className="job-ledger"><h3>Job ledger</h3>{jobs.length ? jobs.map((job) => <div className="job-row" key={job.id}><div><span className={`led ${job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "amber"}`}/><strong>{humanStatus(job.job_type)}</strong><small className="job-story">{jobStoryName(job)}</small><small>{job.message || humanStatus(job.status)} · attempt {job.attempts + 1}</small></div><div className="job-controls">{job.status !== "succeeded" && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.retryJob(job.id), `Job ${job.id} queued for retry.`)} title="Retry this job"><RefreshCw size={13}/></button>}{["queued", "running"].includes(job.status) && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.cancelJob(job.id), `Cancellation requested for job ${job.id}.`)} title="Cancel this job"><X size={13}/></button>}</div></div>) : <p className="ledger-empty">No durable jobs have been recorded for this run yet.</p>}</div><div className="event-spool"><h3>Live event spool</h3><p className="event-spool-help">Newest is at the top. Blue is the latest report, amber is waiting, green is terminal success, and dim is history. A blue event is active only when the job ledger says running.</p><JobPriorityQueue jobs={jobs} busy={busy} onPriority={(job, priority) => void runAction(() => api.priorityJob(job.id, priority), `Updated priority for ${jobStoryName(job)}.`)} />{events.length ? events.slice().reverse().slice(0, 10).map((event) => { const indicator = eventIndicator(event, events[events.length - 1].sequence, selectedRun.status, jobs.some((job) => ["leased", "running"].includes(job.status))); return <div className="event-row" key={`${event.sequence}-${event.event_type}`}><span className={`led ${indicator.tone}`}/><small>#{event.sequence} {event.event_type} · {indicator.label}</small><strong>{String(event.payload.message || event.payload.stage || "Recorded production event")}</strong></div>; }) : <p className="ledger-empty">Waiting for durable progress events.</p>}</div></> : <div className="empty-state"><Radio size={25}/><p>No production run selected.</p></div>}
+          <div className="run-controls"><h3>Run controls</h3><button disabled={busy} className="outline-button" onClick={() => void runAction(async () => { const result = await api.setProductionControl({ admission_paused: !admissionPaused }); setAdmissionPaused(result.admission_paused); }, admissionPaused ? "Queue admission resumed." : "Queue admission paused.")}>{admissionPaused ? "Resume queue admission" : "Pause new jobs"}</button><div className="queue-priority-panel"><span>Queue priority</span>{jobs.filter((job) => ["queued", "retryable"].includes(job.status)).map((job) => <div key={job.id}><small>{humanStatus(job.job_type)} · {job.priority ?? 0}</small><button className="micro-button" disabled={busy || (job.priority ?? 0) >= 100} onClick={() => void runAction(() => api.priorityJob(job.id, Math.min(100, (job.priority ?? 0) + 1)), `Raised priority for ${job.id}.`)} title="Raise priority"><ArrowUp size={12}/></button><button className="micro-button" disabled={busy || (job.priority ?? 0) <= 0} onClick={() => void runAction(() => api.priorityJob(job.id, Math.max(0, (job.priority ?? 0) - 1)), `Lowered priority for ${job.id}.`)} title="Lower priority"><ArrowDown size={12}/></button></div>)}</div><button disabled={busy || jobs.length === 0} className="danger" onClick={() => jobs[0] && void runAction(() => api.cancelJob(jobs[0].id), "Cancellation requested for the current job.")}><Pause size={17}/> Pause / cancel</button><button disabled={busy || jobs.length === 0} className="outline-button" onClick={() => jobs[0] && void runAction(() => api.retryJob(jobs[0].id), "The current job has been returned to the durable queue.")}><RefreshCw size={16}/> Retry</button></div>
+          <details className="run-details"><summary><span>Job ledger</span><small>{jobs.length ? `${jobs.length} item${jobs.length === 1 ? "" : "s"}` : "empty"}</small></summary><div className="job-ledger">{jobs.length ? jobs.map((job) => <div className="job-row" key={job.id}><div><span className={`led ${runLedTone(job.status)} ${job.worker_id ? "live" : ""}`}/><strong>{humanStatus(job.job_type)}</strong><small className="job-story">{jobStoryName(job)}</small><small>{job.message || humanStatus(job.status)} · attempt {job.attempts + 1}</small><small className="job-worker"><span className={`led ${job.worker_id ? "green live" : runLedTone(job.status)}`}/>{jobWorkerLabel(job)}</small></div><div className="job-controls">{job.status !== "succeeded" && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.retryJob(job.id), `Job ${job.id} queued for retry.`)} title="Retry this job"><RefreshCw size={13}/></button>}{["queued", "running"].includes(job.status) && <button className="micro-button" disabled={busy} onClick={() => void runAction(() => api.cancelJob(job.id), `Cancellation requested for job ${job.id}.`)} title="Cancel this job"><X size={13}/></button>}</div></div>) : <p className="ledger-empty">No durable jobs have been recorded for this run yet.</p>}</div></details><details className="run-details"><summary><span>Live event spool</span><small>{events.length ? `${events.length} events` : "empty"}</small></summary><div className="event-spool"><p className="event-spool-help">Newest is at the top. Blue is the latest report, amber is waiting, green is terminal success, and dim is history. A blue event is active only when the job ledger says running.</p><JobPriorityQueue jobs={jobs} busy={busy} onPriority={(job, priority) => void runAction(() => api.priorityJob(job.id, priority), `Updated priority for ${jobStoryName(job)}.`)} />{events.length ? events.slice().reverse().slice(0, 10).map((event) => { const indicator = eventIndicator(event, events[events.length - 1].sequence, selectedRun.status, jobs.some((job) => ["leased", "running"].includes(job.status))); return <div className="event-row" key={`${event.sequence}-${event.event_type}`}><span className={`led ${indicator.tone}`}/><small>#{event.sequence} {event.event_type} · {indicator.label}</small><strong>{String(event.payload.message || event.payload.stage || "Recorded production event")}</strong></div>; }) : <p className="ledger-empty">Waiting for durable progress events.</p>}</div></details></> : <div className="empty-state"><Radio size={25}/><p>No production run selected.</p></div>}
         {selectedRun && <RunControls renderingMode={renderingMode} admissionPaused={admissionPaused} busy={busy} jobs={jobs} onToggleAdmission={() => void runAction(async () => { const result = await api.setProductionControl({ admission_paused: !admissionPaused }); setAdmissionPaused(result.admission_paused); }, admissionPaused ? "Queue admission resumed." : "Queue admission paused.")} onRenderingMode={(mode) => void runAction(async () => { const result = await api.setProductionControl({ rendering_mode: mode }); setRenderingMode(result.rendering_mode); }, `Rendering mode set to ${mode === "basic" ? "Basic / CPU" : mode === "gpu" ? "GPU" : "Max / GPU + CPU"}.`)} onPriority={(job, priority) => void runAction(() => api.priorityJob(job.id, priority), `Updated priority for ${job.id}.`)} onCancel={() => jobs[0] && void runAction(() => api.cancelJob(jobs[0].id), "Cancellation requested for the current job.")} onRetry={() => jobs[0] && void runAction(() => api.retryJob(jobs[0].id), "The current job has been returned to the durable queue.")} />}
         </aside>
       </div>
@@ -531,9 +695,16 @@ export function App() {
       }) : <WorkerLane empty jobs={jobs} busy={busy} onSpawn={() => void runAction(() => api.spawn("gpu"), "GPU ComfyUI worker started.")}/>}</section></> : <StudioDesk view={activeView} stories={stories} runs={runs} workers={activeWorkers} selectedStory={selectedStory} jobs={jobs} busy={busy} brief={brief} onBriefChange={setBrief} world={world} onWorldChange={setWorld} seeds={seeds} seedBusy={seedBusy} onSuggestSeeds={() => void suggestSeeds()} onQueueBrief={() => void queueBrief()} onSpawn={(kind) => void runAction(() => api.spawn(kind), `${kind.toUpperCase()} ComfyUI worker started.`)} onRefresh={() => void refresh()} onSelectRun={(id) => { setSelectedRunId(id); setActiveView("Library"); setNotice(`Run ${id} selected.`); }} onSelectStory={setSelectedStoryId} onAction={(action, message) => void runAction(action, message)} onPreviewRelease={(release) => { setPlayerRelease(release); setPlayerOpen(true); }} />}
       {createOpen && <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="brief-modal-title"><form className="brief-modal metal-panel" onSubmit={submitBrief}>
         <div className="eyebrow"><span>New production brief</span><button type="button" className="icon-button" onClick={() => setCreateOpen(false)} aria-label="Close"><X size={17}/></button></div>
-        <h2 id="brief-modal-title">Set the story in motion.</h2><p>The director will break this brief into granular scene commissions and complete every media requirement before release.</p>
+        <div className="brief-modal-intro"><div><h2 id="brief-modal-title">Set the story in motion.</h2><p>The director will break this brief into granular scene commissions and complete every media requirement before release.</p></div><span className="brief-modal-step">01 / 03<small>Context first</small></span></div>
+        <label className="brief-field world-template-field"><span>Universe / World Builder template</span><select value={worldTemplateId} onChange={(event) => setWorldTemplateId(event.target.value)}>{worldTemplates.map((template) => <option value={template.id} key={template.id}>{template.label} - {template.detail}</option>)}</select><small>The selected canon is attached to this production and becomes the writer's generation context.</small></label>
+        <div className="brief-modal-section-label"><span>Creative direction</span><small>Shape the run without overloading the brief.</small></div>
         <label className="brief-field wide">Story intent<textarea autoFocus value={brief.story_concept} onChange={(event) => setBrief({ ...brief, story_concept: event.target.value })} placeholder="A medic from Johannesburg wakes in a cold mountain village where every wound carries a memory..." /><button type="button" className="outline-button seed-button" disabled={seedBusy} onClick={() => void suggestSeeds()}>{seedBusy ? "Consulting director..." : "Suggest three directions"}</button></label>{seeds.length > 0 && <div className="seed-grid">{seeds.map((seed) => <button type="button" className="seed-card" key={`${seed.title}-${seed.description}`} onClick={() => { setBrief({ ...brief, story_concept: `${seed.title}\n${seed.description}`, style: seed.style || brief.style, tone: seed.tone || brief.tone, characters: seed.characters || brief.characters }); setSeeds([]); }}><strong>{seed.title}</strong><small>{seed.description}</small><em>{seed.style || brief.style} · {seed.tone || brief.tone}</em></button>)}</div>}
-        <div className="brief-grid">
+        {!directionDrafts.length && <>
+        <DirectionSettings input={brief} onChange={setBrief} />
+        </>}
+        {directionDrafts.length > 0 && <DirectionBuilder drafts={directionDrafts} activeId={activeDirectionId} onActive={setActiveDirectionId} onChange={setDirectionDrafts} />}
+        {/* Legacy controls remain below for the single-brief path. */}
+        <div className="brief-grid direction-legacy-hidden">
           <label className="brief-field">Director preset<select value={directorPresets.find((preset) => preset.style === brief.style && preset.tone === brief.tone)?.id || "custom"} onChange={(event) => { const preset = directorPresets.find((item) => item.id === event.target.value); if (preset) setBrief({ ...brief, style: preset.style, tone: preset.tone, num_scenes: preset.scenes, images_per_scene: preset.images, voice_preset: preset.voice, narration_style: preset.narrationStyle }); }}><option value="custom">Custom direction</option>{directorPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
           <label className="brief-field">Scene count<select value={brief.num_scenes} onChange={(event) => setBrief({ ...brief, num_scenes: Number(event.target.value) })}>{sceneOptions.map((count) => <option key={count} value={count}>{count} scenes · {count <= 5 ? "short arc" : count >= 10 ? "full feature" : "balanced arc"}</option>)}</select></label>
           <label className="brief-field">Visual density<select value={brief.images_per_scene} onChange={(event) => setBrief({ ...brief, images_per_scene: Number(event.target.value) })}>{imageOptions.map((count) => <option key={count} value={count}>{count} beats per scene · {count <= 3 ? "spare" : count >= 9 ? "rich" : "cinematic"}</option>)}</select></label>
@@ -541,15 +712,25 @@ export function App() {
           <label className="brief-field">Emotional register<select value={brief.tone} onChange={(event) => setBrief({ ...brief, tone: event.target.value })}>{toneOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label className="brief-field">Narration direction<select value={brief.narration_style || ""} onChange={(event) => setBrief({ ...brief, narration_style: event.target.value })}>{narrationOptions.map(([value, label]) => <option key={value || "default"} value={value}>{label}</option>)}</select></label>
         </div>
-        <label className="brief-field wide">Characters and continuity<textarea value={brief.characters} onChange={(event) => setBrief({ ...brief, characters: event.target.value })} placeholder="Optional character, setting, or visual continuity notes." /></label>
-        <label className="brief-field wide">Narrator<select value={brief.voice_preset} onChange={(event) => setBrief({ ...brief, voice_preset: event.target.value })}>{voiceOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="brief-field wide direction-legacy-hidden-field">Characters and continuity<textarea value={brief.characters} onChange={(event) => setBrief({ ...brief, characters: event.target.value })} placeholder="Optional character, setting, or visual continuity notes." /></label>
+        <label className="brief-field wide direction-legacy-hidden-field">Narrator<select value={brief.voice_preset} onChange={(event) => setBrief({ ...brief, voice_preset: event.target.value })}>{voiceOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
         <div className="modal-actions"><button type="button" className="outline-button" onClick={() => setCreateOpen(false)}>Cancel</button><button className="create" disabled={busy} type="submit"><Plus size={17}/> Queue production</button></div>
       </form></div>}
-      {editorOpen && <><StoryEditor story={editorStory} sceneIndex={editorScene} busy={busy} onClose={() => setEditorOpen(false)} onSelectScene={setEditorScene} onStoryRefresh={async () => { if (editorStory) setEditorStory(await api.story(editorStory.id)); }} onAction={(action, message) => void runAction(action, message)} /><SceneWaveformDock story={editorStory} sceneIndex={editorScene} /></>}
+      {editorOpen && <><StoryEditor story={editorStory} sceneIndex={editorScene} busy={busy} onClose={() => setEditorOpen(false)} onSelectScene={setEditorScene} onStoryRefresh={async () => { if (editorStory) setEditorStory(await api.story(editorStory.id)); }} onAction={(action, message) => void runAction(action, message)} /><SceneImageControls story={editorStory} sceneIndex={editorScene} busy={busy} onStoryRefresh={async () => { if (editorStory) setEditorStory(await api.story(editorStory.id)); }} onAction={(action, message) => void runAction(action, message)} /><SceneWaveformDock story={editorStory} sceneIndex={editorScene} /></>}
       {playerOpen && selectedStory && <ReleasePlayerWithAudio story={selectedStory} release={playerRelease} onClose={() => { setPlayerOpen(false); setPlayerRelease(undefined); }} />}
       {workersOpen && <WorkerConsole workers={comfyWorkers} busy={busy} onClose={() => setWorkersOpen(false)} onRefresh={() => void refresh()} onSpawn={(kind) => void runAction(() => api.spawn(kind), `${kind.toUpperCase()} ComfyUI worker started.`)} onKill={(url) => void runAction(() => api.killComfy(url), "Selected ComfyUI worker stopped.")} onRestart={() => void restartEverything()} />}
     </section>
   </main>;
+}
+
+function DirectionSettings({ input, onChange }: { input: GenerateInput; onChange: (input: GenerateInput) => void }) {
+  const update = (patch: Partial<GenerateInput>) => onChange({ ...input, ...patch });
+  const presetId = directorPresets.find((preset) => preset.style === input.style && preset.tone === input.tone)?.id || "custom";
+  return <div className="direction-settings"><div className="direction-settings-heading"><div><span className="eyebrow-label">Selected direction settings</span><h3>Make this version yours</h3></div><small>These settings apply only to the active direction.</small></div><label className="brief-field wide">Story direction<textarea value={input.story_concept} onChange={(event) => update({ story_concept: event.target.value })}/></label><div className="brief-grid"><label className="brief-field">Director preset<select value={presetId} onChange={(event) => { const preset = directorPresets.find((item) => item.id === event.target.value); if (preset) update({ style: preset.style, tone: preset.tone, num_scenes: preset.scenes, images_per_scene: preset.images, voice_preset: preset.voice, narration_style: preset.narrationStyle }); }}><option value="custom">Custom direction</option>{directorPresets.map((preset) => <option value={preset.id} key={preset.id}>{preset.label}</option>)}</select></label><label className="brief-field">Scene count<select value={input.num_scenes} onChange={(event) => update({ num_scenes: Number(event.target.value) })}>{sceneOptions.map((count) => <option key={count} value={count}>{count} scenes - {count <= 5 ? "short arc" : count >= 10 ? "full feature" : "balanced arc"}</option>)}</select></label><label className="brief-field">Visual density<select value={input.images_per_scene} onChange={(event) => update({ images_per_scene: Number(event.target.value) })}>{imageOptions.map((count) => <option key={count} value={count}>{count} beats per scene - {count <= 3 ? "spare" : count >= 9 ? "rich" : "cinematic"}</option>)}</select></label><label className="brief-field">Visual language<select value={input.style} onChange={(event) => update({ style: event.target.value })}>{styleOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="brief-field">Emotional register<select value={input.tone} onChange={(event) => update({ tone: event.target.value })}>{toneOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="brief-field">Narration direction<select value={input.narration_style || ""} onChange={(event) => update({ narration_style: event.target.value })}>{narrationOptions.map(([value, label]) => <option key={value || "default"} value={value}>{label}</option>)}</select></label></div><label className="brief-field wide">Characters and continuity<textarea value={input.characters} onChange={(event) => update({ characters: event.target.value })} placeholder="Optional immediate cast notes; deeper canon comes from the selected worldbuilder." /></label><label className="brief-field wide">Narrator<select value={input.voice_preset} onChange={(event) => update({ voice_preset: event.target.value })}>{voiceOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>;
+}
+
+function DirectionBuilder({ drafts, activeId, onActive, onChange }: { drafts: ProductionDirection[]; activeId?: string; onActive: (id: string) => void; onChange: Dispatch<SetStateAction<ProductionDirection[]>> }) {
+  return <section className="direction-builder"><div className="direction-builder-heading"><div><span className="eyebrow-label">Parallel production directions</span><h3>Choose the stories to make</h3></div><small>{drafts.filter((direction) => direction.selected).length} of {drafts.length} selected</small></div><div className="direction-picker">{drafts.map((direction) => <article className={direction.id === activeId ? "direction-card active" : "direction-card"} key={direction.id}><button type="button" className="direction-card-select" onClick={() => onActive(direction.id)}><strong>{direction.title}</strong><small>{direction.description}</small><em>{direction.input.style} - {direction.input.tone}</em></button><label className="direction-include"><input type="checkbox" checked={direction.selected} onChange={() => onChange((current) => current.map((item) => item.id === direction.id ? { ...item, selected: !item.selected } : item))}/><span>Queue this story</span></label></article>)}</div>{(() => { const active = drafts.find((direction) => direction.id === activeId) || drafts[0]; return active ? <DirectionSettings input={active.input} onChange={(input) => onChange((current) => current.map((item) => item.id === active.id ? { ...item, input } : item))} /> : null; })()}</section>;
 }
 
 function RunControls({ renderingMode, admissionPaused, busy, jobs, onToggleAdmission, onRenderingMode, onPriority, onCancel, onRetry }: { renderingMode: RenderingMode; admissionPaused: boolean; busy: boolean; jobs: ProductionJob[]; onToggleAdmission: () => void; onRenderingMode: (mode: RenderingMode) => void; onPriority: (job: ProductionJob, priority: number) => void; onCancel: () => void; onRetry: () => void }) {
@@ -606,9 +787,9 @@ function StudioDesk({ view, stories, runs, workers, selectedStory, jobs, busy, b
     try { const result = await api.updateSettings(settings); setSettings(result.settings); onRefresh(); }
     finally { setSettingsBusy(false); }
   };
-  const title = view === "Productions" ? "Production desk" : view === "Assets" ? "Asset library" : view === "Story Studio" ? "Story Studio" : view === "Voice Studio" ? "Voice Studio" : "Studio settings";
-  return <section className="desk-panel metal-panel"><div className="eyebrow"><span>{title}</span><span>{view === "Productions" ? `${runs.length} durable runs` : view === "Workers" ? `${workers.length} active signals` : "Operator view"}</span></div>
-    {view === "Productions" && <ProductionWorkspace runs={runs} stories={stories} selectedStory={selectedStory} jobs={jobs} busy={busy} onSelectRun={onSelectRun} onAction={onAction} />}
+  const title = view === "Production Runs" ? "Production desk" : view === "Assets" ? "Asset library" : view === "Story Studio" ? "Story Studio" : view === "Voice Studio" ? "Voice Studio" : "Studio settings";
+  return <section className="desk-panel metal-panel"><div className="eyebrow"><span>{title}</span><span>{view === "Production Runs" ? `${runs.length} durable runs` : view === "Workers" ? `${workers.length} active signals` : "Operator view"}</span></div>
+    {view === "Production Runs" && <ProductionWorkspace runs={runs} stories={stories} selectedStory={selectedStory} jobs={jobs} busy={busy} onSelectRun={onSelectRun} onAction={onAction} />}
     {view === "Assets" && <AssetWorkspace stories={stories} selectedStory={selectedStory} releases={releases} migration={migration} migrationLoading={migrationLoading} onSelectStory={onSelectStory} onPreviewRelease={onPreviewRelease} />}
     {view === "Story Studio" && <StoryStudioWorkspace brief={brief} onBriefChange={onBriefChange} world={world} onWorldChange={onWorldChange} seeds={seeds} seedBusy={seedBusy} onSuggestSeeds={onSuggestSeeds} onQueueBrief={onQueueBrief} />}
     {view === "Voice Studio" && <VoiceStudioWorkspace settings={settings} brief={brief} onBriefChange={onBriefChange} world={world} onWorldChange={onWorldChange} settingsBusy={settingsBusy} auditionBusy={auditionBusy} auditionUrl={auditionUrl} onSettingsChange={setSettings} onAudition={auditionVoice} onSave={saveSettings} />}
@@ -621,6 +802,8 @@ function ProductionWorkspace({ runs, stories, selectedStory, jobs, busy, onSelec
   const [planStoryId, setPlanStoryId] = useState(selectedStory?.id || stories[0]?.id || "");
   const [editions, setEditions] = useState<ReleaseEditionId[]>(["cinematic", "plex"]);
   const planStory = stories.find((story) => story.id === planStoryId);
+  const focusedRun = runs.find((run) => ["running", "queued", "retryable", "leased"].includes(run.status)) || runs[0];
+  const focusedStory = focusedRun ? stories.find((story) => story.id === focusedRun.story_id) : undefined;
   useEffect(() => {
     if (selectedStory?.id) setPlanStoryId(selectedStory.id);
   }, [selectedStory?.id]);
@@ -642,14 +825,14 @@ function ProductionWorkspace({ runs, stories, selectedStory, jobs, busy, onSelec
     const origin = stories.find((story) => story.id === run.story_id);
     return origin?.title || (run.story_id === "library" ? "Library maintenance" : run.story_id || humanStatus(run.kind));
   };
-  return <div className="production-workspace"><div className="production-intro"><div><span className="eyebrow-label">Production command center</span><h1>From origin story to release.</h1><p className="desk-intro">This is where durable work becomes a release plan. Choose an origin story, select editions, then jump into the live ledger only when you need the event-level detail.</p></div><div className="production-stat"><b>{runs.length}</b><small>durable runs</small><span>{jobs.filter((job) => ["queued", "running", "retryable"].includes(job.status)).length} active jobs in focus</span></div></div><div className="production-layout"><section><div className="section-heading"><h2>Production runs</h2><span>Art and origin included</span></div><div className="production-card-grid">{runs.length ? runs.map((run) => { const origin = stories.find((story) => story.id === run.story_id); const progress = Math.round((run.progress || 0) * 100); return <article className="production-card" key={run.id}><div className={origin && hasUsableCover(origin) ? "production-art" : "production-art production-art-empty"}>{origin && hasUsableCover(origin) ? <img src={origin.cover_image_url || origin.hero_image} alt="" /> : <Clapperboard size={25}/>}<span className={`led ${run.status === "succeeded" ? "green" : run.status === "failed" ? "red" : "amber"}`}/></div><div className="production-card-body"><div className="production-card-kicker"><span>{humanStatus(run.kind)}</span><b>{progress}%</b></div><h3>{runTitle(run)}</h3><p>{run.message || `${run.stage}: durable production record`}</p><div className="production-card-meta"><span>Origin</span><strong>{origin?.title || run.story_id || "Library"}</strong><small>{run.item_count ? `${run.item_count} work items` : timestamp(run.created_at)}</small></div><div className="progress-track"><i style={{ width: `${progress}%` }}/></div><button className="outline-button" onClick={() => onSelectRun(run.id)}>Open live ledger <ChevronRight size={14}/></button></div></article>; }) : <div className="empty-state"><Radio size={25}/><p>No durable production runs yet.</p></div>}</div></section><aside className="release-planner"><div className="eyebrow"><span>Release planning</span><span>{editions.length} selected</span></div><h2>Choose the output editions.</h2><p>Plans are remembered per story. The current render and Plex actions are executable; the other editions remain clearly marked until their dedicated exporters land.</p><label className="planner-story">Origin story<select value={planStoryId} onChange={(event) => setPlanStoryId(event.target.value)}>{stories.length ? stories.map((story) => <option key={story.id} value={story.id}>{story.title}</option>) : <option value="">No stories available</option>}</select></label><div className="edition-grid">{releaseEditionOptions.map(({ id, label, detail, icon: Icon }) => { const selected = editions.includes(id); const executable = id === "cinematic" || id === "plex"; return <button type="button" className={selected ? "edition-card selected" : "edition-card"} key={id} onClick={() => toggleEdition(id)}><span className="edition-icon"><Icon size={16}/></span><span><strong>{label}</strong><small>{detail}</small></span><em>{executable ? "available" : "planned"}</em></button>; })}</div><div className="planner-actions"><button className="create" disabled={busy || !planStory} onClick={() => planStory && onAction(() => api.renderStory(planStory.id), `Cinematic master render requested for ${planStory.title}.`)}><Clapperboard size={15}/> Render cinematic</button><button className="outline-button" disabled={busy || !planStory || !editions.includes("plex")} onClick={() => planStory && onAction(() => api.exportPlex(planStory.id), `Plex package requested for ${planStory.title}.`)}><Archive size={15}/> Export Plex</button></div><small className="planner-note">Selected: {planStory?.title || "Choose an origin story"}</small></aside></div></div>;
+  return <div className="production-workspace"><div className="production-intro"><div><span className="eyebrow-label">Production command center</span><h1>From origin story to release.</h1><p className="desk-intro">This is where durable work becomes a release plan. Choose an origin story, select editions, then jump into the live ledger only when you need the event-level detail.</p></div><div className="production-stat"><b>{runs.length}</b><small>durable runs</small><span>{jobs.filter((job) => ["queued", "running", "retryable"].includes(job.status)).length} active jobs in focus</span></div></div>{focusedRun && <section className="production-focus"><div className="production-focus-heading"><span className="eyebrow-label">Current run</span><span className={`run-state ${focusedRun.status}`}>{humanStatus(focusedRun.status)}</span></div><div className="production-focus-body"><div><span className="production-focus-label">Working on story</span><h2>{focusedStory?.title || runTitle(focusedRun)}</h2><p>{productionRunPhase(focusedRun)}</p><small>{runWorkerSummary(focusedRun).label}</small></div><div className="production-focus-progress"><b>{Math.round((focusedRun.progress || 0) * 100)}%</b><small>{focusedRun.id}</small></div></div></section>}<div className="production-layout"><section><div className="section-heading"><h2>Production runs</h2><span>Art and origin included</span></div><div className="production-card-grid">{runs.length ? runs.map((run) => { const origin = stories.find((story) => story.id === run.story_id); const progress = Math.round((run.progress || 0) * 100); const terminal = ["succeeded", "failed", "cancelled", "done", "error"].includes(run.status); const worker = runWorkerSummary(run); return <article className="production-card" key={run.id}><div className={origin && hasUsableCover(origin) ? "production-art" : "production-art production-art-empty"}>{origin && hasUsableCover(origin) ? <img src={origin.cover_image_url || origin.hero_image} alt="" /> : <Clapperboard size={25}/>}<span className={`led ${runLedTone(run.status)} ${worker.live ? "live" : ""}`} title={worker.label}/></div><div className="production-card-body"><div className="production-card-kicker"><span>{humanStatus(run.kind)}</span><b>{progress}%</b></div><h3>{runTitle(run)}</h3><p>{productionRunNote(run)}</p><div className="production-card-meta"><span>Origin</span><strong>{origin?.title || run.story_id || "Library"}</strong><small>{run.item_count ? `${run.item_count} work items` : timestamp(run.created_at)}</small><div className="production-worker-status"><span className={`led ${worker.tone} ${worker.live ? "live" : ""}`}/><span>{worker.label}</span></div></div><div className="progress-track"><i style={{ width: `${progress}%` }}/></div><div className="production-card-actions"><button className="outline-button" onClick={() => onSelectRun(run.id)}>Open live ledger <ChevronRight size={14}/></button><button className="production-card-delete" disabled={busy || !terminal} onClick={() => { if (!terminal) return; if (!window.confirm(`Delete the ${runTitle(run)} run and its durable history?`)) return; void onAction(() => api.deleteRun(run.id), `Deleted production run for ${runTitle(run)}.`); }} title={terminal ? "Delete this finished run" : "Only finished runs can be deleted"}><Trash2 size={13}/> Delete</button></div></div></article>; }) : <div className="empty-state"><Radio size={25}/><p>No durable production runs yet.</p></div>}</div></section><aside className="release-planner"><div className="eyebrow"><span>Release planning</span><span>{editions.length} selected</span></div><h2>Choose the output editions.</h2><p>Plans are remembered per story. The current render and Plex actions are executable; the other editions remain clearly marked until their dedicated exporters land.</p><label className="planner-story">Origin story<select value={planStoryId} onChange={(event) => setPlanStoryId(event.target.value)}>{stories.length ? stories.map((story) => <option key={story.id} value={story.id}>{story.title}</option>) : <option value="">No stories available</option>}</select></label><div className="edition-grid">{releaseEditionOptions.map(({ id, label, detail, icon: Icon }) => { const selected = editions.includes(id); const executable = id === "cinematic" || id === "plex"; return <button type="button" className={selected ? "edition-card selected" : "edition-card"} key={id} onClick={() => toggleEdition(id)}><span className="edition-icon"><Icon size={16}/></span><span><strong>{label}</strong><small>{detail}</small></span><em>{executable ? "available" : "planned"}</em></button>; })}</div><div className="planner-actions"><button className="create" disabled={busy || !planStory} onClick={() => planStory && onAction(() => api.renderStory(planStory.id), `Cinematic master render requested for ${planStory.title}.`)}><Clapperboard size={15}/> Render cinematic</button><button className="outline-button" disabled={busy || !planStory || !editions.includes("plex")} onClick={() => planStory && onAction(() => api.exportPlex(planStory.id), `Plex package requested for ${planStory.title}.`)}><Archive size={15}/> Export Plex</button></div><small className="planner-note">Selected: {planStory?.title || "Choose an origin story"}</small></aside></div></div>;
 }
 
 function AssetWorkspace({ stories, selectedStory, releases, migration, migrationLoading, onSelectStory, onPreviewRelease }: { stories: Story[]; selectedStory?: Story; releases: ProductionRelease[]; migration?: MigrationReadiness; migrationLoading: boolean; onSelectStory: (id: string) => void; onPreviewRelease: (release: ProductionRelease) => void }) {
   return <div className="asset-workspace"><div className="asset-intro"><div><span className="eyebrow-label">Approved asset library</span><h1>Every story has a visual home.</h1><p className="desk-intro">Browse origin artwork, completion evidence, and release artifacts together. This library is intentionally scrollable so the collection can grow without squeezing the rest of Studio.</p></div>{migrationLoading ? <span className="asset-scan"><span className="led amber"/> Scanning evidence</span> : migration && <span className="asset-scan"><span className="led green"/> {migration.summary.rollback_ready} rollback-ready</span>}</div><div className="asset-library-scroll"><div className="asset-story-grid">{stories.length ? stories.map((story) => <button className={selectedStory?.id === story.id ? "asset-story-card selected" : "asset-story-card"} key={story.id} onClick={() => onSelectStory(story.id)}><div className="asset-story-art">{hasUsableCover(story) ? <img src={story.cover_image_url || story.hero_image} alt="" /> : <Image size={25}/>}</div><div><strong>{story.title}</strong><small>{story.scene_count || 0} scenes · {storyHealth(story).text}</small></div><span className={`led ${storyHealth(story).tone === "ready" ? "green" : "amber"}`}/></button>) : <p className="ledger-empty">No stories have been added to the managed library.</p>}</div></div>{selectedStory ? <section className="asset-detail-panel"><div className="asset-detail-heading"><div><span className="eyebrow-label">Origin story</span><h2>{selectedStory.title}</h2><p>{selectedStory.description || "No story description has been recorded yet."}</p></div><div className="asset-detail-cover">{hasUsableCover(selectedStory) ? <img src={selectedStory.cover_image_url || selectedStory.hero_image} alt="" /> : <Image size={22}/>}</div></div><div className="asset-evidence-grid">{completionRows(selectedStory).map(([, label, complete, detail]) => <div className="asset-evidence-card" key={label}><span className={`led ${complete ? "green" : "amber"}`}/><strong>{label}</strong><small>{detail}</small></div>)}</div><ReleaseLedger releases={releases} onPreview={onPreviewRelease} /></section> : <div className="asset-empty"><Archive size={24}/><p>Select a story card to inspect its assets and releases.</p></div>}</div>;
 }
 
-function StoryStudioWorkspace({ brief, onBriefChange, world, onWorldChange, seeds, seedBusy, onSuggestSeeds, onQueueBrief }: { brief: GenerateInput; onBriefChange: (brief: GenerateInput) => void; world: WorldKnowledgeBase; onWorldChange: (world: WorldKnowledgeBase) => void; seeds: SeedSuggestion[]; seedBusy: boolean; onSuggestSeeds: () => void; onQueueBrief: () => void }) {
+function LegacyStoryStudioWorkspaceOld({ brief, onBriefChange, world, onWorldChange, seeds, seedBusy, onSuggestSeeds, onQueueBrief }: { brief: GenerateInput; onBriefChange: (brief: GenerateInput) => void; world: WorldKnowledgeBase; onWorldChange: (world: WorldKnowledgeBase) => void; seeds: SeedSuggestion[]; seedBusy: boolean; onSuggestSeeds: () => void; onQueueBrief: () => void }) {
   const updateBrief = (patch: Partial<GenerateInput>) => onBriefChange({ ...brief, ...patch });
   const updateWorld = (patch: Partial<WorldKnowledgeBase>) => onWorldChange({ ...world, ...patch });
   const updateCharacter = (id: string, patch: Partial<WorldCharacter>) => updateWorld({ characters: world.characters.map((character) => character.id === id ? { ...character, ...patch } : character) });
@@ -1183,6 +1366,19 @@ function CandidateGallery({ assets, busy, onApprove }: { assets: ShotAsset[]; bu
   const [previewId, setPreviewId] = useState<string>();
   const preview = assets.find((asset) => asset.id === previewId) || assets[0];
   return <div className="candidate-list"><div className="candidate-heading"><b>Image candidates</b><small>{assets.length} generated {assets.length === 1 ? "frame" : "frames"}</small></div>{preview?.url && <img className="candidate-preview" src={preview.url} alt="Selected generated candidate" />}{assets.map((asset) => <button type="button" className={asset.id === preview?.id ? "candidate-card selected" : "candidate-card"} key={asset.id} onClick={() => setPreviewId(asset.id)}><span className="candidate-thumb">{asset.url ? <img src={asset.url} alt="" /> : <Image size={14}/>}</span><span className="candidate-meta"><strong>{asset.status}</strong><small>{asset.filename}</small></span>{asset.status !== "approved" && <span className="candidate-approve" onClick={(event) => { event.stopPropagation(); onApprove(asset); }}>Approve</span>}</button>)}</div>;
+}
+
+function SceneImageControls({ story, sceneIndex, busy, onStoryRefresh, onAction }: { story?: StoryDetail; sceneIndex: number; busy: boolean; onStoryRefresh: () => Promise<void>; onAction: (action: () => Promise<unknown>, message: string) => void }) {
+  const [count, setCount] = useState(1);
+  const [placement, setPlacement] = useState("end");
+  const scene = story?.scenes[sceneIndex];
+  if (!story || !scene) return null;
+  const request = (mode: "director" | "manual") => onAction(async () => {
+    const result = await api.addSceneImage(story.id, sceneIndex, { mode, count, position: placement === "end" ? undefined : Number(placement) });
+    await onStoryRefresh();
+    return result;
+  }, `${count} image${count === 1 ? "" : "s"} added with ${mode === "director" ? "director placement" : "manual placement"}.`);
+  return <aside className="scene-image-controls metal-panel"><div><span className="eyebrow-label">Visual rhythm</span><h3>Add more images</h3><p>Let the Director place a new visual beat against the shot plan, or insert it yourself.</p></div><label>Images to add<select value={count} onChange={(event) => setCount(Number(event.target.value))}><option value={1}>1 image</option><option value={2}>2 images</option><option value={3}>3 images</option><option value={4}>4 images</option></select></label><label>Manual insertion<select value={placement} onChange={(event) => setPlacement(event.target.value)}><option value="end">At the end</option>{(scene.image_filenames || []).map((_, index) => <option value={String(index)} key={index}>Before image {index + 1}</option>)}</select></label><button type="button" className="outline-button" disabled={busy} onClick={() => request("director")}><Wand2 size={15}/> Director placement</button><button type="button" className="outline-button" disabled={busy} onClick={() => request("manual")}><Plus size={15}/> Place manually</button><small>{scene.image_filenames?.length || 0} images currently in this scene. New artwork marks the release timeline stale until rebuilt.</small></aside>;
 }
 
 function StoryEditor({ story, sceneIndex, busy, onClose, onSelectScene, onStoryRefresh, onAction }: { story?: StoryDetail; sceneIndex: number; busy: boolean; onClose: () => void; onSelectScene: (index: number) => void; onStoryRefresh: () => Promise<void>; onAction: (action: () => Promise<unknown>, message: string) => void }) {

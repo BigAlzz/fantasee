@@ -2,9 +2,25 @@ export type Story = {
   id: string;
   title: string;
   description?: string;
+  story_concept?: string;
+  status?: string;
+  style?: string;
+  tone?: string;
+  voice_preset?: string;
+  narration_style?: string;
+  characters?: string;
+  world_context?: string;
+  voice_assignments?: string;
+  critic_rating?: number;
+  rating?: number;
+  review?: Record<string, unknown>;
+  pipeline?: Record<string, unknown>;
   created_at?: string | number;
   updated_at?: string | number;
   scene_count?: number;
+  num_scenes?: number;
+  images_per_scene?: number;
+  scene_art_urls?: string[];
   cover_image_url?: string;
   hero_image?: string;
   background_audio?: string;
@@ -19,6 +35,7 @@ export type Scene = {
   narration_text?: string;
   prompt?: string;
   image_filenames?: string[];
+  image_urls?: string[];
   audio_duration?: number;
   audio_filename?: string;
   subtitle_file?: string;
@@ -52,6 +69,9 @@ export type ProductionJob = {
   message: string;
   required_capabilities: string[];
   priority: number;
+  worker_id?: string;
+  worker_status?: string;
+  lease_expires_at?: number;
 };
 
 export type ProductionRun = {
@@ -65,6 +85,9 @@ export type ProductionRun = {
   created_at?: number;
   updated_at?: number;
   item_count?: number;
+  worker_ids?: string[];
+  worker_id?: string;
+  worker_status?: string;
 };
 
 export type ProductionEvent = {
@@ -145,6 +168,13 @@ export type WorldCharacter = {
   description: string;
   voice: string;
   style: string;
+  age?: string;
+  alignment?: string;
+  traits?: string;
+  appearance?: string;
+  biography?: string;
+  motivation?: string;
+  portrait_url?: string;
 };
 
 export type WorldRelationship = {
@@ -236,6 +266,7 @@ export const api = {
   runs: () => request<{ runs: ProductionRun[] }>("/api/production/runs"),
   run: (id: string) => request<{ run: ProductionRun; jobs: ProductionJob[] }>(`/api/production/runs/${id}`),
   events: (id: string, afterSequence = 0) => request<{ run_id: string; events: ProductionEvent[]; next_sequence: number }>(`/api/production/runs/${id}/events?after_sequence=${afterSequence}`),
+  deleteRun: (id: string) => request<{ status: string; run_id: string; story_id: string; message: string }>(`/api/production/runs/${id}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: true }) }),
   workers: () => request<{ workers: Worker[] }>("/api/production/workers"),
   comfyWorkers: () => request<{ workers: ComfyWorker[] }>("/api/comfyui/workers"),
   backgroundTracks: () => request<{ tracks: BackgroundTrack[] }>("/api/background/tracks"),
@@ -251,10 +282,18 @@ export const api = {
   },
   spawn: (kind: "cpu" | "gpu") => request(`/api/comfyui/workers/spawn-${kind}`, { method: "POST" }),
   killComfy: (url: string) => request("/api/comfyui/workers/kill", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) }),
-  generate: (input: GenerateInput) => request<{ task_id: string; message: string }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  generate: (input: GenerateInput) => request<{ task_id: string; message: string; deduplicated?: boolean }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  generateCharacterPortrait: (input: { character_id: string; name: string; role: string; description?: string; appearance?: string; alignment?: string; traits?: string; biography?: string; world_context?: string }) => request<{ url: string; filename: string }>("/api/world/character-portrait", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  generateCharacterPortraits: (input: { world_context?: string; characters: Array<{ character_id: string; name: string; role: string; description?: string; appearance?: string; alignment?: string; traits?: string; biography?: string }> }) => request<{ portraits: Array<{ character_id: string; url: string; filename: string }>; failed: string[] }>("/api/world/character-portraits", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  generateStoryThumbnail: (storyId: string) => request<{ url: string; filename: string }>(`/api/world/stories/${storyId}/thumbnail`, { method: "POST" }),
+  repairStory: (storyId: string) => request<{ task_id: string; status: string; message: string }>(`/api/stories/${storyId}/repair`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) }),
+  deleteStory: (storyId: string, backup = false) => request<{ task_id?: string; status: string; story_id: string; message?: string }>(`/api/stories/${storyId}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ confirm: true, backup }) }),
   seedSuggestions: (input: Pick<GenerateInput, "story_concept" | "style" | "tone" | "characters">) => request<{ seeds: SeedSuggestion[] }>("/api/seed-suggestions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ concept: input.story_concept, style: input.style, tone: input.tone, characters: input.characters, count: 3 }) }),
   regenerateScene: (storyId: string, sceneIndex: number, options?: { regenerate_audio?: boolean; regenerate_images?: boolean }) => request<{ status: string; scene: Scene; regenerated?: string[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/regenerate`, { method: "POST", headers: options ? { "content-type": "application/json" } : undefined, body: options ? JSON.stringify(options) : undefined }),
-  addSceneImage: (storyId: string, sceneIndex: number) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/add-image`, { method: "POST" }),
+  updateStoryBrief: (storyId: string, input: Partial<Pick<GenerateInput, "story_concept" | "style" | "tone" | "voice_preset" | "narration_style" | "characters" | "world_context" | "voice_assignments" | "num_scenes" | "images_per_scene">>) => request<{ status: string; story_id: string; manifest: Story }>(`/api/stories/${storyId}/brief`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  scanStoryContext: (storyId: string, force = false) => request<{ status: string; story_id: string; manifest: StoryDetail; summary: { characters: number; scenes: number; scanned: boolean } }>(`/api/stories/${storyId}/context/scan`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ force }) }),
+  regenerateStory: (storyId: string, backup = true) => request<{ task_id: string; status: string; story_id: string; message: string }>(`/api/stories/${storyId}/regenerate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ backup }) }),
+  addSceneImage: (storyId: string, sceneIndex: number, input?: { mode?: "director" | "manual"; count?: number; position?: number }) => request<{ status: string; filename: string; filenames: string[]; placements: Array<{ filename: string; position: number; shot_id?: string | null }>; total_images: number; mode: string }>(`/api/stories/${storyId}/scenes/${sceneIndex}/add-image`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input || {}) }),
   sceneShots: (storyId: string, sceneIndex: number) => request<{ shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`),
   planSceneShots: (storyId: string, sceneIndex: number) => request<{ revision: number; shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pacing: "balanced" }) }),
   reviseSceneShot: (storyId: string, sceneIndex: number, shotId: string, visualContext: string) => request<{ revision: number; shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots/${shotId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ visual_context: visualContext }) }),

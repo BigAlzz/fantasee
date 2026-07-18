@@ -1,7 +1,7 @@
 import asyncio
 from unittest.mock import patch
 
-from fantasee_server.production_runtime import start_task
+from fantasee_server.production_runtime import enqueue_task_job, start_task
 
 
 def test_library_maintenance_uses_durable_worker_job(tmp_path, monkeypatch):
@@ -43,3 +43,45 @@ def test_library_maintenance_uses_durable_worker_job(tmp_path, monkeypatch):
     persisted = get_persisted_task("maintenance-1")
     assert persisted["jobs"][0]["job_type"] == "library.complete"
     assert persisted["jobs"][0]["status"] == "succeeded"
+
+
+def test_library_recovery_holds_maintenance_lock(tmp_path, monkeypatch):
+    monkeypatch.setenv("FANTASEE_PRODUCTION_DB", str(tmp_path / "production.db"))
+    monkeypatch.setenv("FANTASEE_GENERATION_RECOVERY_DELAY", "0")
+
+    from fantasee_server import library
+
+    old_running = library._library_maintenance_running
+    start_task("maintenance-1", story_id="library", kind="library_maintenance")
+    enqueue_task_job(
+        "maintenance-1",
+        job_id="maintenance-1-00",
+        job_type="library.complete",
+        payload={"story_id": "story-1"},
+    )
+
+    async def no_sleep(_delay):
+        return None
+
+    class FailingWorker:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def run_once(self, _handler):
+            assert library._library_maintenance_running is True
+            raise RuntimeError("stop after lock assertion")
+
+    monkeypatch.setattr(library.asyncio, "sleep", no_sleep)
+    monkeypatch.setattr(library, "ProductionWorker", FailingWorker)
+
+    try:
+        with patch.object(library, "_complete_story_for_library"):
+            try:
+                asyncio.run(library.recover_library_jobs())
+            except RuntimeError as exc:
+                assert str(exc) == "stop after lock assertion"
+            else:
+                raise AssertionError("recovery should have raised from the failing worker")
+        assert library._library_maintenance_running is False
+    finally:
+        library._library_maintenance_running = old_running

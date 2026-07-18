@@ -134,7 +134,19 @@ def call_llm(
                 allow_redirects=False,
             )
             resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            data = resp.json()
+            choices = data.get("choices") if isinstance(data, dict) else None
+            if not isinstance(choices, list) or not choices:
+                raise RuntimeError("LLM response contained no choices")
+            choice = choices[0] if isinstance(choices[0], dict) else {}
+            message = choice.get("message")
+            content = message.get("content") if isinstance(message, dict) else None
+            if not isinstance(content, str) or not content.strip():
+                finish_reason = choice.get("finish_reason") or "unknown"
+                raise RuntimeError(
+                    f"LLM returned empty content (finish_reason={finish_reason})"
+                )
+            return content
         except Exception as e:
             if attempt < 2:
                 wait = 10 * (attempt + 1)
@@ -658,12 +670,18 @@ GRANULAR_SCENE_SYSTEM += _STYLE_OVERRIDE
 
 def generate_story_outline_granular(
     concept: str, num_scenes: int, style: str, characters: str, tone: str,
+    narration_style: str = "",
 ) -> Optional[list]:
     """Commission bounded context and one validated scene at a time."""
     emit("running", "Commissioning story bible in focused sections...", 0.04)
     budget = TokenBudget(limit=max(8192, 3600 + num_scenes * 2400))
     adapter = GranularLLMAdapter(call_llm, budget=budget, usage_sink=_llm_usage_sink)
-    context = f"Concept: {concept}\nStyle: {style}\nTone: {tone}\nCharacters: {characters or '(none)'}"
+    narration_context = f"\nNarration direction: {narration_style}" if narration_style else ""
+    context = f"Concept: {concept}\nStyle: {style}\nTone: {tone}{narration_context}\nCharacters: {characters or '(none)'}"
+    scene_system = GRANULAR_SCENE_SYSTEM
+    style_text = load_story_style_prompt(narration_style) if narration_style else ""
+    if style_text:
+        scene_system += "\n\nMANDATORY NARRATION STYLE OVERRIDE:\n" + style_text
     try:
         bible = adapter.complete(
             name="story.bible", system=GRANULAR_BIBLE_SYSTEM,
@@ -688,7 +706,7 @@ def generate_story_outline_granular(
         )
         try:
             raw = adapter.complete(
-                name=f"scene.{index:02d}.card", system=GRANULAR_SCENE_SYSTEM,
+                name=f"scene.{index:02d}.card", system=scene_system,
                 prompt=prompt, max_tokens=1200,
             ).text
             parsed = parse_scene_response(f"Scene {index}\n{raw}", expected_scenes=1)

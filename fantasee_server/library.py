@@ -767,6 +767,7 @@ async def _run_library_maintenance_queue(task_id: str, stories: list[dict]) -> N
 
 async def recover_library_jobs() -> None:
     """Resume durable repair jobs left by a previous server process."""
+    global _library_maintenance_running
     await asyncio.sleep(float(os.environ.get("FANTASEE_GENERATION_RECOVERY_DELAY", "5") or "5"))
     capabilities = tuple(
         value.strip()
@@ -779,61 +780,72 @@ async def recover_library_jobs() -> None:
         capabilities=capabilities,
     )
 
-    while True:
-        with ProductionStore(production_database_path()) as store:
-            job = next(
-                (item for item in store.list_runnable_jobs() if item.job_type == "library.complete"),
-                None,
-            )
-        if job is None:
-            return
-        story_id = job.payload["story_id"]
-        _generation_tasks.setdefault(job.run_id, {
-            "id": job.run_id,
-            "kind": "library_maintenance",
-            "status": "running",
-            "progress": 0,
-            "message": "Recovered library maintenance",
-            "created_at": now(),
-        })
-        _generation_tasks.setdefault(job.id, {
-            "id": job.id,
-            "parent": job.run_id,
-            "kind": "library_story",
-            "story_id": story_id,
-            "status": "running",
-            "progress": 0,
-            "message": f"Recovering {story_id}",
-            "created_at": now(),
-        })
+    lock_acquired = False
+    try:
+        while True:
+            with ProductionStore(production_database_path()) as store:
+                job = next(
+                    (item for item in store.list_runnable_jobs() if item.job_type == "library.complete"),
+                    None,
+                )
+            if job is None:
+                return
+            if not lock_acquired:
+                # The periodic library agent is process-local. Hold the same
+                # lock while recovery drains durable jobs so it cannot start a
+                # second maintenance run for the same incomplete stories.
+                _library_maintenance_running = True
+                lock_acquired = True
+            story_id = job.payload["story_id"]
+            _generation_tasks.setdefault(job.run_id, {
+                "id": job.run_id,
+                "kind": "library_maintenance",
+                "status": "running",
+                "progress": 0,
+                "message": "Recovered library maintenance",
+                "created_at": now(),
+            })
+            _generation_tasks.setdefault(job.id, {
+                "id": job.id,
+                "parent": job.run_id,
+                "kind": "library_story",
+                "story_id": story_id,
+                "status": "running",
+                "progress": 0,
+                "message": f"Recovering {story_id}",
+                "created_at": now(),
+            })
 
-        def complete_recovered_job(_job, job_progress):
-            def progress(stage: str, message: str, pct: float) -> None:
-                _generation_tasks[job.id].update({
-                    "stage": stage,
-                    "progress": pct,
-                    "message": message,
-                    "status": "running",
-                })
-                _generation_tasks[job.run_id].update({
-                    "stage": stage,
-                    "progress": pct,
-                    "message": message,
-                    "status": "running",
-                })
-                job_progress(stage, message, pct)
+            def complete_recovered_job(_job, job_progress):
+                def progress(stage: str, message: str, pct: float) -> None:
+                    _generation_tasks[job.id].update({
+                        "stage": stage,
+                        "progress": pct,
+                        "message": message,
+                        "status": "running",
+                    })
+                    _generation_tasks[job.run_id].update({
+                        "stage": stage,
+                        "progress": pct,
+                        "message": message,
+                        "status": "running",
+                    })
+                    job_progress(stage, message, pct)
 
-            return _complete_story_for_library(story_id, progress)
+                return _complete_story_for_library(story_id, progress)
 
-        await worker.run_once(complete_recovered_job)
-        with ProductionStore(production_database_path()) as store:
-            finished = store.get_job(job.id)
-        _generation_tasks[job.id].update({
-            "status": "done" if finished and finished.status == "succeeded" else "error",
-            "progress": 1.0,
-            "message": finished.message if finished and finished.message else story_id,
-        })
-        finalize_run_from_jobs(job.run_id)
+            await worker.run_once(complete_recovered_job)
+            with ProductionStore(production_database_path()) as store:
+                finished = store.get_job(job.id)
+            _generation_tasks[job.id].update({
+                "status": "done" if finished and finished.status == "succeeded" else "error",
+                "progress": 1.0,
+                "message": finished.message if finished and finished.message else story_id,
+            })
+            finalize_run_from_jobs(job.run_id)
+    finally:
+        if lock_acquired:
+            _library_maintenance_running = False
 
 
 async def _library_agent_loop() -> None:

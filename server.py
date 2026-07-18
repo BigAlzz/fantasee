@@ -42,6 +42,7 @@ from fantasee_server.api import (
     stories,
     system,
     tts,
+    world,
     ws,
 )
 from fantasee_server.library import _library_agent_loop, recover_library_jobs
@@ -157,6 +158,7 @@ app.include_router(migration.router, dependencies=[Depends(require_operator)])
 app.include_router(production.router, dependencies=[Depends(require_operator)])
 app.include_router(shots.router, dependencies=[Depends(require_operator)])
 app.include_router(settings.router, dependencies=[Depends(require_operator)])
+app.include_router(world.router, dependencies=[Depends(require_operator)])
 app.include_router(ws.router)
 
 # Serve the bundled frontend (index.html, CSS, JS, etc.) at /static/.

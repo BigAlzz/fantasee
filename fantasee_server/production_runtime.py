@@ -84,6 +84,17 @@ def start_task(task_id: str, *, story_id: str, kind: str, metadata: dict[str, An
         })
 
 
+def find_active_task(*, story_id: str, kind: str, metadata: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """Find an existing queued/running task with the same production input."""
+    fingerprint = _fingerprint(metadata or {})
+    with ProductionStore(_database_path()) as store:
+        runs = store.list_runs(limit=200)
+    for run in runs:
+        if run.story_id == story_id and run.command == kind and run.input_fingerprint == fingerprint and run.status in {"queued", "running"}:
+            return {"id": run.id, "status": run.status}
+    return None
+
+
 def update_task(
     task_id: str,
     *,
@@ -192,6 +203,7 @@ def get_persisted_task(task_id: str) -> dict[str, Any] | None:
             return None
         events = store.list_events(task_id)
         jobs = store.list_jobs(task_id)
+        workers = {worker.id: worker for worker in store.list_workers()}
     job_context = {
         job.id: _story_context(
             job.payload.get("story_id") or run.story_id,
@@ -231,6 +243,9 @@ def get_persisted_task(task_id: str) -> dict[str, Any] | None:
                 "message": job.message,
                 "required_capabilities": list(job.required_capabilities),
                 "priority": job.priority,
+                "worker_id": job.lease_owner,
+                "worker_status": workers.get(job.lease_owner).status if job.lease_owner in workers else None,
+                "lease_expires_at": job.lease_expires_at,
                 "story_id": job_context[job.id][0],
                 "story_name": job_context[job.id][1],
             }
@@ -243,6 +258,8 @@ def list_persisted_tasks(*, limit: int = 50) -> list[dict[str, Any]]:
     """Return persisted runs in the shape expected by the task panel."""
     with ProductionStore(_database_path()) as store:
         runs = store.list_runs(limit=limit)
+        workers = {worker.id: worker for worker in store.list_workers()}
+        run_ids = {run.id for run in runs}
         result = []
         for run in runs:
             events = store.list_events(run.id)
@@ -267,6 +284,10 @@ def list_persisted_tasks(*, limit: int = 50) -> list[dict[str, Any]]:
                 "created_at": run.created_at,
                 "updated_at": run.updated_at,
                 "item_count": len(jobs) or started.get("metadata", {}).get("item_count"),
+                "worker_ids": sorted({
+                    job.lease_owner for job in jobs
+                    if job.lease_owner and job.status in {"leased", "running"}
+                }),
             }
             metadata = started.get("metadata") or {}
             if metadata.get("parent"):
@@ -274,6 +295,10 @@ def list_persisted_tasks(*, limit: int = 50) -> list[dict[str, Any]]:
             result.append(task)
             if jobs and run.command in {"generation_queue", "library_maintenance"}:
                 for job in jobs:
+                    # A durable child run is already returned by list_runs.
+                    # Do not append the parent's projection as a second copy.
+                    if job.id in run_ids:
+                        continue
                     story_id, story_name = _story_context(
                         job.payload.get("story_id") or run.story_id,
                         job.payload.get("story_name")
@@ -292,6 +317,8 @@ def list_persisted_tasks(*, limit: int = 50) -> list[dict[str, Any]]:
                         "story_id": story_id,
                         "story_name": story_name,
                         "created_at": run.created_at,
+                        "worker_id": job.lease_owner,
+                        "worker_status": workers.get(job.lease_owner).status if job.lease_owner in workers else None,
                     }
                     result.append(child)
     return result

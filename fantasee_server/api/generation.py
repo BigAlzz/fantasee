@@ -32,6 +32,7 @@ from fastapi import APIRouter, Body, HTTPException
 from fantasee_server.library import _complete_story_for_library
 from fantasee_server.production_runtime import (
     enqueue_task_job,
+    find_active_task,
     finish_task,
     start_task,
     update_task,
@@ -389,6 +390,18 @@ async def _run_generation(task_id: str, req: GenerateRequest, job_progress=None)
 @router.post("/api/generate")
 async def start_generation(req: GenerateRequest):
     """Start a new story generation task."""
+    existing = find_active_task(
+        story_id=req.story_concept,
+        kind="generate",
+        metadata=req.model_dump(),
+    )
+    if existing:
+        return {
+            "task_id": existing["id"],
+            "status": existing["status"],
+            "message": "This production is already queued; showing the existing run.",
+            "deduplicated": True,
+        }
     task_id = new_uuid()[:8]
     _generation_tasks[task_id] = {
         "id": task_id,
