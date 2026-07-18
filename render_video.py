@@ -34,7 +34,7 @@ DEFAULT_HEIGHT = 1080
 CROSSFADE_DURATION = 0.8       # seconds of crossfade between images
 SCENE_TRANSITION_DURATION = 0.8 # seconds of fade-through-black between scenes
 ZOOM_MAX = 1.08                # max zoom factor (8% zoom in)
-FPS = 30
+FPS = 60                  # Stable motion clock for smooth Ken Burns movement
 AUDIO_BITRATE = "192k"
 VIDEO_CRF = 20                 # quality (lower = better, 18-23 typical)
 
@@ -198,7 +198,7 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
         
         for i, img_path in enumerate(images):
             clip_dur = clip_durations[i]
-            total_frames = int(clip_dur * fps)
+            total_frames = max(1, int(round(clip_dur * fps)))
             # Ease the camera in and out so Ken Burns motion does not jump at
             # the start or end of a shot.  zoompan evaluates these expressions
             # per frame; cosine easing gives zero velocity at both endpoints.
@@ -231,17 +231,19 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
                 f"zoompan=z='{z_expr}':d=1:"
                 f"x='{x_expr}':y='{y_expr}':"
                 f"s={width}x{height}:fps={fps},"
-                f"format=yuv420p"
+                f"fps={fps},settb=AVTB,setpts=N/({fps}*TB),format=yuv420p"
             )
             
             cmd = [
                 "ffmpeg", "-y",
-                "-r", str(fps),
-                "-loop", "1", "-t", f"{clip_dur:.3f}",
+                "-loop", "1", "-framerate", str(fps),
                 "-i", str(img_path),
                 "-vf", zp_filter,
+                "-frames:v", str(total_frames),
                 "-c:v", "libx264", "-preset", "fast",
                 "-crf", str(crf),
+                "-pix_fmt", "yuv420p",
+                "-fps_mode", "cfr",
                 "-an",
                 str(clip_path)
             ]
@@ -276,7 +278,13 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
             # inputs, which are output-link labels rather than input stream
             # labels.  ffmpeg consequently kept the first stream as the
             # effective video throughout the xfade chain.
-            prev_label = "0:v"
+            for i in range(n_images):
+                filter_parts.append(
+                    f"[{i}:v]fps={fps},format=yuv420p,settb=AVTB,"
+                    f"setpts=PTS-STARTPTS[clip{i}]"
+                )
+
+            prev_label = "clip0"
             for i in range(1, n_images):
                 # With explicit shot timing, each transition starts at the
                 # next approved segment boundary. Legacy clips retain their
@@ -289,7 +297,7 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
                     out_label = "vout"
                 
                 filter_parts.append(
-                    f"[{prev_label}][{i}:v]xfade=transition=fade:"
+                    f"[{prev_label}][clip{i}]xfade=transition=fade:"
                     f"duration={CROSSFADE_DURATION}:"
                     f"offset={xfade_off:.3f}[{out_label}]"
                 )
@@ -320,6 +328,9 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
                 "-map", f"[{vout_label}]",
                 "-c:v", "libx264", "-preset", "fast",
                 "-crf", str(crf),
+                "-pix_fmt", "yuv420p",
+                "-r", str(fps),
+                "-fps_mode", "cfr",
                 "-an",
                 str(xfade_video)
             ]
@@ -373,7 +384,7 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
 
 
 def concatenate_scenes(scene_videos: list[Path], slug: str,
-                       output_dir: Path) -> Optional[Path]:
+                       output_dir: Path, fps: int = FPS) -> Optional[Path]:
     """Join scenes with a visible fade transition and matching audio overlap."""
     if not scene_videos:
         return None
@@ -402,7 +413,12 @@ def concatenate_scenes(scene_videos: list[Path], slug: str,
             filter_inputs.extend(["-i", str(scene_video)])
 
         filter_parts = []
-        previous_video = "0:v"
+        for index in range(len(scene_videos)):
+            filter_parts.append(
+                f"[{index}:v]fps={fps},format=yuv420p,settb=AVTB,"
+                f"setpts=PTS-STARTPTS[scene_in{index}]"
+            )
+        previous_video = "scene_in0"
         previous_audio = "0:a"
         elapsed = durations[0]
         for index in range(1, len(scene_videos)):
@@ -410,7 +426,7 @@ def concatenate_scenes(scene_videos: list[Path], slug: str,
             audio_label = f"scene_a{index}"
             offset = max(0.0, elapsed - SCENE_TRANSITION_DURATION)
             filter_parts.append(
-                f"[{previous_video}][{index}:v]xfade=transition=fadeblack:"
+                f"[{previous_video}][scene_in{index}]xfade=transition=fadeblack:"
                 f"duration={SCENE_TRANSITION_DURATION}:offset={offset:.3f}[{video_label}]"
             )
             filter_parts.append(
@@ -430,6 +446,7 @@ def concatenate_scenes(scene_videos: list[Path], slug: str,
             "-map", f"[{previous_audio}]",
             "-c:v", "libx264", "-preset", "fast", "-crf", str(VIDEO_CRF),
             "-c:a", "aac", "-b:a", AUDIO_BITRATE,
+            "-pix_fmt", "yuv420p", "-r", str(fps), "-fps_mode", "cfr",
             "-movflags", "+faststart",
             str(out_path)
         ]
@@ -618,7 +635,7 @@ def main():
     # Concatenate all scenes
     if not args.no_full and len(scene_videos) > 1:
         print("Concatenating scenes...")
-        concatenate_scenes(scene_videos, args.slug, story_dir)
+        concatenate_scenes(scene_videos, args.slug, story_dir, fps=args.fps)
         if scene_vtts:
             concatenate_vtts(
                 scene_vtts,

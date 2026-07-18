@@ -11,12 +11,17 @@ from pathlib import Path
 import pytest
 
 from render_video import concatenate_scenes, concatenate_vtts, render_scene
+from render_video import FPS
 
 
 pytestmark = pytest.mark.skipif(
     shutil.which("ffmpeg") is None,
     reason="ffmpeg is required for the renderer regression test",
 )
+
+
+def test_motion_renderer_uses_a_smooth_default_frame_clock() -> None:
+    assert FPS >= 60
 
 
 def _write_wav(path: Path, seconds: float = 2.0) -> None:

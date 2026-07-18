@@ -384,7 +384,34 @@ def parse_scene_response(response: str, expected_scenes: int = 0) -> list[dict]:
     return scenes
 
 
-STORY_OUTLINE_SYSTEM = """You are a creative writing assistant specializing in visual storytelling.
+HUMAN_DRAMA_GUIDANCE = """HUMAN DRAMA AND APPROACHABILITY (MANDATORY):
+Human drama comes first. The setting is only useful when it changes what a person
+wants, risks, chooses, or loses. Every scene must give a person a clear immediate
+want, an obstacle, and a visible choice or consequence. Start with the person and
+their problem; use the location only when it affects that problem.
+
+Use plain, approachable language. Prefer short, concrete sentences and familiar
+words. Do not reach for grand metaphors, ornate descriptions, or impressive-sounding
+history when a simple human action will do. Let the audience understand the scene
+without studying it. The narration should sound like a thoughtful person telling a
+friend what happened, not a tour guide describing a place.
+
+When a new character appears, make it clear who they are. In their first mention,
+give their name, role or relationship to the existing characters, one memorable
+physical or behavioral detail, and what they want right now. Never introduce a
+name without telling the audience who they are or why they matter. Keep the named
+cast small enough to remember. After the introduction, show relationships through
+choices, interruptions, practical help, disagreement, and consequences.
+
+Each scene should contain at least one human beat: a decision, a promise, a fear
+shown through action, a sacrifice, a misunderstanding, a joke, or a change in a
+relationship. Explain unusual world terms the first time they matter. Do not let
+landscape, lore, or spectacle occupy the narration when a character could be
+doing, saying, choosing, or losing something instead.
+"""
+
+
+STORY_OUTLINE_SYSTEM = HUMAN_DRAMA_GUIDANCE + "\n\n" + """You are a creative writing assistant specializing in visual storytelling.
 Your task is to generate a detailed scene-by-scene breakdown for an illustrated story.
 
 CRITICAL — CHARACTER BIBLE RULE:
@@ -698,8 +725,11 @@ STORY_OUTLINE_SYSTEM += _STYLE_OVERRIDE
 
 GRANULAR_BIBLE_SYSTEM = (
     "You are the story bible editor. Return compact JSON only with keys: "
-    "cast, world, rules, conflicts, continuity. Each value is a short string "
-    "or array of concrete facts. Do not write scenes or prose."
+    "cast, world, rules, conflicts, continuity. The cast value must be an array "
+    "of entries with name, role_or_relationship, immediate_want, fear_or_risk, "
+    "and distinguishing_detail. Each value is a short string or array of concrete "
+    "facts. Do not write scenes or prose.\n\n"
+    + HUMAN_DRAMA_GUIDANCE
 )
 GRANULAR_ARC_SYSTEM = (
     "You are a story architect. Return compact JSON only with an array called "
@@ -708,7 +738,8 @@ GRANULAR_ARC_SYSTEM = (
 GRANULAR_SCENE_SYSTEM = (
     "You are a scene writer working inside an approved story bible. Write exactly "
     "one scene using these labels: Title, Visual Prompt, Narrative, Narration. "
-    "Keep the prompt 35-60 words and narration 80-150 words. Use the canonical style."
+    "Keep the prompt 35-60 words and narration 80-150 words. Use the canonical style.\n\n"
+    + HUMAN_DRAMA_GUIDANCE
 )
 GRANULAR_SCENE_SYSTEM += _STYLE_OVERRIDE
 
@@ -919,7 +950,7 @@ generic "cinematic lighting" language."""
     return scenes
 
 
-SCENE_REFINEMENT_SYSTEM = """You are a scene editor. Revise exactly one story scene.
+SCENE_REFINEMENT_SYSTEM = HUMAN_DRAMA_GUIDANCE + "\n\n" + """You are a scene editor. Revise exactly one story scene.
 Return exactly these four labels and nothing else:
 Title: ...
 Visual Prompt: ...

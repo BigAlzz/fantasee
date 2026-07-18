@@ -24,6 +24,14 @@ class TestStoryQuality(unittest.TestCase):
         self.assertIn("MANDATORY NARRATION STYLE OVERRIDE", STORY_OUTLINE_SYSTEM)
         self.assertIn("Dialogue tags are forbidden", STORY_OUTLINE_SYSTEM)
 
+    def test_generation_guidance_prioritizes_approachable_human_drama(self):
+        from generate_story import HUMAN_DRAMA_GUIDANCE, STORY_OUTLINE_SYSTEM
+
+        self.assertIn("human drama comes first", HUMAN_DRAMA_GUIDANCE.lower())
+        self.assertIn("plain, approachable language", HUMAN_DRAMA_GUIDANCE.lower())
+        self.assertIn("who they are", HUMAN_DRAMA_GUIDANCE.lower())
+        self.assertIn(HUMAN_DRAMA_GUIDANCE, STORY_OUTLINE_SYSTEM)
+
     def test_review_accepts_complete_varied_outline(self):
         scenes = []
         shots = ["wide shot", "medium shot", "low angle", "over-the-shoulder shot"]

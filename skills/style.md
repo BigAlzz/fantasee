@@ -53,6 +53,14 @@ Write narration in this exact voice. Every rule below is mandatory.
 - Action first, name later: "A woman stands in the doorway. Thin dark circles under her eyes. Aya, mother."
 - Physical description uses one or two concrete details, never a full catalogue.
 - Supporting characters are defined by one distinguishing trait.
+- Human drama comes before the location. Start with what a person wants or must do.
+- Introduce every new person with their name, role or relationship, one concrete detail,
+  and the immediate reason they matter. Never leave the audience asking who a name is.
+- Use plain, approachable words. Choose a clear action over a grand metaphor or ornate
+  description. Explain unusual terms when they first become important.
+- Give each scene a human beat: a choice, promise, disagreement, sacrifice, mistake,
+  practical kindness, or relationship change. A location belongs in the narration only
+  when it creates pressure or changes that beat.
 
 ### FORBIDDEN
 - Exposition dumps.
