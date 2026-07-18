@@ -110,30 +110,33 @@ def discover_generated_stories() -> list[dict]:
                     data.setdefault("background_volume", 0.05)
                     data.setdefault("background_muted", False)
                     data.setdefault("chapters", [])
-                    # Prefer the new image-backed title PNG over the legacy
-                    # SVG, but fall back if it's not on disk yet.
-                    hero = (
-                        data.get("title_image")
-                        or data.get("hero_image")
-                        or data.get("title_slide")
+                    # Use story artwork for library cards. Title slides are
+                    # metadata, not story content, so they remain a fallback.
+                    scene_hero = next(
+                        (filename for scene in scenes for filename in (scene.get("image_filenames", []) or [])
+                         if filename and (child / str(filename).lstrip("/")).is_file()),
+                        None,
                     )
-                    if hero and (child / str(hero).lstrip("/")).exists():
-                        data["hero_image_url"] = generated_asset_url(child.name, hero)
-                        data["hero_image"] = hero
+                    if scene_hero:
+                        data["hero_image_url"] = generated_asset_url(child.name, scene_hero)
+                        data["hero_image"] = scene_hero
+                        data["cover_image_url"] = data["hero_image_url"]
                     else:
-                        # Last-ditch: the legacy SVG path
-                        for fallback in ("assets/title/title_slide.png", "assets/title/title_slide.svg"):
-                            if (child / fallback).exists():
-                                data["hero_image_url"] = generated_asset_url(child.name, fallback)
-                                data["hero_image"] = fallback
-                                break
-                    # If we still have no hero, fall back to first scene image
-                    if not data.get("hero_image_url") and scenes:
-                        first_scene = scenes[0]
-                        imgs = first_scene.get("image_filenames", [])
-                        if imgs:
-                            data["hero_image_url"] = generated_asset_url(child.name, imgs[0])
-                            data["hero_image"] = imgs[0]
+                        hero = (
+                            data.get("title_image")
+                            or data.get("hero_image")
+                            or data.get("title_slide")
+                        )
+                        if hero and (child / str(hero).lstrip("/")).exists():
+                            data["hero_image_url"] = generated_asset_url(child.name, hero)
+                            data["hero_image"] = hero
+                        else:
+                            # Last-ditch: the legacy title-slide paths.
+                            for fallback in ("assets/title/title_slide.png", "assets/title/title_slide.svg"):
+                                if (child / fallback).exists():
+                                    data["hero_image_url"] = generated_asset_url(child.name, fallback)
+                                    data["hero_image"] = fallback
+                                    break
                     for scene in scenes:
                         # Convert filenames to URLs
                         imgs = scene.get("image_filenames", [])
