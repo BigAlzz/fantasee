@@ -1,8 +1,14 @@
 # Fantasee
 
-Fantasee is a local AI story generation and viewing app. It writes narrated multi-scene stories from a text concept, generates images through ComfyUI, creates narration audio and synced subtitles, then presents the result in a Netflix-style browser/player.
+Fantasee is a local-first AI animation studio. It turns a creative idea into an
+inspectable production containing story text, scenes, semantic shots, artwork,
+narration, synchronized subtitles, a canonical timeline, rendered video, and a
+verified release that can be watched in Plex.
 
-The app is file-based: story manifests and assets live under `stories/<story-id>/`. There is no application SQLite database. ComfyUI itself may create per-worker SQLite files under its own `user/` directory.
+The current Studio rebuild combines a durable SQLite production ledger with
+file-backed media assets. Existing legacy stories under `outputs/` remain
+readable, while the managed Studio library can start clean and independent from
+the archive.
 
 ## Quick Start
 
@@ -27,7 +33,96 @@ start.bat server
 
 If no ComfyUI worker is detected when the server starts, Fantasee auto-spawns one DirectML GPU worker on port `8189`. Startup and first-run generation only require one healthy GPU worker; additional workers are optional throughput.
 
-## Features
+## Fantasee Studio
+
+Open the rebuild at `http://127.0.0.1:8765/studio/`. It is organized around
+the way a production is actually made:
+
+| Desk | What it does |
+|---|---|
+| **Library** | Shows scene artwork, completion evidence, release state, and the current managed story collection. |
+| **Production Desk** | Shows durable runs, current stages, queue state, retryable failures, worker ownership, and live activity lanes. |
+| **Story Studio** | Edits the brief, scenes, shot plans, prompts, narration, image candidates, subtitles, and revisions. |
+| **Voice Studio** | Auditions voices, sets performance direction and speed, and inspects narration/subtitle timing. |
+| **Player** | Plays the canonical release timeline with scene changes, narration, music, captions, and release selection. |
+| **Assets** | Inspects immutable generated media, provenance, validation state, and release history. |
+| **Settings** | Configures providers, models, workers, audio, defaults, and the Plex destination. |
+
+### From idea to watchable release
+
+1. Start with a concept, style, tone, characters, and optional world context.
+2. Use the seed picker to explore several directions before committing.
+3. Generate a title, description, story bible, bounded outline, and scene cards.
+4. Let the Director plan purposeful shots from narration, pacing, and scene intent.
+5. Generate image candidates through ComfyUI and approve the shots you want.
+6. Revise, reorder, lock, compare, or restore individual shot revisions without
+   rewriting the whole story.
+7. Generate narration, align subtitles to the exact approved audio, and review
+   the waveform and cue coverage.
+8. Build one canonical timeline used by the player, subtitles, FFmpeg renderer,
+   chapters, and Plex publisher.
+9. Render a release, run completion and media quality gates, then export the
+   verified MP4 package to Plex.
+
+### Production control and truthfulness
+
+- **Durable runs and jobs** persist in `.fantasee/production.db`, including
+  events, attempts, leases, progress, worker ownership, token usage, assets,
+  timelines, and releases.
+- **Live worker lanes** show which CPU/GPU worker is online, what it is doing,
+  and whether a job is actually leased. Provider queue activity is not silently
+  presented as an idle worker.
+- **Safe retry and cancellation** support retrying a failed job, cancelling
+  cooperatively, reprioritizing work, and recovering expired leases.
+- **Idempotent production actions** avoid duplicate runs and conflicting
+  releases when the same request is submitted again.
+- **Completion gates** prevent a story or release from being called complete
+  when scenes, shots, images, narration, subtitles, timeline inputs, video
+  streams, chapters, or Plex metadata are missing or stale.
+- **Provenance** records provider, model, workflow, prompt/text fingerprint,
+  seed, settings, source revision, and validation evidence for generated assets.
+
+### Creative and media capabilities
+
+- Granular LLM commissioning for bible sections, arcs, scene cards, shot plans,
+  prompts, continuity, and revisions instead of one opaque whole-story call.
+- Configurable LLM model discovery: Settings queries the selected provider and
+  returns its model list so a different model can be selected without editing
+  source code.
+- ComfyUI image generation with API workflow injection, GPU-first selection,
+  capability-aware workers, alternate-worker retry, face-quality prompt guards,
+  and scene-art-first library cards.
+- Semantic shot planning with shot purpose, framing, action, duration, visual
+  context, candidate approval, locks, ordering, revision history, and targeted
+  regeneration.
+- TTS narration with voice presets, casting/performance direction, speed,
+  auditioning, background music, loudness normalization, and subtitle alignment.
+- Timeline-aware playback with multiple images per scene, timed transitions,
+  narration, captions, chapters, music controls, fullscreen playback, and
+  keyboard navigation.
+- Release history with current-release selection, reversible previews, MP4
+  playback, subtitle sidecars, poster artwork, chapters, and Plex packaging.
+
+### Provider settings
+
+Settings keeps credentials local and exposes the service seams needed for a
+complete production:
+
+| Setting | Purpose |
+|---|---|
+| LLM base URL, API key, and model | Story writing, shot planning, revisions, and model discovery. |
+| TTS base URL, API key, model, voice, and speed | Narration generation and voice auditions. |
+| Unsplash base URL and access key | Optional additional/reference imagery. |
+| ComfyUI worker URLs and auto-spawn | Image generation workers and GPU/CPU fallback. |
+| Whisper model size | Subtitle alignment quality/performance tradeoff. |
+| Scenes, images per scene, style, tone, and narration style | New-production defaults. |
+| Plex destination and background audio directory | Release publishing and music selection. |
+
+Provider health checks validate the LLM model list, TTS endpoint, ComfyUI
+workers, FFmpeg capabilities, and Plex destination before production work is
+started.
+
+## Core Features
 
 - **Story generation** — title, description, scene outline, image prompts, narration, subtitles, and manifest output.
 - **Seed picker** — ask the LLM for 2-6 story ideas before committing to generation.
