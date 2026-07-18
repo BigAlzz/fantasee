@@ -266,7 +266,12 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
             for i, cp in enumerate(clip_paths):
                 filter_inputs.extend(["-i", str(cp)])
             
-            prev_label = "v0"
+            # Input pads are addressed by their ffmpeg stream labels.  The
+            # previous implementation used ``v0``, ``v1``, ... for the
+            # inputs, which are output-link labels rather than input stream
+            # labels.  ffmpeg consequently kept the first stream as the
+            # effective video throughout the xfade chain.
+            prev_label = "0:v"
             for i in range(1, n_images):
                 # With explicit shot timing, each transition starts at the
                 # next approved segment boundary. Legacy clips retain their
@@ -279,7 +284,7 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
                     out_label = "vout"
                 
                 filter_parts.append(
-                    f"[{prev_label}][v{i}]xfade=transition=fade:"
+                    f"[{prev_label}][{i}:v]xfade=transition=fade:"
                     f"duration={CROSSFADE_DURATION}:"
                     f"offset={xfade_off:.3f}[{out_label}]"
                 )

@@ -31,6 +31,8 @@ def test_call_llm_retries_empty_content_before_returning(monkeypatch):
 
     assert result == "READY"
     assert len(calls) == 2
+    assert calls[0][1]["json"]["max_completion_tokens"] == 64
+    assert calls[1][1]["json"]["max_completion_tokens"] == 128
 
 
 def test_call_llm_uses_the_runtime_selected_model(monkeypatch):

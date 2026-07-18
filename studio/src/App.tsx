@@ -10,6 +10,7 @@ import { StoryStudioWorkspace } from "./StoryStudio";
 import { LibraryCatalog } from "./LibraryCatalog";
 import { StoryDetails } from "./StoryDetails";
 import { projectProductionActivity, type ProductionActivity } from "./productionActivity";
+import { selectPlayableRelease } from "./releasePlayback";
 
 const nav = [
   [Library, "Library"], [Sparkles, "Story Studio"], [Volume2, "Voice Studio"], [Clapperboard, "Production Runs"], [Archive, "Assets"], [Settings, "Settings"],
@@ -666,6 +667,19 @@ export function App() {
     catch (error) { setNotice(error instanceof Error ? error.message : "Could not load the story editor."); }
   };
 
+  const openCanonicalPlayer = async (story?: Story) => {
+    if (!story) return;
+    try {
+      const result = await api.releases(story.id);
+      const release = selectPlayableRelease(result.releases);
+      if (!release) throw new Error("This story has no verified release to play yet.");
+      setPlayerRelease(release);
+      setPlayerOpen(true);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not load the current release.");
+    }
+  };
+
   return <main className="studio-shell">
     <aside className="rail">
       <div className="brand"><img src="branding/fantasee-studio-banner.png" alt="FantaSee Studio" /></div>
@@ -678,12 +692,12 @@ export function App() {
     <section className="workspace">
       <header className="command-bar"><label><Search size={19}/><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search stories..." /></label><div><button className="icon-button" onClick={() => void refresh()} aria-label="Refresh"><RefreshCw size={18}/></button><button className="create" onClick={() => setCreateOpen(true)}><Plus size={17}/> Create story</button><button className="icon-button" onClick={() => setWorkersOpen(true)} aria-label="Open worker controls" title="Worker controls"><MoreHorizontal size={19}/></button></div></header>
       <div className="status-strip"><span className="led green"/> {notice} <span>•</span> {workerSummary}</div>
-      {activeView === "Library" ? <><div className={detailStory ? "library-details-layer open" : "library-details-layer"}>{detailStory && <StoryDetails story={detailStory} onBack={() => setDetailStoryId(undefined)} onOpenEditor={() => void openEditor()} onPlay={() => setPlayerOpen(true)} onDeleted={() => { setDetailStoryId(undefined); setSelectedStoryId(undefined); void refresh(); }} />}</div><div className="content-grid">
+      {activeView === "Library" ? <><div className={detailStory ? "library-details-layer open" : "library-details-layer"}>{detailStory && <StoryDetails story={detailStory} onBack={() => setDetailStoryId(undefined)} onOpenEditor={() => void openEditor()} onPlay={() => void openCanonicalPlayer(detailStory)} onDeleted={() => { setDetailStoryId(undefined); setSelectedStoryId(undefined); void refresh(); }} />}</div><div className="content-grid">
         <section className="library-module metal-panel">
           <div className="eyebrow"><span>Featured story</span><span>Newest first</span></div>
           {selectedStory ? <article className="feature">
             <div className="cover">{hasUsableCover(selectedStory) ? <img src={selectedStory.cover_image_url || selectedStory.hero_image} alt=""/> : <Sparkles size={34}/>}</div>
-            <div><h1>{selectedStory.title}</h1><p>{selectedStory.description || "A new production, ready for its editorial pass."}</p><div className="story-meta">{selectedStory.scene_count || 0} scenes <span/> updated {timestamp(selectedStory.updated_at || selectedStory.created_at)}</div><div className="feature-actions"><button className="outline-button" onClick={() => void openEditor()}>Open in editor <ChevronRight size={16}/></button><button className="outline-button" disabled={!selectedStory.completion?.full_video_ok} onClick={() => setPlayerOpen(true)}><Play size={15}/> Play release</button><button className="outline-button" disabled={busy} onClick={() => void runAction(() => api.generateStoryThumbnail(selectedStory.id), `Story card art requested for ${selectedStory.title}.`)}><Image size={15}/> {busy ? "Painting..." : "Generate card art"}</button></div></div>
+            <div><h1>{selectedStory.title}</h1><p>{selectedStory.description || "A new production, ready for its editorial pass."}</p><div className="story-meta">{selectedStory.scene_count || 0} scenes <span/> updated {timestamp(selectedStory.updated_at || selectedStory.created_at)}</div><div className="feature-actions"><button className="outline-button" onClick={() => void openEditor()}>Open in editor <ChevronRight size={16}/></button><button className="outline-button" disabled={!selectedStory.completion?.full_video_ok} onClick={() => void openCanonicalPlayer(selectedStory)}><Play size={15}/> Play release</button><button className="outline-button" disabled={busy} onClick={() => void runAction(() => api.generateStoryThumbnail(selectedStory.id), `Story card art requested for ${selectedStory.title}.`)}><Image size={15}/> {busy ? "Painting..." : "Generate card art"}</button></div></div>
           </article> : <div className="empty-state"><Sparkles size={28}/><h1>No stories yet</h1><p>Create a story to establish the first production run.</p></div>}
           <div className="section-heading"><h2>Story library</h2><span>{visibleStories.length} title{visibleStories.length === 1 ? "" : "s"}</span></div>
           <LibraryCatalog stories={visibleStories} selectedStoryId={selectedStoryId} onOpenStory={(story) => { setSelectedStoryId(story.id); setDetailStoryId(story.id); }} />
@@ -1195,6 +1209,7 @@ function formatTrackDuration(seconds: number) {
 function ReleasePlayerWithAudio({ story, release, onClose }: { story: Story; release?: ProductionRelease; onClose: () => void }) {
   const video = release ? api.releaseVideo(story.id, release.id) : `/generated/${story.id}/${story.id}_full.mp4`;
   const subtitles = release ? api.releaseSubtitles(story.id, release.id) : `/generated/${story.id}/${story.id}_full.vtt`;
+  const isCanonical = release?.status === "current";
   const videoRef = useRef<HTMLVideoElement>(null);
   const backgroundAudioRef = useRef<HTMLAudioElement>(null);
   const audioGraphRef = useRef<BackgroundAudioGraph | undefined>(undefined);
@@ -1351,7 +1366,7 @@ function ReleasePlayerWithAudio({ story, release, onClose }: { story: Story; rel
     navigator.mediaSession.metadata = new MediaMetadata({
       title: story.title,
       artist: currentScene?.title || "FantaSee Studio",
-      album: release ? "Archived release" : "Canonical release",
+      album: isCanonical ? "Canonical release" : "Archived release",
     });
   }, [currentScene?.title, release, story.title]);
 
@@ -1367,7 +1382,7 @@ function ReleasePlayerWithAudio({ story, release, onClose }: { story: Story; rel
   return <div className="modal-scrim player-scrim" role="dialog" aria-modal="true" aria-labelledby="release-player-title">
     <section className="release-player metal-panel">
       <header className="editor-header">
-        <div><span className="eyebrow-label">{release ? "Archived release preview" : "Canonical release"}</span><h1 id="release-player-title">{story.title}</h1><small>{release ? `${humanStatus(release.release_type)} Â· ${humanStatus(release.status)}` : "MP4 + timeline subtitles"}</small></div>
+        <div><span className="eyebrow-label">{isCanonical ? "Canonical release" : "Archived release preview"}</span><h1 id="release-player-title">{story.title}</h1><small>{release ? `${humanStatus(release.release_type)} Â· ${humanStatus(release.status)}` : "MP4 + timeline subtitles"}</small></div>
         <div className="player-tools">
           <div className="player-menu">
             <button className="icon-button" onClick={() => setMenuOpen((open) => !open)} aria-label="Player options" aria-expanded={menuOpen}><MoreHorizontal size={19}/></button>
@@ -1389,7 +1404,7 @@ function ReleasePlayerWithAudio({ story, release, onClose }: { story: Story; rel
       </video>
       <audio ref={backgroundAudioRef} className="background-audio" src={backgroundSrc} loop preload="metadata" onError={() => toggleBackground(false)} aria-label="Background audio" />
       <div className="player-audio-status"><span className={backgroundEnabled ? "led green" : "led amber"}/><span>{backgroundEnabled ? `${processingLabel} bed ready` : "Music bed muted"}</span><small>Open ... for audio and subtitle controls</small></div>
-      <p className="player-note">{release ? "This is a historical artifact. Previewing it does not restore it or change the current completion evidence." : "Playback uses the rendered release and its canonical subtitle timeline. Narration is loudness-normalized during generation and final render."}</p>
+      <p className="player-note">{isCanonical ? "Playback uses the rendered release and its canonical subtitle timeline. Narration is loudness-normalized during generation and final render." : "This is a historical artifact. Previewing it does not restore it or change the current completion evidence."}</p>
     </section>
   </div>;
 }

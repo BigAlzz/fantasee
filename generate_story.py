@@ -112,17 +112,18 @@ def call_llm(
         emit("error", f"Unsafe LLM provider URL: {exc}")
         return None
 
-    payload = {
-        "model": os.environ.get("FANTASEE_LLM_MODEL", MIIMO_MODEL),
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": temperature,
-        "max_completion_tokens": max_tokens or 16384,
-    }
+    requested_max_tokens = max_tokens or 16384
     for attempt in range(3):
         try:
+            payload = {
+                "model": os.environ.get("FANTASEE_LLM_MODEL", MIIMO_MODEL),
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": temperature,
+                "max_completion_tokens": requested_max_tokens,
+            }
             resp = requests.post(
                 f"{base_url}/chat/completions",
                 json=payload,
@@ -143,6 +144,8 @@ def call_llm(
             content = message.get("content") if isinstance(message, dict) else None
             if not isinstance(content, str) or not content.strip():
                 finish_reason = choice.get("finish_reason") or "unknown"
+                if finish_reason == "length":
+                    requested_max_tokens = min(16384, requested_max_tokens * 2)
                 raise RuntimeError(
                     f"LLM returned empty content (finish_reason={finish_reason})"
                 )
