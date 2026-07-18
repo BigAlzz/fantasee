@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { selectPlayableRelease } from "../src/releasePlayback.ts";
+import { selectPlayableRelease, selectPlaybackTarget } from "../src/releasePlayback.ts";
 
 const release = (id: string, status: string) => ({
   id,
@@ -22,4 +22,9 @@ test("canonical playback selects the current durable release", () => {
 test("playback falls back to the newest available release when status is missing", () => {
   assert.equal(selectPlayableRelease([release("latest", "unknown")])?.id, "latest");
   assert.equal(selectPlayableRelease([]), undefined);
+});
+
+test("completed legacy stories fall back to their canonical generated video", () => {
+  assert.deepEqual(selectPlaybackTarget([], true), { kind: "canonical" });
+  assert.equal(selectPlaybackTarget([], false), undefined);
 });

@@ -10,7 +10,7 @@ import { StoryStudioWorkspace } from "./StoryStudio";
 import { LibraryCatalog } from "./LibraryCatalog";
 import { StoryDetails } from "./StoryDetails";
 import { projectProductionActivity, type ProductionActivity } from "./productionActivity";
-import { selectPlayableRelease } from "./releasePlayback";
+import { selectPlaybackTarget } from "./releasePlayback";
 
 const nav = [
   [Library, "Library"], [Sparkles, "Story Studio"], [Volume2, "Voice Studio"], [Clapperboard, "Production Runs"], [Archive, "Assets"], [Settings, "Settings"],
@@ -717,9 +717,9 @@ export function App() {
     if (!story) return;
     try {
       const result = await api.releases(story.id);
-      const release = selectPlayableRelease(result.releases);
-      if (!release) throw new Error("This story has no verified release to play yet.");
-      setPlayerRelease(release);
+      const target = selectPlaybackTarget(result.releases, story.completion?.full_video_ok === true);
+      if (!target) throw new Error("This story has no verified release to play yet.");
+      setPlayerRelease(target.kind === "release" ? target.release : undefined);
       setPlayerOpen(true);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Could not load the current release.");
