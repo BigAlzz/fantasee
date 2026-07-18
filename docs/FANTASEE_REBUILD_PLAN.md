@@ -1,10 +1,22 @@
 # Fantasee Studio Rebuild Plan
 
-Status: Decision checkpoint 1 complete; implementation pending
+Status: Decision checkpoint 1 complete; implementation in progress
 
 Created: 2026-07-17
 
 Implementation method: Incremental strangler migration with vertical-slice TDD
+
+## Implementation Checkpoint (2026-07-18)
+
+The rebuild branch now has a working Studio shell at `/studio/` with durable
+production runs, completion evidence, worker controls, semantic shot plans,
+candidate approval, canonical timeline rendering, release records, historical
+release preview, scene narration waveform inspection, keyboard-safe dialogs,
+director presets, and scene-art-first library cards. The current evidence is
+`194` passing Python tests, a passing Studio TypeScript/Vite build, and live
+browser smoke checks against the local server. Remaining phases stay active:
+enhanced creative tools, migration rehearsal, legacy parity review, and the
+final end-to-end acceptance gate.
 
 ## 1. Executive Summary
 
