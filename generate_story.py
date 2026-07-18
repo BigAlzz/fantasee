@@ -56,6 +56,14 @@ MIIMO_API_KEY = os.environ.get("XIAOMI_API_KEY", "")
 MIIMO_BASE_URL = os.environ.get("XIAOMI_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1")
 MIIMO_MODEL = "mimo-v2.5-pro"
 
+
+def _positive_int_setting(name: str, default: int) -> int:
+    """Read a bounded positive integer setting without taking down generation."""
+    try:
+        return max(1, int(os.environ.get(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
 # ── Emit progress updates (read by the backend) ────────────────────────
 
 
@@ -145,7 +153,14 @@ def call_llm(
             if not isinstance(content, str) or not content.strip():
                 finish_reason = choice.get("finish_reason") or "unknown"
                 if finish_reason == "length":
-                    requested_max_tokens = min(16384, requested_max_tokens * 2)
+                    retry_floor = min(
+                        16384,
+                        _positive_int_setting("FANTASEE_LLM_LENGTH_RETRY_FLOOR", 8000),
+                    )
+                    requested_max_tokens = min(
+                        16384,
+                        max(requested_max_tokens * 2, retry_floor),
+                    )
                 raise RuntimeError(
                     f"LLM returned empty content (finish_reason={finish_reason})"
                 )
@@ -677,7 +692,16 @@ def generate_story_outline_granular(
 ) -> Optional[list]:
     """Commission bounded context and one validated scene at a time."""
     emit("running", "Commissioning story bible in focused sections...", 0.04)
-    budget = TokenBudget(limit=max(8192, 3600 + num_scenes * 2400))
+    context_retry_floor = min(
+        16384,
+        _positive_int_setting("FANTASEE_LLM_LENGTH_RETRY_FLOOR", 8000),
+    )
+    budget = TokenBudget(
+        limit=max(
+            context_retry_floor * 2 + num_scenes * 2400,
+            3600 + num_scenes * 2400,
+        )
+    )
     adapter = GranularLLMAdapter(call_llm, budget=budget, usage_sink=_llm_usage_sink)
     narration_context = f"\nNarration direction: {narration_style}" if narration_style else ""
     context = f"Concept: {concept}\nStyle: {style}\nTone: {tone}{narration_context}\nCharacters: {characters or '(none)'}"
