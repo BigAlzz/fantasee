@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from background_music import (
     BackgroundTrack,
     DEFAULT_BACKGROUND_VOLUME,
     background_audio_payload,
+    build_track_index,
     list_background_tracks,
     select_background_track,
     _match_score,
@@ -30,6 +33,15 @@ class TestBackgroundListing(unittest.TestCase):
         """If the dir is missing we return [] rather than raising."""
         with temp_dir() as tmp:
             self.assertEqual(list_background_tracks(tmp / "nope"), [])
+
+    def test_default_index_uses_operator_selected_folder(self):
+        """The app can scan a private local music folder without bundling it."""
+        with temp_dir() as tmp:
+            track = tmp / "cinematic-atmosphere-private.mp3"
+            track.write_bytes(b"")
+            with patch.dict(os.environ, {"FANTASEE_BACKGROUND_DIR": str(tmp)}):
+                indexed = build_track_index()
+        self.assertEqual([item.filename for item in indexed], [track.name])
 
 
 class TestToneScoring(unittest.TestCase):

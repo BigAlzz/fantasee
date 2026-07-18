@@ -122,6 +122,9 @@ async def _run_generation(task_id: str, req: GenerateRequest, job_progress=None)
         cmd += ["--characters", req.characters]
     if getattr(req, "narration_style", ""):
         cmd += ["--narration-style", req.narration_style]
+    world_parts = [part.strip() for part in (getattr(req, "world_context", ""), getattr(req, "voice_assignments", "")) if part and part.strip()]
+    if world_parts:
+        cmd += ["--world-context", "\n\n".join(world_parts)]
 
     process = await asyncio.create_subprocess_exec(
         *cmd,

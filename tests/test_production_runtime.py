@@ -26,6 +26,8 @@ def test_task_progress_is_persisted_for_restart_recovery(tmp_path, monkeypatch):
     assert persisted["run"]["status"] == "running"
     assert persisted["events"][-1]["payload"]["progress"] == 0.6
     assert persisted["jobs"][0]["id"] == "task-1-00"
+    assert persisted["jobs"][0]["story_id"] == "story-1"
+    assert persisted["jobs"][0]["story_name"] == "A test story"
 
     finish_task("task-1", status="succeeded", message="Complete")
     assert get_persisted_task("task-1")["run"]["status"] == "succeeded"

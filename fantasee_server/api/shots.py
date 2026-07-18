@@ -103,6 +103,14 @@ def reorder_scene_shots(story_id: str, scene_idx: int, body: dict = Body(default
     return {"scene_id": scene_id, "revision": revision, "shots": [shot.__dict__ for shot in shots], "timeline_stale": True}
 
 
+@router.get("/api/stories/{story_id}/scenes/{scene_idx}/shots/revisions")
+def list_scene_shot_revisions(story_id: str, scene_idx: int):
+    _, scene_id = _scene_for(story_id, scene_idx)
+    with ProductionStore(production_database_path()) as store:
+        revisions = store.list_shot_plan_revisions(story_id, scene_id)
+    return {"revisions": revisions}
+
+
 @router.patch("/api/stories/{story_id}/scenes/{scene_idx}/shots/{shot_id}")
 def revise_scene_shot(story_id: str, scene_idx: int, shot_id: str, body: dict = Body(default=None)):
     _, scene_id = _scene_for(story_id, scene_idx)
@@ -224,14 +232,6 @@ async def generate_scene_shot(story_id: str, scene_idx: int, shot_id: str):
     )
     asyncio.create_task(_run_shot_job(run_id))
     return {"run_id": run_id, "status": "queued", "shot_id": shot_id}
-
-
-@router.get("/api/stories/{story_id}/scenes/{scene_idx}/shots/revisions")
-def list_scene_shot_revisions(story_id: str, scene_idx: int):
-    _, scene_id = _scene_for(story_id, scene_idx)
-    with ProductionStore(production_database_path()) as store:
-        revisions = store.list_shot_plan_revisions(story_id, scene_id)
-    return {"revisions": revisions}
 
 
 @router.post("/api/stories/{story_id}/scenes/{scene_idx}/shots/revisions/{revision}/restore")

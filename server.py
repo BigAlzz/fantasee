@@ -40,6 +40,7 @@ from fantasee_server.api import (
     settings,
     shots,
     stories,
+    system,
     tts,
     ws,
 )
@@ -62,6 +63,16 @@ async def lifespan(app: FastAPI):
     _state._stories_cache = load_stories()
     print(f"Loaded {len(_state._stories_cache)} stories with "
           f"{sum(len(s['scenes']) for s in _state._stories_cache)} total scenes")
+
+    # Worker selection is durable, but the image adapter also needs a fast
+    # process-local copy while it dispatches a request.
+    try:
+        from fantasee_server.production_runtime import production_database_path
+        from fantasee_server.production_store import ProductionStore
+        with ProductionStore(production_database_path()) as store:
+            os.environ["FANTASEE_RENDERING_MODE"] = store.rendering_mode()
+    except Exception as exc:
+        print(f"[startup] Rendering mode could not be restored: {exc}")
 
     # Resume durable generation jobs after ComfyUI has had a chance to start.
     asyncio.create_task(generation.recover_generation_jobs())
@@ -135,6 +146,7 @@ app.include_router(stories.router)
 app.include_router(generated.router)
 app.include_router(generation.router, dependencies=[Depends(require_operator)])
 app.include_router(comfyui.router, dependencies=[Depends(require_operator)])
+app.include_router(system.router, dependencies=[Depends(require_operator)])
 app.include_router(tts.router, dependencies=[Depends(require_operator)])
 app.include_router(improvement.router, dependencies=[Depends(require_operator)])
 app.include_router(plex.router, dependencies=[Depends(require_operator)])
@@ -202,7 +214,6 @@ from fantasee_server.discovery import (  # noqa: E402
     _first_scene_art_url,
     _story_scene_art_urls,
     discover_generated_stories,
-    ensure_title_slide_for_manifest,
     generated_asset_url,
     iter_generated_story_dirs,
 )

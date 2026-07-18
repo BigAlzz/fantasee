@@ -7,7 +7,9 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sys
+import subprocess
 import time
 from pathlib import Path
 from typing import Optional
@@ -312,6 +314,149 @@ def wait_for_ready(timeout: int = 120) -> bool:
     return False
 
 
+def _clamp_percent(value: object) -> float | None:
+    """Return a finite utilization percentage, or None for bad samples."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number:
+        return None
+    return round(max(0.0, min(100.0, number)), 1)
+
+
+def _normalize_process_cpu_percent(value: object, *, logical_cpus: int | None = None) -> float | None:
+    """Normalize Windows process CPU time to total machine capacity."""
+    try:
+        cpus = max(1, int(logical_cpus or os.cpu_count() or 1))
+        return _clamp_percent(float(value) / cpus)
+    except (TypeError, ValueError):
+        return None
+
+
+def _powershell_scalar(script: str) -> float | None:
+    """Run a small read-only Windows counter query and parse its scalar result."""
+    executable = shutil.which("powershell.exe") or shutil.which("pwsh")
+    if not executable:
+        return None
+    try:
+        result = subprocess.run(
+            [executable, "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=4,
+            check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            return float(line)
+        except ValueError:
+            return None
+    return None
+
+
+def _windows_gpu_usage(pid: int) -> float | None:
+    """Read the worker process's busiest Windows GPU engine as a percentage."""
+    if os.name != "nt" or not pid:
+        return None
+    # Task Manager reports the busiest engine rather than summing engines,
+    # which avoids double-counting a process using compute plus copy engines.
+    script = (
+        "$rows = @(Get-CimInstance -ClassName "
+        "Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine "
+        f"| Where-Object {{ $_.Name -like 'pid_{int(pid)}_*' }}); "
+        "if ($rows.Count -eq 0) { '' } else { "
+        "[math]::Round([double](($rows | Measure-Object "
+        "-Property UtilizationPercentage -Maximum).Maximum), 1) }"
+    )
+    return _clamp_percent(_powershell_scalar(script))
+
+
+def _nvidia_gpu_usage() -> float | None:
+    """Use nvidia-smi as a cross-platform fallback for a single GPU host."""
+    executable = shutil.which("nvidia-smi")
+    if not executable:
+        return None
+    try:
+        result = subprocess.run(
+            [executable, "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    samples = []
+    for line in result.stdout.splitlines():
+        try:
+            samples.append(float(line.strip()))
+        except ValueError:
+            continue
+    return _clamp_percent(max(samples)) if samples else None
+
+
+def _process_cpu_usage(pid: int) -> tuple[float | None, str]:
+    """Read process CPU usage, preferring the native Windows performance counter."""
+    if os.name == "nt" and pid:
+        script = (
+            "$process = Get-CimInstance -ClassName "
+            "Win32_PerfFormattedData_PerfProc_Process "
+            f"-Filter 'IDProcess = {int(pid)}' -ErrorAction SilentlyContinue; "
+            "if ($process) { [double]$process.PercentProcessorTime } else { '' }"
+        )
+        sample = _powershell_scalar(script)
+        normalized = _normalize_process_cpu_percent(sample)
+        if normalized is not None:
+            return normalized, "windows-process"
+    try:
+        import psutil  # type: ignore[import-not-found]
+
+        process = psutil.Process(pid)
+        sample = process.cpu_percent(interval=0.1)
+        return _normalize_process_cpu_percent(sample, logical_cpus=psutil.cpu_count()), "psutil-process"
+    except ImportError:
+        return None, "unavailable"
+    except Exception:
+        return None, "unavailable"
+
+
+def _worker_telemetry(pid: int | None, kind: str) -> dict[str, object]:
+    """Return one honest utilization sample for a local worker process."""
+    telemetry: dict[str, object] = {
+        "gpu_percent": None,
+        "cpu_percent": None,
+        "cpu_source": "unavailable",
+        "gpu_source": "unavailable",
+        "source": "unavailable",
+        "sampled_at": int(time.time() * 1000),
+    }
+    if not pid:
+        return telemetry
+    cpu_percent, cpu_source = _process_cpu_usage(int(pid))
+    telemetry.update(cpu_percent=cpu_percent, cpu_source=cpu_source)
+    if kind == "cpu":
+        telemetry.update(source=cpu_source)
+        return telemetry
+    gpu_percent = _windows_gpu_usage(int(pid))
+    gpu_source = "windows-gpu-engine"
+    if gpu_percent is None:
+        gpu_percent = _nvidia_gpu_usage()
+        gpu_source = "nvidia-smi" if gpu_percent is not None else "unavailable"
+    telemetry.update(gpu_percent=gpu_percent, gpu_source=gpu_source, source=gpu_source)
+    return telemetry
+
+
 # ── Worker Pool / Auto-spawn Supervisor ────────────────────────────────
 #
 # A single healthy GPU worker is enough for startup and first-run image
@@ -322,8 +467,8 @@ def wait_for_ready(timeout: int = 120) -> bool:
 # Disable with FANTASEE_AUTO_SPAWN_CPU=0.
 # Override CPU port with COMFYUI_CPU_PORT=8189.
 
-import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 _cpu_process: Optional[subprocess.Popen] = None
 _gpu_processes: dict[str, subprocess.Popen] = {}
@@ -705,6 +850,23 @@ def ensure_workers(min_workers: int = 1, wait_for_spawn: bool = False,
             )
         return existing
 
+    # Basic mode is intentionally CPU-only. Do not auto-start the historical
+    # DirectML fallback and then silently leave the requested mode unusable.
+    mode = os.environ.get("FANTASEE_RENDERING_MODE", "gpu").strip().lower()
+    if mode == "basic" and not explicit_urls:
+        cpu_port = int(os.environ.get("COMFYUI_CPU_PORT", "8189"))
+        cpu_url = f"http://127.0.0.1:{cpu_port}"
+        if is_running_at(cpu_url, timeout=1.0)["running"]:
+            os.environ["COMFYUI_URLS"] = cpu_url
+            _register_worker_kind(cpu_url, "cpu")
+            return [cpu_url]
+        if os.environ.get("FANTASEE_AUTO_SPAWN_CPU", "1") != "0":
+            result = spawn_cpu_worker(port=cpu_port, wait=wait_for_spawn, wait_timeout=wait_timeout)
+            if result.get("started") or is_running_at(cpu_url, timeout=0.5)["running"]:
+                os.environ["COMFYUI_URLS"] = cpu_url
+                return [cpu_url]
+        return []
+
     # Auto-discover actual local workers. The default 8188 URL is only a
     # fallback address, not proof that a worker exists.
     discovered: list[str] = []
@@ -772,11 +934,9 @@ def get_worker_status() -> dict:
         "cpu_pid": _cpu_process.pid if (_cpu_process and _cpu_process.poll() is None) else None,
         "workers": [],
     }
-    seen = set()
-    for url in urls:
-        if url in seen:
-            continue
-        seen.add(url)
+    unique_urls = list(dict.fromkeys(urls))
+
+    def read_worker(url: str) -> dict:
         info = is_running_at(url)
         info["url"] = url
         try:
@@ -792,7 +952,13 @@ def get_worker_status() -> dict:
         elif "--cpu" in argv_text:
             inferred_kind = "cpu"
         info["kind"] = _worker_kinds.get(url, inferred_kind)
-        status["workers"].append(info)
+        info["telemetry"] = _worker_telemetry(info.get("pid"), info["kind"])
+        return info
+
+    # Status calls include PowerShell performance counters. Sampling workers
+    # serially made the UI appear frozen as soon as a second worker existed.
+    with ThreadPoolExecutor(max_workers=max(1, min(8, len(unique_urls)))) as executor:
+        status["workers"] = list(executor.map(read_worker, unique_urls))
     return status
 
 
@@ -990,12 +1156,16 @@ def _healthy_bases(timeout: float = 1.5) -> list[str]:
     generate_images_parallel() to avoid silently sending jobs to dead
     workers.
     """
-    healthy = []
-    for base in _comfyui_bases():
+    def probe(base: str) -> str | None:
         status = is_running_at(base, timeout=timeout)
         if status["running"]:
             _infer_worker_kind(base, status)
-            healthy.append(base)
+            return base
+        return None
+
+    bases = _comfyui_bases()
+    with ThreadPoolExecutor(max_workers=max(1, min(8, len(bases)))) as executor:
+        healthy = [base for base in executor.map(probe, bases) if base]
     return healthy
 
 
@@ -1057,6 +1227,12 @@ def _pick_healthy_base(worker_kind: Optional[str] = None) -> Optional[str]:
     pool = _bases_by_priority(healthy)
     if worker_kind:
         pool = [base for base in pool if _worker_kind(base) == worker_kind]
+    else:
+        mode = os.environ.get("FANTASEE_RENDERING_MODE", "gpu").strip().lower()
+        if mode == "basic":
+            pool = [base for base in pool if _worker_kind(base) == "cpu"]
+        elif mode == "gpu":
+            pool = [base for base in pool if _worker_kind(base) == "gpu"]
     if not pool:
         return None
 

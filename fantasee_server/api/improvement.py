@@ -19,7 +19,6 @@ import sys
 
 from fastapi import APIRouter, Body, HTTPException
 
-from fantasee_server.discovery import ensure_title_slide_for_manifest
 from fantasee_server.library import story_completion_report
 from fantasee_server.paths import (
     GEN_OUTPUTS,
@@ -38,8 +37,8 @@ router = APIRouter(tags=["improvement"])
 
 
 @router.post("/api/stories/{story_id}/scenes/{scene_idx}/regenerate")
-async def regenerate_scene(story_id: str, scene_idx: int):
-    """Regenerate images and TTS for a single scene."""
+async def regenerate_scene(story_id: str, scene_idx: int, body: dict = Body(default=None)):
+    """Regenerate selected scene outputs and realign subtitles to new audio."""
     story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
@@ -55,36 +54,48 @@ async def regenerate_scene(story_id: str, scene_idx: int):
     padded = f"{scene_num:02d}"
     safe_title = re.sub(r'[^a-zA-Z0-9]+', '_', scene.get("title", "")).strip("_")[:30]
 
-    # Delete old images
-    for old_img in scene.get("image_filenames", []):
-        old_path = story_dir / old_img
-        if old_path.exists():
-            old_path.unlink()
+    options = body or {}
+    regenerate_images = bool(options.get("regenerate_images", True))
+    regenerate_audio = bool(options.get("regenerate_audio", True))
+    unknown = sorted(set(options) - {"regenerate_images", "regenerate_audio"})
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown regeneration options: {', '.join(unknown)}")
+    regenerated: list[str] = []
 
-    # Generate new image
+    # Generate a replacement before removing the last valid artwork.
     sys.path.insert(0, str(STORY_VIEWER_DIR))
     from comfyui_utils import generate_image, is_running
-    status = is_running()
-    new_filename = None
-    if status.get("running", False):
-        seed = hash(story_id + str(scene_num)) % (2**32 - 1)
-        prefix = f"{story_id}_s{padded}_{safe_title}_01"
-        new_filename = generate_image(
-            prompt=scene["prompt"],
-            output_prefix=prefix,
-            output_dir=str(story_dir),
-            seed=seed,
-            timeout=600,
-        )
-    scene["image_filenames"] = [new_filename] if new_filename else []
     stale_outputs = set(scene.get("stale_outputs") or [])
-    if new_filename:
-        stale_outputs.discard("images")
+    if regenerate_images:
+        old_images = list(scene.get("image_filenames") or [])
+        status = is_running()
+        new_filename = None
+        if status.get("running", False):
+            seed = hash(story_id + str(scene_num)) % (2**32 - 1)
+            prefix = f"{story_id}_s{padded}_{safe_title}_01"
+            new_filename = generate_image(
+                prompt=scene["prompt"],
+                output_prefix=prefix,
+                output_dir=str(story_dir),
+                seed=seed,
+                timeout=600,
+            )
+        if new_filename:
+            for old_img in old_images:
+                old_path = story_dir / old_img
+                if old_path.exists() and old_img != new_filename:
+                    old_path.unlink()
+            scene["image_filenames"] = [new_filename]
+            stale_outputs.discard("images")
+            regenerated.append("images")
 
     # Regenerate TTS
-    from tts_utils import generate_tts, get_audio_duration
-    narration = scene.get("narration", scene.get("narration_text", ""))
-    if narration:
+    if regenerate_audio:
+        from tts_utils import generate_tts, get_audio_duration
+        narration = scene.get("narration", scene.get("narration_text", ""))
+    else:
+        narration = ""
+    if regenerate_audio and narration:
         old_audio = scene.get("audio_filename", "")
         if old_audio:
             old_path = story_dir / old_audio
@@ -110,11 +121,12 @@ async def regenerate_scene(story_id: str, scene_idx: int):
         _regen_scene_subs(story_dir, story_id, padded, scene, manifest)
         stale_outputs.discard("audio")
         stale_outputs.discard("subtitles")
+        regenerated.extend(("audio", "subtitles"))
 
     scene["stale_outputs"] = [kind for kind in ("images", "audio", "subtitles", "scene_video", "full_video", "plex") if kind in stale_outputs]
 
     atomic_write_json(manifest_path, manifest)
-    return {"status": "ok", "scene": scene}
+    return {"status": "ok", "scene": scene, "regenerated": regenerated}
 
 
 @router.post("/api/stories/{story_id}/scenes/{scene_idx}/add-image")
@@ -304,14 +316,6 @@ async def render_story(story_id: str, body: dict = Body(default=None)):
                 "issues": [issue for issue in completion.get("issues", []) if issue.get("kind") in blocked][:20],
             },
         )
-    try:
-        ensure_title_slide_for_manifest(
-            story_dir,
-            json.loads(manifest_path.read_text(encoding="utf-8")),
-        )
-    except (json.JSONDecodeError, OSError):
-        pass
-
     scene_idx = (body or {}).get("scene_idx")
     cmd = [sys.executable, str(STORY_VIEWER_DIR / "render_video.py"), story_id]
     if scene_idx is not None:

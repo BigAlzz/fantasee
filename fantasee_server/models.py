@@ -7,7 +7,7 @@ without circular dependencies.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
@@ -21,6 +21,8 @@ class GenerateRequest(BaseModel):
     tone: str = "dramatic"
     voice_preset: str = "Dean"
     narration_style: str = ""  # optional: name of a style file in skills/
+    world_context: str = ""
+    voice_assignments: str = ""
 
 
 class SeedRequest(BaseModel):
@@ -39,6 +41,14 @@ class TTSRequest(BaseModel):
     text: str
     voice_preset: str = "Dean"
     output_name: Optional[str] = None
+    model: Literal["preset", "design", "clone"] = "preset"
+    style: str = ""
+    voice_description: str = ""
+    voice_sample: Optional[str] = None
+    optimize_text_preview: bool = True
+    stream: bool = False
+    tone: str = ""
+    speed: Optional[float] = None
 
 
 class PlexExportRequest(BaseModel):

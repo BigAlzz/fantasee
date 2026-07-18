@@ -160,6 +160,25 @@ def test_queue_admission_pause_and_priority_are_durable(tmp_path):
     reopened.close()
 
 
+def test_rendering_mode_is_durable_and_validated(tmp_path):
+    database_path = tmp_path / "production.db"
+    store = ProductionStore(database_path)
+
+    assert store.rendering_mode() == "gpu"
+    assert store.set_rendering_mode("basic") == "basic"
+    store.close()
+
+    reopened = ProductionStore(database_path)
+    assert reopened.rendering_mode() == "basic"
+    try:
+        reopened.set_rendering_mode("turbo")
+    except ValueError as exc:
+        assert "basic, gpu, or max" in str(exc)
+    else:
+        raise AssertionError("unsupported rendering modes must be rejected")
+    reopened.close()
+
+
 def test_semantic_shot_plan_survives_store_restart(tmp_path):
     database_path = tmp_path / "production.db"
     shots = [

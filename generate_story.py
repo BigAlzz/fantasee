@@ -1096,6 +1096,7 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
                  skip_images: bool = False, images_per_scene: int = 5,
                  voice_preset: str = "Dean",
                  narration_style: str = "",
+                 world_context: str = "",
                  background_audio: Optional[str] = None,
                  background_volume: Optional[float] = None,
                  background_muted: bool = False):
@@ -1129,9 +1130,6 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
     update_stage(story_dir, "story", "running", message="Creating title and story metadata")
 
     emit("running", f"Story: \"{story_title}\" (id: {story_id})", 0.03)
-    emit("running", "Generating title slide first...", 0.035)
-    title_slide = write_title_slide(story_dir, story_id, story_title, concept, tone, style)
-
     # Pick a background music track up-front so the LLM can pace narration
     # to its mood. The selection is auto from the Background/ folder
     # unless the caller pinned one in via the CLI / API.
@@ -1162,12 +1160,9 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
         "style": style,
         "num_scenes": num_scenes,
         "images_per_scene": images_per_scene,
+        "world_context": world_context,
         "generated": True,
         "status": "generating",
-        "hero_image": title_slide,
-        "title_image": title_slide,    # canonical: image-backed PNG
-        "title_slide": title_slide,    # legacy alias for older clients
-        "title_slide_svg": "assets/title/title_slide.svg",
         "background_audio": bg_payload.get("background_audio"),
         "background_volume": bg_payload.get("background_volume", 0.05),
         "background_muted": bg_payload.get("background_muted", False),
@@ -1197,7 +1192,10 @@ Be evocative but concise."""
     # ── Step 3: Generate scene outline + narration ─────────────────────
     emit("running", "Step 3/6: Generating scenes and narration...", 0.08)
     update_stage(story_dir, "outline", "running", message="Generating and reviewing the scene outline")
-    scenes = generate_story_outline(concept, num_scenes, style, characters, tone, narration_style=narration_style)
+    context_characters = characters
+    if world_context.strip():
+        context_characters = f"{characters}\n\nWorld knowledge and continuity bible:\n{world_context}".strip()
+    scenes = generate_story_outline(concept, num_scenes, style, context_characters, tone, narration_style=narration_style)
     if not scenes:
         update_stage(story_dir, "outline", "failed", message="Outline generation or quality review failed")
         emit("error", "Failed to generate scene outline.")
@@ -1211,7 +1209,7 @@ Be evocative but concise."""
         encoding="utf-8",
     )
     outline_review = review_scene_outline(
-        scenes, num_scenes, characters=characters, tone=tone,
+        scenes, num_scenes, characters=context_characters, tone=tone,
     )
     (layout["critic"] / "outline_review.json").write_text(
         json.dumps(outline_review, indent=2), encoding="utf-8",
@@ -1459,12 +1457,9 @@ Be evocative but concise."""
         "style": style,
         "num_scenes": num_scenes,
         "images_per_scene": images_per_scene,
+        "world_context": world_context,
         "generated": True,
         "status": "draft",
-        "hero_image": title_slide,
-        "title_image": title_slide,    # canonical: image-backed PNG
-        "title_slide": title_slide,    # legacy alias
-        "title_slide_svg": "assets/title/title_slide.svg",
         "background_audio": early_manifest.get("background_audio"),
         "background_volume": early_manifest.get("background_volume", 0.05),
         "background_muted": early_manifest.get("background_muted", False),
@@ -1510,6 +1505,7 @@ if __name__ == "__main__":
     parser.add_argument("--tone", default="dramatic", help="Story tone")
     parser.add_argument("--voice", default="Dean", help="Xiaomi voice: Mia, Chloe, Milo, Dean (default: Dean)")
     parser.add_argument("--narration-style", default="", help="Narration style name (maps to skills/<name>-style-prompt.md)")
+    parser.add_argument("--world-context", default="", help="World knowledge, continuity, arcs, and voice assignments")
     parser.add_argument("--skip-images", action="store_true", help="Skip ComfyUI rendering")
     parser.add_argument("--target-duration", type=float, help="Target total duration in minutes (overrides --scenes)")
     parser.add_argument("--background-audio", default=None,
@@ -1536,6 +1532,7 @@ if __name__ == "__main__":
             images_per_scene=args.images_per_scene,
             voice_preset=args.voice,
             narration_style=args.narration_style,
+            world_context=args.world_context,
             background_audio=args.background_audio,
             background_volume=args.background_volume,
             background_muted=args.background_muted,

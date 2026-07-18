@@ -17,12 +17,14 @@ Key references from the docs that drive the design:
 """
 
 import base64
+import io
 import json
 import os
 import re
 import subprocess
 import sys
 import time
+import wave
 from pathlib import Path
 from typing import Optional
 
@@ -33,6 +35,7 @@ from fantasee_server.security import validate_provider_url
 # ── Config ──────────────────────────────────────────────────────────────
 TTS_API_URL = "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions"
 DEFAULT_TTS_SPEED = float(os.environ.get("FANTASEE_TTS_SPEED", "1.3"))
+NARRATION_LOUDNORM_FILTER = "loudnorm=I=-16:TP=-1.5:LRA=11:linear=false"
 
 
 def configured_tts_speed() -> float:
@@ -70,7 +73,7 @@ VOICE_ALIASES = {
 TTS_MODELS = {
     "preset": "mimo-v2.5-tts",                  # built-in voices
     "design": "mimo-v2.5-tts-voicedesign",      # text-described voice
-    "clone":  "mimo-v2.5-tts-voiceclone",       # audio-cloned voice (not wired yet)
+    "clone":  "mimo-v2.5-tts-voiceclone",       # audio-cloned voice
 }
 
 # ── Voice presets with director-mode style prompts ──────────────────
@@ -282,6 +285,9 @@ def synthesize(
     model: str = "preset",
     timeout: int = 90,
     tone: str = "",
+    voice_sample: Optional[str] = None,
+    optimize_text_preview: bool = True,
+    stream: bool = False,
 ) -> bytes | None:
     """Synthesize speech using Xiaomi MiMo TTS.
 
@@ -300,7 +306,8 @@ def synthesize(
         text: The text to be spoken (placed in `role: assistant`).
         voice: Built-in voice id (Mia/Chloe/Milo/Dean/冰糖/...).
         style: Natural-language style/voice description (placed in `role: user`).
-        model: "preset" for built-in voices, "design" for voice design.
+        model: "preset" for built-in voices, "design" for voice design, or
+            "clone" for an audio sample clone.
         timeout: Request timeout in seconds.
         tone: Optional tone name (e.g. "dark", "epic", "epic-fantasy"). When
             provided, the matching TONE_MODIFIERS snippet is appended to
@@ -322,8 +329,15 @@ def synthesize(
         return None
     voice = normalize_voice(voice)
 
-    # Determine if we're using voice-design mode
+    # Determine which provider voice contract applies.
     voice_design = model == "design" or "voicedesign" in model
+    voice_clone = model == "clone" or "voiceclone" in model
+    if voice_clone and not voice_sample:
+        print("[tts_utils] ERROR: clone mode requires a voice sample", file=sys.stderr)
+        return None
+    if stream and model != "preset":
+        print("[tts_utils] ERROR: streaming is only supported for preset voices", file=sys.stderr)
+        return None
 
     # Compose final style: if a tone is given, layer its modifier on top
     # of any explicit style the caller passed.
@@ -343,6 +357,9 @@ def synthesize(
     if voice_design:
         messages.append({"role": "user", "content": final_style or "Use a warm, cinematic narrator voice."})
         messages.append({"role": "assistant", "content": text})
+    elif voice_clone:
+        messages.append({"role": "user", "content": final_style})
+        messages.append({"role": "assistant", "content": text})
     else:
         if final_style:
             messages.append({"role": "user", "content": final_style})
@@ -354,9 +371,13 @@ def synthesize(
         "messages": messages,
     }
     if voice_design:
-        payload["audio"] = {"format": "wav", "optimize_text_preview": True}
+        payload["audio"] = {"format": "pcm16" if stream else "wav", "optimize_text_preview": optimize_text_preview}
+    elif voice_clone:
+        payload["audio"] = {"format": "wav", "voice": voice_sample}
     else:
-        payload["audio"] = {"format": "wav", "voice": voice}
+        payload["audio"] = {"format": "pcm16" if stream else "wav", "voice": voice}
+    if stream:
+        payload["stream"] = True
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -372,8 +393,11 @@ def synthesize(
                 json=payload,
                 timeout=timeout,
                 allow_redirects=False,
+                stream=stream,
             )
             if r.status_code == 200:
+                if stream:
+                    return _decode_streaming_pcm(r)
                 data = r.json()
                 audio_b64 = data["choices"][0]["message"]["audio"]["data"]
                 return base64.b64decode(audio_b64)
@@ -396,6 +420,36 @@ def synthesize(
     return None
 
 
+def _decode_streaming_pcm(response: requests.Response) -> bytes | None:
+    """Collect MiMo PCM16 SSE chunks into a normal WAV for the local pipeline."""
+    chunks = bytearray()
+    try:
+        for line in response.iter_lines(decode_unicode=True):
+            if not line or not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if payload == "[DONE]":
+                break
+            try:
+                event = json.loads(payload)
+                audio = event.get("choices", [{}])[0].get("delta", {}).get("audio")
+                if audio and audio.get("data"):
+                    chunks.extend(base64.b64decode(audio["data"]))
+            except (IndexError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+                continue
+    finally:
+        response.close()
+    if not chunks:
+        return None
+    output = io.BytesIO()
+    with wave.open(output, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(24000)
+        wav.writeframes(bytes(chunks))
+    return output.getvalue()
+
+
 def _atempo_filter(speed: float) -> str:
     """Build an ffmpeg atempo chain, preserving pitch while changing speed."""
     speed = max(0.5, min(float(speed or 1.0), 4.0))
@@ -411,10 +465,11 @@ def _atempo_filter(speed: float) -> str:
 
 
 def _write_tts_audio(audio_bytes: bytes, output_path: Path, speed: Optional[float] = None) -> bool:
-    """Write synthesized audio, applying the app-wide narration speed."""
+    """Write synthesized audio with consistent loudness and app-wide speed."""
     speed = configured_tts_speed() if speed is None else speed
     raw_wav = output_path.with_name(output_path.stem + ".raw_tts.wav")
     sped_wav = output_path.with_name(output_path.stem + ".speed_tts.wav")
+    normalized_wav = output_path.with_name(output_path.stem + ".normalized_tts.wav")
     try:
         raw_wav.write_bytes(audio_bytes)
         if abs(float(speed or 1.0) - 1.0) > 0.01:
@@ -433,6 +488,19 @@ def _write_tts_audio(audio_bytes: bytes, output_path: Path, speed: Optional[floa
         else:
             source = raw_wav
 
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", str(source),
+                "-af", NARRATION_LOUDNORM_FILTER,
+                "-ar", "48000", "-ac", "2",
+                str(normalized_wav),
+            ],
+            capture_output=True,
+            timeout=60,
+            check=True,
+        )
+        source = normalized_wav
+
         if output_path.suffix.lower() == ".mp3":
             subprocess.run(
                 ["ffmpeg", "-y", "-i", str(source), "-codec:a", "libmp3lame", "-b:a", "128k", str(output_path)],
@@ -448,7 +516,7 @@ def _write_tts_audio(audio_bytes: bytes, output_path: Path, speed: Optional[floa
         output_path.write_bytes(audio_bytes)
         return True
     finally:
-        for tmp in (raw_wav, sped_wav):
+        for tmp in (raw_wav, sped_wav, normalized_wav):
             try:
                 if tmp.exists():
                     tmp.unlink()
@@ -464,6 +532,10 @@ def generate_tts(
     voice_preset: Optional[str] = None,
     tone: str = "",
     speed: Optional[float] = None,
+    model: str = "preset",
+    voice_sample: Optional[str] = None,
+    optimize_text_preview: bool = True,
+    stream: bool = False,
 ) -> bool:
     """Generate TTS audio from text.
 
@@ -481,6 +553,10 @@ def generate_tts(
             delivery matches the mood.
         speed: Playback speed baked into the generated file. When omitted,
             the current FANTASEE_TTS_SPEED setting is read at call time.
+        model: MiMo model mode: preset, design, or clone.
+        voice_sample: MP3/WAV data URI required for clone mode.
+        optimize_text_preview: Let MiMo polish preview text in design mode.
+        stream: Request low-latency PCM streaming for built-in voices.
 
     Returns:
         True if successful, False otherwise.
@@ -496,7 +572,16 @@ def generate_tts(
     # Use preset model for named voices. The synthesize() function will
     # combine `style` with `tone` automatically and fall back to the
     # voice's preset if both are empty.
-    audio_bytes = synthesize(text, voice=voice, style=style, model="preset", tone=tone)
+    audio_bytes = synthesize(
+        text,
+        voice=voice,
+        style=style,
+        model=model,
+        tone=tone,
+        voice_sample=voice_sample,
+        optimize_text_preview=optimize_text_preview,
+        stream=stream,
+    )
     if not audio_bytes:
         return False
 

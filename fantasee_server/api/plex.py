@@ -12,13 +12,11 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import sys
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from fantasee_server.discovery import ensure_title_slide_for_manifest
 from fantasee_server.models import PlexExportRequest
 from fantasee_server.paths import STORY_VIEWER_DIR, generated_story_dir
 from fantasee_server.state import (
@@ -73,16 +71,6 @@ async def export_plex(story_id: str, req: PlexExportRequest):
                 "issues": completion.get("issues", [])[:20],
             },
         )
-
-    # Make sure the title slide exists (in case this story pre-dates the
-    # image-backed version). Skips silently if Pillow isn't available.
-    try:
-        ensure_title_slide_for_manifest(
-            story_dir,
-            json.loads(manifest_path.read_text(encoding="utf-8")),
-        )
-    except (json.JSONDecodeError, OSError):
-        pass
 
     task_id = f"plex-{new_uuid()[:6]}"
     _generation_tasks[task_id] = {

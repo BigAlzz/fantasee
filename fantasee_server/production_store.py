@@ -420,6 +420,31 @@ class ProductionStore:
             )
         return paused
 
+    def rendering_mode(self) -> str:
+        """Return the durable image/render worker policy."""
+        row = self.connection.execute(
+            "SELECT value FROM production_controls WHERE key = 'rendering_mode'"
+        ).fetchone()
+        value = str(row["value"] if row else "gpu").strip().lower()
+        return value if value in {"basic", "gpu", "max"} else "gpu"
+
+    def set_rendering_mode(self, mode: str) -> str:
+        """Persist a validated worker policy for new production work."""
+        value = str(mode or "").strip().lower()
+        if value not in {"basic", "gpu", "max"}:
+            raise ValueError("rendering mode must be basic, gpu, or max")
+        now = time.time()
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO production_controls(key, value, updated_at)
+                VALUES ('rendering_mode', ?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+                """,
+                (value, now),
+            )
+        return value
+
     def set_job_priority(self, job_id: str, priority: int) -> ProductionJob:
         now = time.time()
         with self.connection:

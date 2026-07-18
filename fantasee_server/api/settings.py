@@ -24,6 +24,7 @@ from fantasee_server.state import atomic_write_json
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 SETTINGS_FILE = Path(__file__).parent.parent.parent / "fantasee_settings.json"
+DEFAULT_BACKGROUND_AUDIO_DIR = str(SETTINGS_FILE.parent / "Background")
 
 # ── Known tone presets (from tts_utils.py TONE_MODIFIERS) ─────────
 # These map to specific narration tone modifiers. Freeform strings
@@ -67,6 +68,9 @@ DEFAULTS: dict = {
     # Plex
     "plex_destination": r"D:\Downloads\Plex",
 
+    # Background audio stays in an operator-selected local folder.
+    "background_audio_dir": DEFAULT_BACKGROUND_AUDIO_DIR,
+
     # Whisper
     "whisper_model_size": "base",
 
@@ -97,6 +101,9 @@ class Settings(BaseModel):
 
     # Plex
     plex_destination: str = Field(default=r"D:\Downloads\Plex", description="Plex export destination directory")
+
+    # Background audio
+    background_audio_dir: str = Field(default=DEFAULT_BACKGROUND_AUDIO_DIR, description="Local folder containing background audio")
 
     # Whisper
     whisper_model_size: str = Field(default="base", description="Whisper model size (tiny/base/small/medium/large)")
@@ -184,6 +191,11 @@ def apply_settings_to_env(settings: dict) -> None:
     os.environ["XIAOMI_BASE_URL"] = llm_base_url
     os.environ["XIAOMI_API_KEY"] = settings.get("llm_api_key", DEFAULTS["llm_api_key"])
     os.environ["FANTASEE_PLEX_DEST"] = settings.get("plex_destination", DEFAULTS["plex_destination"])
+    background_audio_dir = str(settings.get("background_audio_dir", DEFAULTS["background_audio_dir"])).strip()
+    if background_audio_dir:
+        os.environ["FANTASEE_BACKGROUND_DIR"] = background_audio_dir
+    else:
+        os.environ.pop("FANTASEE_BACKGROUND_DIR", None)
     os.environ["FANTASEE_TTS_SPEED"] = str(settings.get("tts_speed", DEFAULTS["tts_speed"]))
     os.environ["FANTASEE_WHISPER_MODEL"] = settings.get("whisper_model_size", DEFAULTS["whisper_model_size"])
 

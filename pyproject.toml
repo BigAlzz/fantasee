@@ -53,3 +53,7 @@ fantasee = "server:app"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "media: opt-in media smoke tests that require ffmpeg, ffprobe, or Pillow",
+    "hardware: opt-in hardware smoke tests that exercise worker readiness and device selection",
+]

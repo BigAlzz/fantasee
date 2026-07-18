@@ -12,6 +12,7 @@ from pathlib import Path
 
 from plex_export import (
     SceneChapter,
+    _copy_poster,
     _ffmpeg_escape_title,
     _plex_movie_folder_name,
     _sanitize_for_plex,
@@ -23,6 +24,27 @@ from plex_export import (
     segments_to_srt,
     segments_to_vtt,
 )
+
+
+def test_plex_poster_uses_scene_art_not_title_slide(tmp_path):
+    story_dir = tmp_path / "story"
+    title = story_dir / "assets" / "title" / "title_slide.png"
+    scene = story_dir / "scene-01.png"
+    title.parent.mkdir(parents=True)
+    story_dir.mkdir(exist_ok=True)
+    (tmp_path / "plex").mkdir()
+    title.write_bytes(b"title-card")
+    scene.write_bytes(b"scene-art")
+
+    poster = _copy_poster(
+        story_dir,
+        "story",
+        tmp_path / "plex",
+        {"scenes": [{"image_filenames": ["scene-01.png"]}]},
+    )
+
+    assert poster is not None
+    assert poster.read_bytes() == b"scene-art"
 
 
 def test_timeline_sidecars_use_absolute_scene_offsets(tmp_path):

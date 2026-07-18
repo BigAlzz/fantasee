@@ -4,6 +4,8 @@ import os
 import unittest
 from unittest.mock import patch
 
+import pytest
+
 from tests._helpers import PROJECT_ROOT  # noqa: F401
 
 import comfyui_utils
@@ -13,6 +15,7 @@ GPU_1 = "http://127.0.0.1:8188"
 GPU_2 = "http://127.0.0.1:8189"
 
 
+@pytest.mark.hardware
 class TestComfyUIStartupReadiness(unittest.TestCase):
     def setUp(self):
         self._old_env = {

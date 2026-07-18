@@ -7,6 +7,8 @@ export type Story = {
   scene_count?: number;
   cover_image_url?: string;
   hero_image?: string;
+  background_audio?: string;
+  background_volume?: number;
   completion?: Record<string, unknown>;
 };
 
@@ -41,6 +43,8 @@ export type SubtitleCue = { start: number; end: number; text: string };
 
 export type ProductionJob = {
   id: string;
+  story_id?: string;
+  story_name?: string;
   job_type: string;
   status: string;
   attempts: number;
@@ -103,6 +107,22 @@ export type ComfyWorker = {
   device?: string;
   queue_remaining?: number;
   queue_running?: number;
+  telemetry?: {
+    gpu_percent?: number | null;
+    cpu_percent?: number | null;
+    cpu_source?: string;
+    gpu_source?: string;
+    source?: string;
+    sampled_at?: number;
+  };
+};
+
+export type RenderingMode = "basic" | "gpu" | "max";
+
+export type BackgroundTrack = {
+  filename: string;
+  duration_seconds: number;
+  tags: string[];
 };
 
 export type GenerateInput = {
@@ -114,9 +134,72 @@ export type GenerateInput = {
   tone: string;
   voice_preset: string;
   narration_style?: string;
+  world_context?: string;
+  voice_assignments?: string;
+};
+
+export type WorldCharacter = {
+  id: string;
+  name: string;
+  role: string;
+  description: string;
+  voice: string;
+  style: string;
+};
+
+export type WorldRelationship = {
+  id: string;
+  from: string;
+  to: string;
+  label: string;
+  status: string;
+};
+
+export type WorldArc = {
+  id: string;
+  title: string;
+  summary: string;
+  status: "planned" | "active" | "resolved";
+  beats: string;
+};
+
+export type WorldKnowledgeBase = {
+  title: string;
+  premise: string;
+  rules: string;
+  factions: string;
+  characters: WorldCharacter[];
+  relationships: WorldRelationship[];
+  arcs: WorldArc[];
+  flowDiagram: string;
 };
 
 export type SeedSuggestion = { title: string; description: string; style?: string; tone?: string; characters?: string };
+export type TtsModel = "preset" | "design" | "clone";
+export type TtsGenerateInput = {
+  text: string;
+  voice_preset?: string;
+  model?: TtsModel;
+  style?: string;
+  voice_description?: string;
+  voice_sample?: string;
+  optimize_text_preview?: boolean;
+  stream?: boolean;
+  tone?: string;
+  speed?: number;
+};
+export type SavedVoiceProfile = {
+  id: string;
+  name: string;
+  model: TtsModel;
+  voice_preset?: string;
+  voice_description?: string;
+  style: string;
+  narration_style?: string;
+  voice_sample?: string;
+  sample_name?: string;
+  created_at: number;
+};
 export type StudioSettings = {
   comfyui_urls: string;
   comfyui_auto_spawn: boolean;
@@ -126,6 +209,7 @@ export type StudioSettings = {
   tts_voice_preset: string;
   tts_speed: number;
   plex_destination: string;
+  background_audio_dir: string;
   whisper_model_size: string;
   default_scenes: number;
   default_images_per_scene: number;
@@ -154,17 +238,22 @@ export const api = {
   events: (id: string, afterSequence = 0) => request<{ run_id: string; events: ProductionEvent[]; next_sequence: number }>(`/api/production/runs/${id}/events?after_sequence=${afterSequence}`),
   workers: () => request<{ workers: Worker[] }>("/api/production/workers"),
   comfyWorkers: () => request<{ workers: ComfyWorker[] }>("/api/comfyui/workers"),
+  backgroundTracks: () => request<{ tracks: BackgroundTrack[] }>("/api/background/tracks"),
+  restartEverything: (rendering_mode?: RenderingMode) => request<{ accepted: boolean; message: string; rendering_mode: RenderingMode; services: Array<{ name: string; command: string; port: number }> }>("/api/system/restart", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(rendering_mode ? { rendering_mode } : {}) }),
   retryJob: (id: string) => request(`/api/production/jobs/${id}/retry`, { method: "POST" }),
   cancelJob: (id: string) => request(`/api/production/jobs/${id}/cancel`, { method: "POST" }),
   priorityJob: (id: string, priority: number) => request(`/api/production/jobs/${id}/priority`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ priority }) }),
-  productionControl: () => request<{ admission_paused: boolean }>("/api/production/control"),
-  setProductionControl: (admission_paused: boolean) => request<{ admission_paused: boolean }>("/api/production/control", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ admission_paused }) }),
-  ttsGenerate: (text: string, voice_preset: string) => request<{ url: string; duration: number }>("/api/tts/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, voice_preset }) }),
+  productionControl: () => request<{ admission_paused: boolean; rendering_mode: RenderingMode }>("/api/production/control"),
+  setProductionControl: (input: { admission_paused?: boolean; rendering_mode?: RenderingMode }) => request<{ admission_paused: boolean; rendering_mode: RenderingMode }>("/api/production/control", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
+  ttsGenerate: (input: TtsGenerateInput | string, legacyVoice?: string) => {
+    const body = typeof input === "string" ? { text: input, voice_preset: legacyVoice } : input;
+    return request<{ url: string; duration: number }>("/api/tts/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  },
   spawn: (kind: "cpu" | "gpu") => request(`/api/comfyui/workers/spawn-${kind}`, { method: "POST" }),
   killComfy: (url: string) => request("/api/comfyui/workers/kill", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) }),
   generate: (input: GenerateInput) => request<{ task_id: string; message: string }>("/api/generate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),
   seedSuggestions: (input: Pick<GenerateInput, "story_concept" | "style" | "tone" | "characters">) => request<{ seeds: SeedSuggestion[] }>("/api/seed-suggestions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ concept: input.story_concept, style: input.style, tone: input.tone, characters: input.characters, count: 3 }) }),
-  regenerateScene: (storyId: string, sceneIndex: number) => request<{ status: string; scene: Scene }>(`/api/stories/${storyId}/scenes/${sceneIndex}/regenerate`, { method: "POST" }),
+  regenerateScene: (storyId: string, sceneIndex: number, options?: { regenerate_audio?: boolean; regenerate_images?: boolean }) => request<{ status: string; scene: Scene; regenerated?: string[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/regenerate`, { method: "POST", headers: options ? { "content-type": "application/json" } : undefined, body: options ? JSON.stringify(options) : undefined }),
   addSceneImage: (storyId: string, sceneIndex: number) => request(`/api/stories/${storyId}/scenes/${sceneIndex}/add-image`, { method: "POST" }),
   sceneShots: (storyId: string, sceneIndex: number) => request<{ shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`),
   planSceneShots: (storyId: string, sceneIndex: number) => request<{ revision: number; shots: SemanticShot[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}/shots`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ pacing: "balanced" }) }),

@@ -473,8 +473,10 @@ def mix_audio_into_video(
         raise ValueError(f"Could not determine narration duration: {narration_path}")
 
     inputs: list[str] = ["-y", "-i", str(video_path), "-i", str(narration_path)]
-    filter_complex_parts: list[str] = []
-    map_args: list[str] = ["-map", "0:v:0", "-map", "1:a:0"]
+    filter_complex_parts: list[str] = [
+        "[1:a]dynaudnorm=f=150:g=15[narration]"
+    ]
+    map_args: list[str] = ["-map", "0:v:0", "-map", "[narration]"]
 
     if background_path and background_path.exists() and not background_muted and background_volume > 0:
         # Loop background infinitely so the amix can take what it needs and
@@ -489,7 +491,7 @@ def mix_audio_into_video(
         # background weight 1 too — we already scaled its volume above so
         # the mix produces the right final loudness.
         filter_complex_parts.append(
-            "[1:a][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+            "[narration][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]"
         )
         map_args = ["-map", "0:v:0", "-map", "[aout]"]
 
@@ -647,6 +649,14 @@ def _copy_to_plex_destination(
         for visual in sorted(visuals.iterdir()):
             if visual.is_file():
                 candidates.append((visual, f"visuals/{visual.name}"))
+
+    # Remove poster variants from an earlier export so a legacy title card
+    # cannot remain alongside the new scene-art poster in the Plex folder.
+    for stale_poster in target_dir.glob(f"{file_stem}-poster.*"):
+        try:
+            stale_poster.unlink()
+        except OSError:
+            pass
 
     copied: list[str] = []
     for src, dst_name in candidates:
@@ -872,7 +882,7 @@ def export_plex_package(
 
     # ── 7. Copy poster image next to the video ─────────────────────
     _progress("finalize", "Copying poster image...", 0.90)
-    poster = _copy_poster(story_dir, slug, result.plex_dir)
+    poster = _copy_poster(story_dir, slug, result.plex_dir, manifest)
     result.poster = poster
     result.visuals_dir = _copy_timeline_visuals(story_dir, result.plex_dir)
 
@@ -1007,16 +1017,18 @@ def _mix_and_chapter(
 ) -> None:
     """Run the final FFmpeg pass: mix audio, embed chapters, faststart."""
     inputs: list[str] = ["-y", "-i", str(video_path), "-i", str(narration_path)]
-    filter_parts: list[str] = []
+    filter_parts: list[str] = [
+        "[1:a]dynaudnorm=f=150:g=15[narration]"
+    ]
 
     if background_path and background_path.exists() and not background_muted and background_volume > 0:
         vol = max(0.0, min(1.0, float(background_volume)))
         inputs.extend(["-stream_loop", "-1", "-i", str(background_path)])
         filter_parts.append(f"[2:a]volume={vol:.4f},aresample=44100[bg]")
-        filter_parts.append("[1:a][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]")
+        filter_parts.append("[narration][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]")
         audio_map = ["-map", "0:v:0", "-map", "[aout]"]
     else:
-        audio_map = ["-map", "0:v:0", "-map", "1:a:0"]
+        audio_map = ["-map", "0:v:0", "-map", "[narration]"]
 
     narration_dur = _read_audio_duration(narration_path)
     # Chapters file input index: 2 when no background, 3 when background is present
@@ -1043,31 +1055,32 @@ def _mix_and_chapter(
         raise RuntimeError(f"Final mux failed: {(result.stderr or '')[-600:]}")
 
 
-def _copy_poster(story_dir: Path, slug: str, plex_dir: Path) -> Optional[Path]:
-    """Copy a poster/title image next to the final MP4.
+def _copy_poster(story_dir: Path, slug: str, plex_dir: Path, manifest: Optional[dict] = None) -> Optional[Path]:
+    """Copy the first approved story artwork next to the final MP4.
 
-    Prefers the image-backed title PNG, falls back to the legacy SVG, then
-    to the first scene image.
+    Title slides are metadata and must never become the Plex poster. Prefer
+    the manifest's first scene artwork, then the conventional scene filename.
     """
-    candidates = [
-        story_dir / "assets" / "title" / "title_slide.png",
-        story_dir / "assets" / "title" / "title_slide.svg",
-        story_dir / f"{slug}.json",  # used below for hero_image / first scene fallback
-    ]
-    poster: Optional[Path] = None
-    for c in candidates[:2]:
-        if c.exists():
-            poster = c
+    candidates: list[Path] = []
+    for scene in (manifest or {}).get("scenes", []) or []:
+        for filename in scene.get("image_filenames", []) or []:
+            if filename:
+                candidates.append(story_dir / str(filename).lstrip("/\\"))
+                break
+        if candidates:
             break
-    if not poster:
-        # Last-resort: first scene image
-        for c in sorted(story_dir.glob(f"{slug}_s*_00001_.png")):
-            poster = c
-            break
+    candidates.extend(sorted(story_dir.glob(f"{slug}_s*_00001_.png")))
+    poster = next((candidate for candidate in candidates if candidate.is_file()), None)
     if not poster:
         return None
     suffix = poster.suffix.lower()
     target = plex_dir / f"{slug}-poster{suffix}"
+    for stale_poster in plex_dir.glob(f"{slug}-poster.*"):
+        if stale_poster != target:
+            try:
+                stale_poster.unlink()
+            except OSError:
+                pass
     shutil.copy2(poster, target)
     return target
 

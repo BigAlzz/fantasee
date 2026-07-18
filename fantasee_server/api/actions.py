@@ -86,7 +86,6 @@ async def update_story_scene(story_id: str, scene_idx: int, body: dict = Body(de
             raise HTTPException(status_code=400, detail="Scene visual direction cannot be empty")
         if prompt != str(scene.get("prompt") or ""):
             scene["prompt"] = prompt
-            scene["image_filenames"] = []
             stale.update({"images", "scene_video", "full_video", "plex"})
     if "narration" in payload:
         narration = str(payload["narration"]).strip()
@@ -96,9 +95,6 @@ async def update_story_scene(story_id: str, scene_idx: int, body: dict = Body(de
         if narration != current:
             scene["narration"] = narration
             scene["narration_text"] = narration
-            scene["audio_filename"] = ""
-            scene["audio_duration"] = 0
-            scene["subtitle_file"] = ""
             stale.update({"audio", "subtitles", "scene_video", "full_video", "plex"})
 
     stale_order = ("images", "audio", "subtitles", "scene_video", "full_video", "plex")

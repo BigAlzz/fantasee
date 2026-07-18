@@ -18,14 +18,25 @@ router = APIRouter(tags=["production"])
 @router.get("/api/production/control")
 def get_production_control():
     with ProductionStore(production_database_path()) as store:
-        return {"admission_paused": store.admission_paused()}
+        paused = store.admission_paused()
+        mode = store.rendering_mode()
+    os.environ["FANTASEE_RENDERING_MODE"] = mode
+    return {"admission_paused": paused, "rendering_mode": mode}
 
 
 @router.post("/api/production/control")
-def set_production_control(admission_paused: bool = Body(..., embed=True)):
+def set_production_control(
+    admission_paused: bool | None = Body(default=None, embed=True),
+    rendering_mode: str | None = Body(default=None, embed=True),
+):
     with ProductionStore(production_database_path()) as store:
-        paused = store.set_admission_paused(admission_paused)
-    return {"admission_paused": paused}
+        paused = store.admission_paused() if admission_paused is None else store.set_admission_paused(admission_paused)
+        try:
+            mode = store.rendering_mode() if rendering_mode is None else store.set_rendering_mode(rendering_mode)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    os.environ["FANTASEE_RENDERING_MODE"] = mode
+    return {"admission_paused": paused, "rendering_mode": mode}
 
 
 @router.get("/api/production/runs")

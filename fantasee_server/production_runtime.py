@@ -29,6 +29,26 @@ def production_database_path() -> Path:
     return _database_path()
 
 
+def _story_context(story_id: Any, fallback: Any = None) -> tuple[str | None, str]:
+    """Resolve a durable job's story identity to a user-facing title."""
+    candidate = str(story_id or "").strip()
+    fallback_text = str(fallback or "").strip()
+    if not candidate or candidate in {"queue", "library"}:
+        return (candidate or None, fallback_text or "Story context pending")
+    try:
+        from fantasee_server.paths import generated_story_dir
+
+        manifest_path = generated_story_dir(candidate) / f"{candidate}.json"
+        if manifest_path.is_file():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            title = str(manifest.get("title") or "").strip()
+            if title:
+                return candidate, title
+    except Exception:
+        pass
+    return candidate, fallback_text or candidate
+
+
 def record_llm_usage(run_id: str, result: Any) -> None:
     """Persist one bounded creative commission's token evidence."""
     with ProductionStore(_database_path()) as store:
@@ -172,6 +192,17 @@ def get_persisted_task(task_id: str) -> dict[str, Any] | None:
             return None
         events = store.list_events(task_id)
         jobs = store.list_jobs(task_id)
+    job_context = {
+        job.id: _story_context(
+            job.payload.get("story_id") or run.story_id,
+            job.payload.get("story_name")
+            or job.payload.get("story_concept")
+            or job.payload.get("concept")
+            or job.payload.get("story_id")
+            or run.story_id,
+        )
+        for job in jobs
+    }
     return {
         "run": {
             "id": run.id,
@@ -200,6 +231,8 @@ def get_persisted_task(task_id: str) -> dict[str, Any] | None:
                 "message": job.message,
                 "required_capabilities": list(job.required_capabilities),
                 "priority": job.priority,
+                "story_id": job_context[job.id][0],
+                "story_name": job_context[job.id][1],
             }
             for job in jobs
         ],
@@ -241,6 +274,14 @@ def list_persisted_tasks(*, limit: int = 50) -> list[dict[str, Any]]:
             result.append(task)
             if jobs and run.command in {"generation_queue", "library_maintenance"}:
                 for job in jobs:
+                    story_id, story_name = _story_context(
+                        job.payload.get("story_id") or run.story_id,
+                        job.payload.get("story_name")
+                        or job.payload.get("story_concept")
+                        or job.payload.get("concept")
+                        or job.payload.get("story_id")
+                        or run.story_id,
+                    )
                     child = {
                         "id": job.id,
                         "parent": run.id,
@@ -248,7 +289,8 @@ def list_persisted_tasks(*, limit: int = 50) -> list[dict[str, Any]]:
                         "status": {"succeeded": "done", "failed": "error"}.get(job.status, job.status),
                         "progress": job.progress,
                         "message": job.message or job.status,
-                        "story_id": job.payload.get("story_id") or job.payload.get("story_concept"),
+                        "story_id": story_id,
+                        "story_name": story_name,
                         "created_at": run.created_at,
                     }
                     result.append(child)
