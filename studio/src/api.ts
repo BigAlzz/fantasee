@@ -107,6 +107,7 @@ export type GenerateInput = {
   characters: string;
   tone: string;
   voice_preset: string;
+  narration_style?: string;
 };
 
 export type SeedSuggestion = { title: string; description: string; style?: string; tone?: string; characters?: string };

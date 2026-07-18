@@ -11,6 +11,12 @@ const nav = [
   [Library, "Library"], [Clapperboard, "Productions"], [Archive, "Assets"], [UserRoundCog, "Workers"], [Settings, "Settings"],
 ] as const;
 
+const directorPresets = [
+  { id: "finn", label: "Finn realism", style: "cinematic grounded realism", tone: "grounded, tense, humane", scenes: 8, images: 7, voice: "Dean", narrationStyle: "" },
+  { id: "dark-fable", label: "Dark fable", style: "moody painterly fantasy", tone: "ominous, intimate, restrained", scenes: 7, images: 6, voice: "Milo", narrationStyle: "" },
+  { id: "bright-adventure", label: "Bright adventure", style: "cinematic storybook adventure", tone: "warm, kinetic, hopeful", scenes: 6, images: 5, voice: "Mia", narrationStyle: "" },
+] as const;
+
 function timestamp(value?: string | number) {
   if (!value) return "Awaiting date";
   const date = new Date(typeof value === "number" && value < 10_000_000_000 ? value * 1000 : value);
@@ -89,7 +95,7 @@ export function App() {
   const [activeView, setActiveView] = useState("Library");
   const [editorStory, setEditorStory] = useState<StoryDetail>();
   const [editorScene, setEditorScene] = useState(0);
-  const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic fantasy realism", num_scenes: 8, images_per_scene: 5, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean" });
+  const [brief, setBrief] = useState<GenerateInput>({ story_concept: "", style: "cinematic grounded realism", num_scenes: 8, images_per_scene: 7, characters: "", tone: "grounded, tense, humane", voice_preset: "Dean", narration_style: "" });
   const [seeds, setSeeds] = useState<SeedSuggestion[]>([]);
   const [seedBusy, setSeedBusy] = useState(false);
   const [admissionPaused, setAdmissionPaused] = useState(false);
@@ -239,7 +245,7 @@ export function App() {
         <div className="eyebrow"><span>New production brief</span><button type="button" className="icon-button" onClick={() => setCreateOpen(false)} aria-label="Close"><X size={17}/></button></div>
         <h2 id="brief-modal-title">Set the story in motion.</h2><p>The director will break this brief into granular scene commissions and complete every media requirement before release.</p>
         <label className="brief-field wide">Story intent<textarea autoFocus value={brief.story_concept} onChange={(event) => setBrief({ ...brief, story_concept: event.target.value })} placeholder="A medic from Johannesburg wakes in a cold mountain village where every wound carries a memory..." /><button type="button" className="outline-button seed-button" disabled={seedBusy} onClick={() => void suggestSeeds()}>{seedBusy ? "Consulting director..." : "Suggest three directions"}</button></label>{seeds.length > 0 && <div className="seed-grid">{seeds.map((seed) => <button type="button" className="seed-card" key={`${seed.title}-${seed.description}`} onClick={() => { setBrief({ ...brief, story_concept: `${seed.title}\n${seed.description}`, style: seed.style || brief.style, tone: seed.tone || brief.tone, characters: seed.characters || brief.characters }); setSeeds([]); }}><strong>{seed.title}</strong><small>{seed.description}</small><em>{seed.style || brief.style} · {seed.tone || brief.tone}</em></button>)}</div>}
-        <div className="brief-grid"><label className="brief-field">Scenes<input type="number" min="3" max="20" value={brief.num_scenes} onChange={(event) => setBrief({ ...brief, num_scenes: Number(event.target.value) })}/></label><label className="brief-field">Images per scene<input type="number" min="1" max="10" value={brief.images_per_scene} onChange={(event) => setBrief({ ...brief, images_per_scene: Number(event.target.value) })}/></label><label className="brief-field">Style<input value={brief.style} onChange={(event) => setBrief({ ...brief, style: event.target.value })}/></label><label className="brief-field">Tone<input value={brief.tone} onChange={(event) => setBrief({ ...brief, tone: event.target.value })}/></label></div>
+        <div className="brief-grid"><label className="brief-field">Director preset<select value={directorPresets.find((preset) => preset.style === brief.style && preset.tone === brief.tone)?.id || "custom"} onChange={(event) => { const preset = directorPresets.find((item) => item.id === event.target.value); if (preset) setBrief({ ...brief, style: preset.style, tone: preset.tone, num_scenes: preset.scenes, images_per_scene: preset.images, voice_preset: preset.voice, narration_style: preset.narrationStyle }); }}><option value="custom">Custom</option>{directorPresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label><label className="brief-field">Scenes<input type="number" min="3" max="20" value={brief.num_scenes} onChange={(event) => setBrief({ ...brief, num_scenes: Number(event.target.value) })}/></label><label className="brief-field">Images per scene<input type="number" min="1" max="10" value={brief.images_per_scene} onChange={(event) => setBrief({ ...brief, images_per_scene: Number(event.target.value) })}/></label><label className="brief-field">Style<input value={brief.style} onChange={(event) => setBrief({ ...brief, style: event.target.value })}/></label><label className="brief-field">Tone<input value={brief.tone} onChange={(event) => setBrief({ ...brief, tone: event.target.value })}/></label></div>
         <label className="brief-field wide">Characters and continuity<textarea value={brief.characters} onChange={(event) => setBrief({ ...brief, characters: event.target.value })} placeholder="Optional character, setting, or visual continuity notes." /></label>
         <label className="brief-field wide">Narrator<input value={brief.voice_preset} onChange={(event) => setBrief({ ...brief, voice_preset: event.target.value })}/></label>
         <div className="modal-actions"><button type="button" className="outline-button" onClick={() => setCreateOpen(false)}>Cancel</button><button className="create" disabled={busy} type="submit"><Plus size={17}/> Queue production</button></div>
