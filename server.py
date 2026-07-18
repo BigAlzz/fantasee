@@ -34,6 +34,7 @@ from fantasee_server.api import (
     generation,
     improvement,
     library_routes,
+    migration,
     plex,
     production,
     settings,
@@ -140,6 +141,7 @@ app.include_router(plex.router, dependencies=[Depends(require_operator)])
 app.include_router(delete.router, dependencies=[Depends(require_operator)])
 app.include_router(actions.router, dependencies=[Depends(require_operator)])
 app.include_router(library_routes.router, dependencies=[Depends(require_operator)])
+app.include_router(migration.router, dependencies=[Depends(require_operator)])
 app.include_router(production.router, dependencies=[Depends(require_operator)])
 app.include_router(shots.router, dependencies=[Depends(require_operator)])
 app.include_router(settings.router, dependencies=[Depends(require_operator)])

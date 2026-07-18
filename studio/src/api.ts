@@ -80,6 +80,12 @@ export type ProductionRelease = {
   created_at: number;
 };
 
+export type MigrationReadiness = {
+  stories: Array<{ id: string; title: string; storage_root: string; complete: boolean; migration_ready: boolean; rollback_ready: boolean; risks: string[] }>;
+  summary: { total: number; migration_ready: number; legacy_read_only: number; incomplete: number; rollback_ready: number };
+  destructive_actions_performed: boolean;
+};
+
 export type Worker = {
   id: string;
   capabilities: string[];
@@ -139,6 +145,7 @@ export const api = {
   stories: () => request<{ stories: Story[] }>("/api/stories"),
   story: (id: string) => request<StoryDetail>(`/api/stories/${id}`),
   releases: (storyId: string) => request<{ releases: ProductionRelease[] }>(`/api/stories/${storyId}/releases`),
+  migrationReadiness: () => request<MigrationReadiness>("/api/migration/readiness"),
   releaseVideo: (storyId: string, releaseId: string) => `/api/stories/${storyId}/releases/${releaseId}/video`,
   releaseSubtitles: (storyId: string, releaseId: string) => `/api/stories/${storyId}/releases/${releaseId}/subtitles`,
   updateScene: (storyId: string, sceneIndex: number, input: { title?: string; prompt?: string; narration?: string }) => request<{ status: string; scene: Scene; stale_outputs: string[] }>(`/api/stories/${storyId}/scenes/${sceneIndex}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(input) }),

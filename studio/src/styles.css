@@ -62,6 +62,14 @@ nav { display:grid; gap:8px; } .nav-item { position:relative; border:1px solid t
 .release-row small { display:block; margin-top:4px; color:#aaa294; font-size:11px; }
 .release-path { max-width:700px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .release-note { max-width:700px; color:#827b6e; font-size:11px; line-height:1.5; }
+.migration-summary { max-width:780px; margin-top:24px; padding:15px; border:1px solid #4b4639; background:#10120f; }
+.migration-loading { display:flex; align-items:center; gap:9px; max-width:780px; margin-top:22px; padding:11px 13px; border:1px solid #4b4639; color:#b9ad99; font-size:11px; }
+.migration-summary h2 { margin:0; font-size:17px; }
+.migration-metrics { display:flex; flex-wrap:wrap; gap:22px; margin:15px 0 8px; }
+.migration-metrics span { display:grid; gap:3px; }
+.migration-metrics b { color:#d4b16d; font:22px "Iowan Old Style",Georgia,serif; }
+.migration-metrics small,.migration-summary p { color:#999183; font-size:11px; }
+.migration-summary p { margin:10px 0 0; line-height:1.45; }
  .asset-row,.settings-ledger div { display:flex; align-items:center; gap:10px; border-bottom:1px solid #373931; padding:14px 0; }
  .asset-row strong,.settings-ledger dt { color:#ddd1bc; flex:1; }
  .asset-row small,.settings-ledger dd { margin:0; color:#b7985f; font-size:11px; }
