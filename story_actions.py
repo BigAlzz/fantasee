@@ -142,6 +142,7 @@ class ExtendPlan:
     current_minutes: float
     style: str
     tone: str
+    duration_minutes: Optional[float] = None
 
     def to_dict(self) -> dict:
         return {
@@ -150,6 +151,7 @@ class ExtendPlan:
             "current_minutes": round(self.current_minutes, 1),
             "style": self.style,
             "tone": self.tone,
+            "duration_minutes": round(self.duration_minutes, 1) if self.duration_minutes else None,
         }
 
 
@@ -801,10 +803,11 @@ def _regen_scene_subs(story_dir, story_id, padded, scene_obj, manifest) -> None:
 
 def plan_extend(
     story_id: str,
-    scenes: int = DEFAULT_EXTEND_SCENES,
+    scenes: Optional[int] = DEFAULT_EXTEND_SCENES,
+    duration_minutes: Optional[float] = None,
     story_dir: Optional[Path] = None,
 ) -> ExtendPlan:
-    """Decide what the "Add N scenes" action will do."""
+    """Decide how many scenes are needed for a scene or duration extension."""
     story_dir = _resolve_story_dir(story_id, story_dir)
     manifest = _load_manifest(story_dir)
     current = manifest.get("scenes") or []
@@ -824,27 +827,40 @@ def plan_extend(
     style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
     tone = manifest.get("tone") or (tags[1] if len(tags) > 1 else "dramatic")
 
+    if duration_minutes is not None:
+        requested_minutes = float(duration_minutes)
+        if requested_minutes <= 0:
+            raise ValueError("duration_minutes must be positive")
+        average_seconds = total_seconds / len(current) if total_seconds and current else 45.0
+        will_add = max(1, min(50, int((requested_minutes * 60 + average_seconds - 1) // average_seconds)))
+    else:
+        requested_minutes = None
+        will_add = max(1, min(50, int(scenes or DEFAULT_EXTEND_SCENES)))
+
     return ExtendPlan(
-        will_add=max(1, int(scenes)),
+        will_add=will_add,
         current_scene_count=len(current),
         current_minutes=total_seconds / 60.0 if total_seconds else 0.0,
         style=style,
         tone=tone,
+        duration_minutes=requested_minutes,
     )
 
 
 def apply_extend(
     story_id: str,
-    scenes: int = DEFAULT_EXTEND_SCENES,
+    scenes: Optional[int] = DEFAULT_EXTEND_SCENES,
     *,
+    duration_minutes: Optional[float] = None,
+    prompt: str = "",
     progress: Optional[Callable[[str, str, float], None]] = None,
     story_dir: Optional[Path] = None,
 ) -> dict:
     """Add N new scenes to the end of the story.
 
-    Mirrors the existing ``/api/stories/{id}/extend`` endpoint but
-    accepts a scene count instead of target minutes, and runs the
-    per-scene work in-process so we can stream progress.
+    Runs the per-scene work in-process so the existing story-action progress
+    channel can report each generated scene. ``prompt`` is a creative
+    instruction, including an optional requested ending or character fate.
     """
     from generate_story import call_llm, STORY_OUTLINE_SYSTEM, parse_scene_response
     from tts_utils import generate_tts, get_audio_duration
@@ -863,7 +879,7 @@ def apply_extend(
     images_per_scene = int(manifest.get("images_per_scene") or 1)
     image_checkpoint = checkpoint_for_style(style)
 
-    plan = plan_extend(story_id, scenes, story_dir=story_dir)
+    plan = plan_extend(story_id, scenes, duration_minutes, story_dir=story_dir)
 
     def _emit(stage: str, msg: str, pct: float) -> None:
         if progress:
@@ -889,6 +905,7 @@ def apply_extend(
 
 Write exactly {plan.will_add} more scenes that continue from where the story left off.
 Maintain the same characters, tone, and visual style.
+Director's continuation instruction: {prompt.strip() or "Continue naturally and leave a meaningful new turn at the end."}
 Each scene MUST have a Narration field (voiceover text for TTS — 80-150 words, dramatic, present tense).
 Make each visual prompt detailed enough for AI image generation (80-150 words).
 Prefer cinematic action compositions over static portraits whenever possible: show characters moving, fighting, climbing, discovering, reacting, using tools, crossing terrain, or interacting with the environment. Use dynamic poses, visible hands/body language, depth, camera angle, and a clear story action in the frame. Do not make every image a face close-up.

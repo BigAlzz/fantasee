@@ -63,10 +63,12 @@ class PlexExportRequest(BaseModel):
 
 
 class ExtendRequest(BaseModel):
-    scenes: int = 5
+    scenes: Optional[int] = None
+    duration_minutes: Optional[float] = None
     images_per_scene: Optional[int] = None
     voice: Optional[str] = None
     tone: Optional[str] = None
+    prompt: str = ""
 
 
 class RegenRequest(BaseModel):

@@ -269,9 +269,12 @@ async def extend_story(story_id: str, body: dict = Body(default=None)):
     """Add N new scenes to the end of a story.
 
     Body:
-      - ``scenes`` (int, default 5): how many new scenes to generate.
+      - ``scenes`` (int, optional): how many new scenes to generate.
+      - ``duration_minutes`` (float, optional): approximate runtime to add;
+        the current average scene duration determines the scene count.
       - ``images_per_scene`` (int, optional): override the story's default.
       - ``voice`` / ``tone`` (str, optional): override the story's defaults.
+      - ``prompt`` (str, optional): continuation or ending instruction.
 
     Per-scene failures are isolated: a bad TTS or image-gen call for one
     scene is logged and skipped, and the manifest is written after every
@@ -282,6 +285,12 @@ async def extend_story(story_id: str, body: dict = Body(default=None)):
         raise HTTPException(status_code=404, detail="Story not found")
 
     req = ExtendRequest(**(body or {}))
+    if req.scenes is not None and req.scenes < 1:
+        raise HTTPException(status_code=400, detail="scenes must be at least 1")
+    if req.duration_minutes is not None and not 0 < req.duration_minutes <= 240:
+        raise HTTPException(status_code=400, detail="duration_minutes must be between 0 and 240")
+    if req.scenes is None and req.duration_minutes is None:
+        req.scenes = 5
     scenes_n = max(1, min(50, int(req.scenes or 5)))
 
     # Allow voice/tone override via the request body without rewriting
@@ -309,6 +318,8 @@ async def extend_story(story_id: str, body: dict = Body(default=None)):
     try:
         result = story_actions.apply_extend(
             story_id, scenes=scenes_n,
+            duration_minutes=req.duration_minutes,
+            prompt=req.prompt[:4000],
             progress=lambda stage, msg, pct: _push_story_action_progress(
                 story_id, stage, msg, pct, kind="extend"),
         )
