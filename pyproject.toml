@@ -40,6 +40,7 @@ dev = [
 ]
 tts = [
     "edge-tts>=6.1.0",
+    "faster-whisper>=1.0.0",
 ]
 
 [project.urls]

@@ -21,7 +21,10 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from faster_whisper import WhisperModel
+try:
+    from faster_whisper import WhisperModel
+except ImportError:  # Optional for lightweight API/test installs.
+    WhisperModel = None  # type: ignore[assignment,misc]
 
 
 # ── Config ──────────────────────────────────────────────────────────────
@@ -32,6 +35,8 @@ _whisper_model = None  # Cache the model to avoid reloading per scene
 def _get_whisper_model() -> WhisperModel:
     """Get or create the Whisper model singleton."""
     global _whisper_model
+    if WhisperModel is None:
+        raise RuntimeError("faster-whisper is required for word-aligned subtitles; install the 'tts' extra")
     if _whisper_model is None:
         _whisper_model = WhisperModel(MODEL_SIZE, device="cpu", compute_type="int8")
     return _whisper_model
