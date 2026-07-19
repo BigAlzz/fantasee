@@ -10,6 +10,10 @@ from typing import Any, Callable
 from fantasee_server.production_store import ProductionJob, ProductionStore
 
 
+class NonRetryableJobError(RuntimeError):
+    """A terminal job failure caused by an invariant or exhausted decision loop."""
+
+
 class ProductionWorker:
     """Claim and execute one job without allowing stale workers to overwrite it."""
 
@@ -89,7 +93,10 @@ class ProductionWorker:
                         job.id,
                         token,
                         message=str(exc),
-                        retryable=job.attempts < self.max_attempts,
+                        retryable=(
+                            job.attempts < self.max_attempts
+                            and not isinstance(exc, NonRetryableJobError)
+                        ),
                         retry_delay=min(60, 2 ** max(0, job.attempts - 1)),
                     )
                 except ValueError:

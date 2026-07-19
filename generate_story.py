@@ -743,6 +743,15 @@ GRANULAR_SCENE_SYSTEM = (
 )
 GRANULAR_SCENE_SYSTEM += _STYLE_OVERRIDE
 
+VISUAL_PROMPT_SYSTEM = (
+    "You are the visual continuity director for an illustrated story. "
+    "Turn exactly one visual sentence into a compact image-generation prompt. "
+    "Keep the event in that sentence as the only main action. Preserve recurring "
+    "characters, vehicles, clothing, devices, buildings, rooms, and landscape "
+    "from the continuity anchors. Do not introduce unrelated art, props, people, "
+    "locations, or genre elements. Output only 35-60 words of natural language."
+)
+
 
 def visual_style_instruction(style: str) -> str:
     """Return bounded visual direction for the selected image preset."""
@@ -757,6 +766,88 @@ def visual_style_instruction(style: str) -> str:
             "Do not use a sterile standing portrait or a neutral lineup."
         )
     return ""
+
+
+def _clip_visual_context(value: object, limit: int) -> str:
+    """Keep continuity hints bounded so image prompting stays local."""
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if len(text) <= limit:
+        return text
+    clipped = text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:")
+    return clipped + "..."
+
+
+def extract_visual_sentence(scene: dict) -> str:
+    """Select one concrete sentence for the visual director to stage."""
+    source = str(scene.get("narrative") or scene.get("narration") or "").strip()
+    if not source:
+        return ""
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", source) if part.strip()]
+    return sentences[0] if sentences else _clip_visual_context(source, 240)
+
+
+def build_visual_prompt_request(
+    scene: dict,
+    *,
+    scene_index: int,
+    total_scenes: int,
+    characters: str,
+    previous_scene: Optional[dict] = None,
+) -> str:
+    """Build the bounded prompt consumed by the visual continuity director."""
+    continuity = scene.get("continuity") or scene.get("visual_continuity") or ""
+    previous_prompt = (previous_scene or {}).get("prompt") or ""
+    return f"""Scene {scene_index} of {total_scenes}
+
+Visual sentence:
+{extract_visual_sentence(scene)}
+
+Continuity anchors:
+{_clip_visual_context(characters, 700) or "(none recorded)"}
+
+Persistent details for this scene:
+{_clip_visual_context(continuity, 360) or "Preserve established people, clothing, props, architecture, and setting."}
+
+Previous scene visual reference:
+{_clip_visual_context(previous_prompt, 300) or "(opening scene)"}
+
+Write only the image prompt. Stage the visual sentence in the established world. Preserve identity, clothing, vehicles, devices, houses, rooms, and landscape continuity. Do not add unrelated subjects or locations."""
+
+
+def _clean_visual_prompt(value: str) -> str:
+    cleaned = re.sub(r"^\s*(?:\*\*)?\s*visual\s+prompt\s*:\s*", "", value or "", flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", cleaned).strip().strip('"')
+
+
+def _commission_visual_prompt(
+    scene: dict,
+    *,
+    scene_index: int,
+    total_scenes: int,
+    characters: str,
+    previous_scene: Optional[dict],
+    adapter: GranularLLMAdapter,
+) -> Optional[str]:
+    """Commission one bounded visual prompt without replacing a valid draft on failure."""
+    try:
+        raw = adapter.complete(
+            name=f"scene.{scene_index:02d}.visual_prompt",
+            system=VISUAL_PROMPT_SYSTEM,
+            prompt=build_visual_prompt_request(
+                scene,
+                scene_index=scene_index,
+                total_scenes=total_scenes,
+                characters=characters,
+                previous_scene=previous_scene,
+            ),
+            max_tokens=320,
+        ).text
+    except Exception as exc:
+        emit("warning", f"Scene {scene_index} visual prompt skipped: {exc}")
+        return None
+    cleaned = _clean_visual_prompt(raw)
+    words = cleaned.split()
+    return cleaned if 8 <= len(words) <= 90 else None
 
 
 def generate_story_outline_granular(
@@ -818,6 +909,16 @@ def generate_story_outline_granular(
         if len(parsed) != 1 or not _has_scene_content(parsed[0]):
             emit("error", f"Scene {index} failed its schema gate.")
             return None
+        visual_prompt = _commission_visual_prompt(
+            parsed[0],
+            scene_index=index,
+            total_scenes=num_scenes,
+            characters=characters,
+            previous_scene=scenes[-1] if scenes else None,
+            adapter=adapter,
+        )
+        if visual_prompt:
+            parsed[0]["prompt"] = visual_prompt
         scenes.append(parsed[0])
         emit("running", f"Commissioned scene {index} of {num_scenes}.", 0.08 + 0.55 * index / num_scenes)
 
@@ -998,6 +1099,16 @@ Narration: {scene.get('narration', '')}
             ).text
             parsed = parse_scene_response(f"Scene 1\n{revised_text}", expected_scenes=1)
             if len(parsed) == 1 and _has_scene_content(parsed[0]):
+                visual_prompt = _commission_visual_prompt(
+                    parsed[0],
+                    scene_index=index + 1,
+                    total_scenes=len(scenes),
+                    characters=characters,
+                    previous_scene=refined[-1] if refined else None,
+                    adapter=adapter,
+                )
+                if visual_prompt:
+                    parsed[0]["prompt"] = visual_prompt
                 refined.append(parsed[0])
                 continue
         except (RuntimeError, ValueError) as exc:

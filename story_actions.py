@@ -42,6 +42,7 @@ from typing import Callable, Iterable, Optional
 
 from story_storage import STORIES_ROOT, ensure_story_layout, existing_story_dir
 from image_quality import is_usable_story_image, requested_images_per_scene
+from fantasee_server.subtitle_validation import validate_subtitle_segments
 
 
 # ── Constants ──────────────────────────────────────────────────────────
@@ -755,20 +756,27 @@ def _regen_scene_audio(story_dir, story_id, padded, scene_obj, manifest) -> None
     if not narration:
         raise RuntimeError("Scene has no narration — cannot regenerate audio")
 
-    # Drop the old audio file (any extension) so the .wav we write is
-    # the only thing on disk
     old = scene_obj.get("audio_filename")
-    if old:
-        _safe_unlink(story_dir / old)
     audio_filename = f"tts_{story_id}_s{padded}.wav"
     audio_path = str(story_dir / audio_filename)
+    target_path = Path(audio_path)
+    temporary_path = target_path.with_name(f".{target_path.stem}.{os.getpid()}.replacement.wav")
     tone = (manifest.get("tone") or (manifest.get("tags") or ["", "dramatic"])[1] or "dramatic")
     voice = manifest.get("voice_preset") or "Dean"
-    ok = generate_tts(narration, audio_path, voice=voice, tone=tone)
-    if not ok:
-        raise RuntimeError(f"TTS generation failed for scene {padded}")
+    try:
+        ok = generate_tts(narration, str(temporary_path), voice=voice, tone=tone)
+        if not ok or not temporary_path.exists() or temporary_path.stat().st_size <= 1000:
+            raise RuntimeError(f"TTS generation failed for scene {padded}")
+        duration = get_audio_duration(str(temporary_path))
+        if duration <= 0:
+            raise RuntimeError(f"TTS output has no usable duration for scene {padded}")
+        os.replace(temporary_path, target_path)
+    finally:
+        _safe_unlink(temporary_path)
+    if old and old != audio_filename:
+        _safe_unlink(story_dir / old)
     scene_obj["audio_filename"] = audio_filename
-    scene_obj["audio_duration"] = get_audio_duration(audio_path)
+    scene_obj["audio_duration"] = duration
 
 
 def _regen_scene_subs(story_dir, story_id, padded, scene_obj, manifest) -> None:
@@ -785,8 +793,6 @@ def _regen_scene_subs(story_dir, story_id, padded, scene_obj, manifest) -> None:
         raise RuntimeError("Scene has no narration — cannot generate subtitles")
 
     sub_path = story_dir / f"subs_{story_id}_s{padded}.json"
-    # Drop the old subs file so we always write a fresh one
-    _safe_unlink(sub_path)
 
     try:
         from generate_subtitles import generate_subtitles
@@ -794,7 +800,17 @@ def _regen_scene_subs(story_dir, story_id, padded, scene_obj, manifest) -> None:
     except Exception as e:
         raise RuntimeError(f"Subtitle generation failed: {e}")
 
-    sub_path.write_text(json.dumps(segs, indent=2), encoding="utf-8")
+    try:
+        validate_subtitle_segments(segs, _audio_duration(audio_path))
+    except ValueError as exc:
+        raise RuntimeError(f"Subtitle generation produced invalid timing: {exc}") from exc
+
+    temporary_path = sub_path.with_name(f".{sub_path.stem}.{os.getpid()}.replacement.json")
+    try:
+        temporary_path.write_text(json.dumps(segs, indent=2), encoding="utf-8")
+        os.replace(temporary_path, sub_path)
+    finally:
+        _safe_unlink(temporary_path)
     scene_obj["subtitle_file"] = sub_path.name
 
 

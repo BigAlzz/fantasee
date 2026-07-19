@@ -55,10 +55,11 @@ from fantasee_server.state import (
 from fantasee_server.production_runtime import finish_task, start_task, update_task
 from fantasee_server.production_runtime import production_database_path, enqueue_task_job, finalize_run_from_jobs
 from fantasee_server.production_store import ProductionStore
-from fantasee_server.production_worker import ProductionWorker
+from fantasee_server.production_worker import NonRetryableJobError, ProductionWorker
 from fantasee_server.asset_registry import AssetRegistry
 from fantasee_server.media_timeline import build_story_shot_timeline, write_shot_timeline, write_story_timeline
 from fantasee_server.shot_planning import ShotSpec
+from fantasee_server.subtitle_validation import validate_subtitle_segments
 from story_pipeline import sync_from_completion, update_stage
 from image_quality import is_usable_story_image, requested_images_per_scene
 
@@ -177,36 +178,20 @@ def story_completion_report(story_id: str, *, story: Optional[dict] = None,
                 continue
             try:
                 subs = json.loads(subs_path.read_text(encoding="utf-8"))
-                if not isinstance(subs, list) or not subs:
-                    subs_error = "Subtitle alignment file is empty"
-                    continue
-                previous_end = 0.0
-                valid_segments = True
-                for segment in subs:
-                    if not isinstance(segment, dict) or not (segment.get("text") or "").strip():
-                        valid_segments = False
-                        subs_error = "Subtitle alignment contains an empty segment"
-                        break
-                    try:
-                        start = float(segment["start"])
-                        end = float(segment["end"])
-                    except (KeyError, TypeError, ValueError):
-                        valid_segments = False
-                        subs_error = "Subtitle alignment contains invalid timestamps"
-                        break
-                    audio_duration = float(scene.get("audio_duration") or 0.0)
-                    if start < 0 or end <= start or start < previous_end - 0.05:
-                        valid_segments = False
-                        subs_error = "Subtitle alignment contains overlapping or invalid timestamps"
-                        break
-                    if audio_duration > 0 and end > audio_duration + 1.0:
-                        valid_segments = False
-                        subs_error = "Subtitle alignment extends beyond the narration audio"
-                        break
-                    previous_end = end
-                subs_ok = valid_segments
+                validate_subtitle_segments(subs, float(scene.get("audio_duration") or 0.0))
+                subs_ok = True
             except (json.JSONDecodeError, OSError):
                 subs_error = "Subtitle alignment file is unreadable"
+            except ValueError as exc:
+                message = str(exc)
+                if "empty" in message:
+                    subs_error = "Subtitle alignment file is empty"
+                elif "beyond" in message:
+                    subs_error = "Subtitle alignment extends beyond the narration audio"
+                elif "segment" in message:
+                    subs_error = "Subtitle alignment contains an empty segment"
+                else:
+                    subs_error = "Subtitle alignment contains overlapping or invalid timestamps"
             if subs_ok:
                 break
         if subs_ok:
@@ -384,8 +369,8 @@ def _build_approved_shot_timeline_for_library(story_id: str, story_dir: Path) ->
     return write_shot_timeline(story_id, story_dir, segments)
 
 
-def _complete_story_for_library(story_id: str, progress) -> dict:
-    """Regenerate/repair/render/export one story until it is complete."""
+def _complete_story_iteration(story_id: str, progress) -> dict:
+    """Run one dependency-aware maintenance iteration for one story."""
     sys.path.insert(0, str(STORY_VIEWER_DIR))
     import story_actions
     from plex_export import export_plex_package
@@ -496,6 +481,118 @@ def _complete_story_for_library(story_id: str, progress) -> dict:
     return result
 
 
+def _completion_signature(report: dict) -> str:
+    """Return stable evidence used to detect a repair loop that made no progress."""
+    evidence = {
+        "missing": sorted(report.get("missing") or []),
+        "issues": [
+            (issue.get("kind"), issue.get("scene"), issue.get("message"))
+            for issue in report.get("issues") or []
+        ],
+    }
+    return json.dumps(evidence, sort_keys=True, ensure_ascii=False)
+
+
+def _mark_quality_changes_stale(story_id: str, before: dict, after: dict) -> bool:
+    """Mark derived outputs stale when the optional critic changes a scene."""
+    changed = False
+    before_scenes = before.get("scenes") or []
+    manifest_path = generated_story_dir(story_id) / f"{story_id}.json"
+    for index, scene in enumerate(after.get("scenes") or []):
+        old = before_scenes[index] if index < len(before_scenes) else {}
+        narration_changed = (scene.get("narration") or scene.get("narration_text")) != (
+            old.get("narration") or old.get("narration_text")
+        )
+        visual_changed = (scene.get("prompt") or "") != (old.get("prompt") or "")
+        images_changed = (scene.get("image_filenames") or []) != (old.get("image_filenames") or [])
+        if not (narration_changed or visual_changed or images_changed):
+            continue
+        stale = set(scene.get("stale_outputs") or [])
+        stale.update({"scene_video", "full_video", "plex"})
+        if narration_changed:
+            stale.update({"audio", "subtitles"})
+        scene["stale_outputs"] = [
+            kind for kind in ("images", "audio", "subtitles", "scene_video", "full_video", "plex")
+            if kind in stale
+        ]
+        changed = True
+    if changed:
+        after["status"] = "draft"
+        atomic_write_json(manifest_path, after)
+    return changed
+
+
+def _run_quality_improvement_for_library(story_id: str, progress) -> dict | None:
+    """Run the optional critic loop only after structural completion is proven."""
+    if os.environ.get("FANTASEE_AUTO_CRITIC", "0").strip().lower() not in {"1", "true", "yes"}:
+        return None
+    manifest_path = generated_story_dir(story_id) / f"{story_id}.json"
+    before = json.loads(manifest_path.read_text(encoding="utf-8"))
+    from fantasee_server.improver import _run_improve_loop_sync
+
+    result = _run_improve_loop_sync(
+        story_id,
+        {
+            "target_stars": float(os.environ.get("FANTASEE_CRITIC_TARGET_STARS", "4.0")),
+            "max_rounds": max(1, int(os.environ.get("FANTASEE_CRITIC_MAX_ROUNDS", "1"))),
+            "max_scenes_per_round": max(1, int(os.environ.get("FANTASEE_CRITIC_MAX_SCENES", "2"))),
+        },
+        progress=progress,
+    )
+    after = json.loads(manifest_path.read_text(encoding="utf-8"))
+    result["changed_outputs"] = _mark_quality_changes_stale(story_id, before, after)
+    return result
+
+
+def _complete_story_for_library(story_id: str, progress) -> dict:
+    """Supervise bounded maintenance iterations until completion or no progress."""
+    max_iterations = max(1, int(os.environ.get("FANTASEE_SUPERVISOR_MAX_ITERATIONS", "3")))
+    previous_signature: str | None = None
+    history: list[dict] = []
+
+    for iteration in range(1, max_iterations + 1):
+        progress("supervisor", f"Completion supervisor iteration {iteration}/{max_iterations}", (iteration - 1) / max_iterations)
+        try:
+            result = _complete_story_iteration(story_id, progress)
+        except Exception as exc:
+            report = story_completion_report(story_id)
+            signature = _completion_signature(report)
+            history.append({"iteration": iteration, "complete": False, "signature": signature, "error": str(exc)})
+            if signature == previous_signature:
+                raise NonRetryableJobError(
+                    f"Completion supervisor stopped after no progress: {exc}"
+                ) from exc
+            previous_signature = signature
+            if iteration >= max_iterations:
+                raise
+            progress("supervisor", "Repair failed; re-scanning changed completion evidence", iteration / max_iterations)
+            continue
+
+        report = result.get("completion") or story_completion_report(story_id)
+        signature = _completion_signature(report)
+        history.append({"iteration": iteration, "complete": bool(report.get("complete")), "signature": signature})
+        if not report.get("complete"):
+            if signature == previous_signature:
+                missing = ", ".join(report.get("missing") or ["unknown"])
+                raise NonRetryableJobError(f"Completion supervisor stopped after no progress: {missing}")
+            previous_signature = signature
+            continue
+
+        quality = _run_quality_improvement_for_library(story_id, progress)
+        if quality and quality.get("changed_outputs"):
+            post_quality = story_completion_report(story_id)
+            post_signature = _completion_signature(post_quality)
+            history.append({"iteration": iteration, "stage": "critic", "complete": bool(post_quality.get("complete")), "signature": post_signature})
+            if not post_quality.get("complete"):
+                previous_signature = post_signature
+                continue
+            result["completion"] = post_quality
+        result["supervisor"] = {"iterations": history}
+        return result
+
+    raise RuntimeError(f"Completion supervisor exhausted {max_iterations} iterations")
+
+
 # ── Library maintenance queue (multi-story) ────────────────────────
 
 async def _start_library_maintenance_queue(*, story_ids: Optional[list[str]] = None,
@@ -601,12 +698,6 @@ async def _run_library_maintenance_queue(task_id: str, stories: list[dict]) -> N
                 "created_at": now(),
             }
             try:
-                start_task(
-                    sub_id,
-                    story_id=story_id,
-                    kind="library_story",
-                    metadata={"parent": task_id},
-                )
                 enqueue_task_job(
                     task_id,
                     job_id=sub_id,

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from fantasee_server.shot_planning import ShotSpec
+from fantasee_server.subtitle_validation import validate_subtitle_segments
 
 
 @dataclass(frozen=True)
@@ -47,19 +48,15 @@ def build_story_timeline(
             segments = json.loads(subtitle_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise ValueError(f"Scene {scene_id} subtitles are unreadable") from exc
-        if not isinstance(segments, list) or not segments:
-            raise ValueError(f"Scene {scene_id} subtitles are empty")
-        previous_end = 0.0
+        try:
+            validate_subtitle_segments(segments, duration)
+        except ValueError as exc:
+            raise ValueError(f"Scene {scene_id} {str(exc)}") from exc
         for raw in segments:
             text = str(raw.get("text") or "").strip()
             start = float(raw.get("start"))
             end = float(raw.get("end"))
-            if not text or start < 0 or end <= start or start < previous_end:
-                raise ValueError(f"Scene {scene_id} contains invalid subtitle timing")
-            if end > duration + 1.0:
-                raise ValueError(f"Scene {scene_id} subtitles exceed audio duration")
             timeline.append(TimelineSegment(scene_id, text, offset + start, offset + end))
-            previous_end = end
         offset += duration
     return timeline
 

@@ -2,7 +2,7 @@ import asyncio
 import time
 
 from fantasee_server.production_store import ProductionStore
-from fantasee_server.production_worker import ProductionWorker
+from fantasee_server.production_worker import NonRetryableJobError, ProductionWorker
 
 
 def test_worker_claims_runs_and_completes_job(tmp_path):
@@ -128,6 +128,32 @@ def test_retryable_job_can_be_claimed_again(tmp_path):
     assert asyncio.run(worker.run_once(handler)) is True
 
     assert attempts == [1, 2]
+
+
+def test_non_retryable_supervisor_failure_is_terminal(tmp_path):
+    database_path = tmp_path / "production.db"
+    with ProductionStore(database_path) as store:
+        run = store.create_run(
+            story_id="story-1",
+            command="generate",
+            input_fingerprint="fingerprint-1",
+        )
+        store.enqueue_job(
+            run.id,
+            job_id="job-1",
+            job_type="story.generate",
+            payload={},
+            idempotency_key="job-1",
+        )
+
+    def handler(_job, _progress):
+        raise NonRetryableJobError("no progress")
+
+    worker = ProductionWorker(database_path, worker_id="cpu-1", capabilities=("cpu",))
+    assert asyncio.run(worker.run_once(handler)) is True
+
+    with ProductionStore(database_path) as store:
+        assert store.get_job("job-1").status == "failed"
 
 
 def test_worker_registry_records_capabilities_and_heartbeat(tmp_path):

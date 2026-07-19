@@ -78,6 +78,18 @@ Each story has a single JSON manifest named `<story-id>.json`. A typical scene c
 
 The server starts generation in the background and streams progress over `WS /ws` as `task_update` events.
 
+### Visual continuity and completion supervision
+
+The final image prompt is commissioned separately from the story-writing call. It receives one concrete visual sentence, bounded continuity anchors, and the previous scene's visual reference. The visual director must preserve recurring characters, clothing, vehicles, devices, buildings, rooms, and landscapes without adding unrelated subjects.
+
+After draft generation, the durable completion worker runs bounded maintenance iterations. Each iteration scans the completion contract, repairs only the missing dependency, and verifies the result again. An unchanged completion signature stops the loop as a terminal no-progress failure. Optional critic-driven improvement runs only after structural completion and marks affected renders and releases stale before the supervisor rebuilds them.
+
+Supervisor settings:
+
+- `FANTASEE_SUPERVISOR_MAX_ITERATIONS` — maximum completion iterations, default `3`.
+- `FANTASEE_AUTO_CRITIC` — enable the post-completion critic loop, default disabled.
+- `FANTASEE_CRITIC_MAX_ROUNDS` and `FANTASEE_CRITIC_MAX_SCENES` — bound critic work when enabled.
+
 ## Seed Suggestions
 
 When the Create modal seed slider is set above `1`, clicking **Generate N Seeds** calls `POST /api/seed-suggestions`. That endpoint asks the LLM for distinct story ideas, shows a picker, and only starts generation after the user chooses one or more seeds.
