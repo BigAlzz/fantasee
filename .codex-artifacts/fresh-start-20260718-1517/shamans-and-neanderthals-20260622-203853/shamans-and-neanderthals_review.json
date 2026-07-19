@@ -1,0 +1,444 @@
+{
+  "story_id": "shamans-and-neanderthals",
+  "title": "Clash of Ancient Shamans and Mystics",
+  "scene_count": 10,
+  "scenes": [
+    {
+      "scene_num": "01",
+      "title": "Scene 1",
+      "score": 6.5,
+      "narration": {
+        "word_count": 8,
+        "sentences": 1,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration",
+          "Very short (8 words)"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 591KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 9.9,
+        "score": 10,
+        "notes": [
+          "Duration: 9.9s, Size: 465KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 6,
+        "score": 7.5,
+        "issues": [
+          "Cue 6: too short (0.34s) \u2014 can't read"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "02",
+      "title": "Scene 2",
+      "score": 6.5,
+      "narration": {
+        "word_count": 117,
+        "sentences": 3,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration",
+          "Run-on sentences \u2014 hard to follow in narration"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 653KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 66.2,
+        "score": 10,
+        "notes": [
+          "Duration: 66.2s, Size: 3105KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 24,
+        "score": 7.5,
+        "issues": [
+          "Cue 1: too short (0.44s) \u2014 can't read"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "03",
+      "title": "Scene 3",
+      "score": 6.5,
+      "narration": {
+        "word_count": 1,
+        "sentences": 1,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration",
+          "Very short (1 words)",
+          "Choppy sentences \u2014 feels staccato"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 673KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 1.3,
+        "score": 10,
+        "notes": [
+          "Duration: 1.3s, Size: 60KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 1,
+        "score": 7.5,
+        "issues": [
+          "Cue 1: too short (0.42s) \u2014 can't read"
+        ]
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "04",
+      "title": "Scene 4",
+      "score": 6.5,
+      "narration": {
+        "word_count": 7,
+        "sentences": 1,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration",
+          "Very short (7 words)"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 787KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 3.2,
+        "score": 10,
+        "notes": [
+          "Duration: 3.2s, Size: 150KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 1,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "05",
+      "title": "Scene 5",
+      "score": 6.5,
+      "narration": {
+        "word_count": 128,
+        "sentences": 10,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 653KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 76.8,
+        "score": 10,
+        "notes": [
+          "Duration: 76.8s, Size: 3600KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 10,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "06",
+      "title": "Scene 6",
+      "score": 6.5,
+      "narration": {
+        "word_count": 48,
+        "sentences": 4,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 644KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 23.8,
+        "score": 10,
+        "notes": [
+          "Duration: 23.8s, Size: 1117KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 3,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "07",
+      "title": "Scene 7",
+      "score": 6.5,
+      "narration": {
+        "word_count": 101,
+        "sentences": 13,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 635KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 54.9,
+        "score": 10,
+        "notes": [
+          "Duration: 54.9s, Size: 2572KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 15,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "08",
+      "title": "Scene 8",
+      "score": 6.5,
+      "narration": {
+        "word_count": 1,
+        "sentences": 1,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration",
+          "Very short (1 words)",
+          "Choppy sentences \u2014 feels staccato"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 698KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 3.4,
+        "score": 10,
+        "notes": [
+          "Duration: 3.4s, Size: 157KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 2,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "09",
+      "title": "Scene 9",
+      "score": 6.5,
+      "narration": {
+        "word_count": 8,
+        "sentences": 1,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration",
+          "Very short (8 words)"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 599KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 5.6,
+        "score": 10,
+        "notes": [
+          "Duration: 5.6s, Size: 262KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 1,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": false
+    },
+    {
+      "scene_num": "10",
+      "title": "Scene 10",
+      "score": 6.5,
+      "narration": {
+        "word_count": 134,
+        "sentences": 8,
+        "score": 2.0,
+        "issues": [
+          "Parser metadata leaked into narration"
+        ]
+      },
+      "images": {
+        "count": 1,
+        "score": 8.5,
+        "notes": [
+          "1 images, avg 631KB",
+          "Single image per scene \u2014 limited visual variety"
+        ],
+        "issues": []
+      },
+      "audio": {
+        "duration": 66.2,
+        "score": 10,
+        "notes": [
+          "Duration: 66.2s, Size: 3105KB"
+        ],
+        "issues": []
+      },
+      "subtitles": {
+        "cue_count": 10,
+        "score": 8.0,
+        "issues": []
+      },
+      "has_video": false
+    }
+  ],
+  "overall_issues": [
+    "Opening scene is 8 words \u2014 feels rushed",
+    "No rendered video found"
+  ],
+  "continuity_issues": [],
+  "recommendations": [
+    "Render videos with: python render_video.py shamans-and-neanderthals"
+  ],
+  "scores": {
+    "overall": 6.5,
+    "story": 2.0,
+    "visual": 8.5,
+    "audio": 10.0,
+    "subtitles": 7.8,
+    "structure": 8.0
+  },
+  "review": {
+    "rating": 3.2,
+    "stars": 3,
+    "summary": "A solid 3.2/5 star effort. Main areas to address: parser metadata leaked into narration (10 scenes).",
+    "categories": [
+      {
+        "name": "Narrative",
+        "score": 2.0,
+        "max_score": 10.0
+      },
+      {
+        "name": "Visuals",
+        "score": 8.5,
+        "max_score": 10.0
+      },
+      {
+        "name": "Audio",
+        "score": 10.0,
+        "max_score": 10.0
+      },
+      {
+        "name": "Subtitles",
+        "score": 7.8,
+        "max_score": 10.0
+      },
+      {
+        "name": "Structure",
+        "score": 8.0,
+        "max_score": 10.0
+      }
+    ],
+    "what_works": [
+      "All scenes have complete image sets",
+      "Audio production is solid throughout",
+      "Subtitle sync is accurate"
+    ],
+    "needs_work": [
+      "Parser metadata leaked into narration (10 scenes)",
+      "Very short narration (5 scenes)",
+      "Subtitle cue timing issue (3 scenes)",
+      "Choppy sentences \u2014 feels staccato (2 scenes)",
+      "Run-on sentences \u2014 hard to follow in narration"
+    ],
+    "badge": "Decent",
+    "scene_count": 10,
+    "overall_score": 6.5
+  }
+}

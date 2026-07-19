@@ -1,0 +1,32 @@
+{
+  "id": "red-sand-schism",
+  "title": "Red Sand Schism",
+  "subtitle": "Footprints in Red Sand\nDriven from their northern territorie",
+  "description": "Footprints in Red Sand\nDriven from their northern territories, Neanderthals push south into the Cape, clashing with entrenched human tribes in a series of brutal skirmishes that ultimately force an un",
+  "tags": [
+    "dark fantasy",
+    "epic",
+    "generated"
+  ],
+  "tone": "epic",
+  "voice_preset": "Dean",
+  "tts_speed": 1.2,
+  "story_concept": "Footprints in Red Sand\nDriven from their northern territories, Neanderthals push south into the Cape, clashing with entrenched human tribes in a series of brutal skirmishes that ultimately force an uneasy coexistence.",
+  "style": "dark fantasy",
+  "num_scenes": 8,
+  "images_per_scene": 7,
+  "world_context": "Universe: Humans vs Neanderthals\n\nPremise: In an Ice Age valley, two intelligent human lineages compete for shelter, memory, and a future neither can survive alone.\n\nWorld rules: Climate and food scarcity shape every alliance. Both lineages have language, ritual, craft, and internal political divisions. Do not reduce either group to a single culture or moral role.\n\nFactions: River Homo sapiens: mobile traders and astronomers. Ridge Neanderthals: settled stoneworkers and winter guardians. The Ash Council: elders who profit from keeping the lineages divided.\n\nCharacter sheets:\nNara (Human scout) | Age/era: 28 | Alignment: Chaotic good | Traits: observant, impatient, protective | Biography: Raised between trading camps, Nara learned every safe pass before she learned which people she was supposed to fear. | Appearance: Wind-burned face, dark braids threaded with blue stone, layered hide and woven reed cloak. | Motivation: She wants to prove cooperation is practical before the valley's scarcity turns hope into a luxury. | Voice: Mia; style: Intimate audiobook\nVar (Neanderthal toolmaker) | Age/era: 34 | Alignment: True neutral | Traits: patient, inventive, quietly funny | Biography: Var inherited a workshop and a feud, then quietly turned both into places where people could be useful together. | Appearance: Broad shoulders, ash-grey curls, ochre-stained hands, a carved bone tool worn as a pendant. | Motivation: He wants to keep his settlement alive without becoming the weapon his elders expect. | Voice: Milo; style: Grounded and warm\n\nRelationships:\nNara -> Var: uneasy alliance [forming]\nNara -> Ash Council: opposed by [active]\n\nUniverse arcs:\nThe Shared Winter [planned]: Nara and Var must protect a mixed settlement before the first deep freeze.\nBeats: Discovery of the pass\nA failed exchange\nThe avalanche\nA shared fire\nThe council's betrayal\n\n[{\"name\":\"Nara\",\"role\":\"Human scout\",\"voice\":\"Mia\",\"style\":\"Intimate audiobook\",\"alignment\":\"Chaotic good\",\"traits\":\"observant, impatient, protective\"},{\"name\":\"Var\",\"role\":\"Neanderthal toolmaker\",\"voice\":\"Milo\",\"style\":\"Grounded and warm\",\"alignment\":\"True neutral\",\"traits\":\"patient, inventive, quietly funny\"}]",
+  "generated": true,
+  "status": "generating",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

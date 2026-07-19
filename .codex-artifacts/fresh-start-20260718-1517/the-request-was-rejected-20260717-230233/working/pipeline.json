@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "story_id": "the-request-was-rejected",
+  "status": "running",
+  "current_stage": "render",
+  "started_at": "2026-07-17T21:00:17.839245+00:00",
+  "updated_at": "2026-07-17T21:02:33.474655+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T21:00:35.146577+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T21:00:35.159586+00:00",
+      "message": "Generating and reviewing the scene outline"
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

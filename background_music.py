@@ -12,6 +12,7 @@ wins, so adding a new track to ``Background/`` does not require a code change
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from dataclasses import dataclass, asdict
@@ -60,6 +61,12 @@ TONE_TAGS: list[tuple[str, tuple[str, ...]]] = [
 
 # Acceptable audio extensions.
 _AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
+
+
+def configured_background_dir() -> Path:
+    """Return the operator-selected local music folder or the app default."""
+    configured = os.environ.get("FANTASEE_BACKGROUND_DIR", "").strip()
+    return Path(configured).expanduser() if configured else BACKGROUND_DIR
 
 
 # ── Track dataclass ─────────────────────────────────────────────────────
@@ -158,12 +165,13 @@ def _read_duration(audio_path: Path) -> float:
     return 0.0
 
 
-def build_track_index(background_dir: Path = BACKGROUND_DIR) -> list[BackgroundTrack]:
+def build_track_index(background_dir: Path | None = None) -> list[BackgroundTrack]:
     """Build a stable index of background tracks with metadata.
 
     Cached internally per-directory so repeated lookups are cheap.
     Cache is invalidated when the directory modification time changes.
     """
+    background_dir = background_dir or configured_background_dir()
     cache_attr = f"_index_cache_{background_dir}"
     mtime_attr = f"_index_mtime_{background_dir}"
     
@@ -195,7 +203,7 @@ def build_track_index(background_dir: Path = BACKGROUND_DIR) -> list[BackgroundT
 def select_background_track(
     tone: str = "dramatic",
     style: str = "",
-    background_dir: Path = BACKGROUND_DIR,
+    background_dir: Path | None = None,
     tracks: Optional[Iterable[BackgroundTrack]] = None,
 ) -> Optional[BackgroundTrack]:
     """Pick the best background track for a story.
@@ -257,7 +265,7 @@ def ensure_chapter_titles(scenes: list[dict]) -> list[dict]:
 def background_audio_payload(
     tone: str = "dramatic",
     style: str = "",
-    background_dir: Path = BACKGROUND_DIR,
+    background_dir: Path | None = None,
 ) -> dict:
     """Return a payload suitable for storing on the story manifest.
 

@@ -22,14 +22,29 @@ import warnings
 import sys
 import time
 import traceback
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from story_storage import STORIES_ROOT, ensure_story_layout
 from fantasee_server.security import validate_provider_url
 from story_pipeline import initialize_pipeline, update_stage
 from story_quality import outline_feedback, review_scene_outline
+from fantasee_server.llm_adapter import GranularLLMAdapter, TokenBudget
+from fantasee_server.llm_tokens import llm_unlimited, scaled_llm_tokens
+
+
+def _llm_usage_sink(result) -> None:
+    """Record generation calls when launched under a durable production run."""
+    run_id = os.environ.get("FANTASEE_PRODUCTION_RUN_ID", "").strip()
+    if not run_id:
+        return
+    try:
+        from fantasee_server.production_runtime import record_llm_usage
+        record_llm_usage(run_id, result)
+    except Exception as exc:
+        print(f"[llm] token ledger update failed: {exc}", file=sys.stderr)
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -43,7 +58,20 @@ MIIMO_API_KEY = os.environ.get("XIAOMI_API_KEY", "")
 MIIMO_BASE_URL = os.environ.get("XIAOMI_BASE_URL", "https://token-plan-sgp.xiaomimimo.com/v1")
 MIIMO_MODEL = "mimo-v2.5-pro"
 
+
+def _positive_int_setting(name: str, default: int) -> int:
+    """Read a bounded positive integer setting without taking down generation."""
+    try:
+        return max(1, int(os.environ.get(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
 # ── Emit progress updates (read by the backend) ────────────────────────
+
+_PIPELINE_PROGRESS_CALLBACK: ContextVar[Optional[Callable[[str, str, Optional[float]], None]]] = ContextVar(
+    "fantasee_pipeline_progress_callback",
+    default=None,
+)
 
 
 def emit(status: str, message: str, progress: float = None):
@@ -52,6 +80,13 @@ def emit(status: str, message: str, progress: float = None):
     if progress is not None:
         msg["progress"] = progress
     print(f"__PROGRESS__:{json.dumps(msg)}", flush=True)
+    callback = _PIPELINE_PROGRESS_CALLBACK.get()
+    if callback:
+        try:
+            callback(status, message, progress)
+        except Exception:
+            # Progress reporting must never take down the production pipeline.
+            pass
 
 
 # ── Resolve API keys from Hermes auth.json ──────────────────────────────
@@ -82,7 +117,12 @@ def _resolve_api_key():
 # ── LLM-based Scene Generation (via MiMo API) ──────────────────────────
 
 
-def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str]:
+def call_llm(
+    system: str,
+    prompt: str,
+    temperature: float = 0.7,
+    max_tokens: int | None = None,
+) -> Optional[str]:
     """Call the MiMo LLM API."""
     _resolve_api_key()
     if not MIIMO_API_KEY:
@@ -94,17 +134,20 @@ def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str
         emit("error", f"Unsafe LLM provider URL: {exc}")
         return None
 
-    payload = {
-        "model": MIIMO_MODEL,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": temperature,
-        "max_completion_tokens": 16384,
-    }
+    max_completion_cap = scaled_llm_tokens(16384)
+    requested_max_tokens = scaled_llm_tokens(max_tokens or 16384)
     for attempt in range(3):
         try:
+            payload = {
+                "model": os.environ.get("FANTASEE_LLM_MODEL", MIIMO_MODEL),
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": temperature,
+            }
+            if not llm_unlimited():
+                payload["max_completion_tokens"] = requested_max_tokens
             resp = requests.post(
                 f"{base_url}/chat/completions",
                 json=payload,
@@ -116,7 +159,28 @@ def call_llm(system: str, prompt: str, temperature: float = 0.7) -> Optional[str
                 allow_redirects=False,
             )
             resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            data = resp.json()
+            choices = data.get("choices") if isinstance(data, dict) else None
+            if not isinstance(choices, list) or not choices:
+                raise RuntimeError("LLM response contained no choices")
+            choice = choices[0] if isinstance(choices[0], dict) else {}
+            message = choice.get("message")
+            content = message.get("content") if isinstance(message, dict) else None
+            if not isinstance(content, str) or not content.strip():
+                finish_reason = choice.get("finish_reason") or "unknown"
+                if finish_reason == "length":
+                    retry_floor = min(
+                        max_completion_cap,
+                        scaled_llm_tokens(_positive_int_setting("FANTASEE_LLM_LENGTH_RETRY_FLOOR", 8000)),
+                    )
+                    requested_max_tokens = min(
+                        max_completion_cap,
+                        max(requested_max_tokens * 2, retry_floor),
+                    )
+                raise RuntimeError(
+                    f"LLM returned empty content (finish_reason={finish_reason})"
+                )
+            return content
         except Exception as e:
             if attempt < 2:
                 wait = 10 * (attempt + 1)
@@ -320,7 +384,34 @@ def parse_scene_response(response: str, expected_scenes: int = 0) -> list[dict]:
     return scenes
 
 
-STORY_OUTLINE_SYSTEM = """You are a creative writing assistant specializing in visual storytelling.
+HUMAN_DRAMA_GUIDANCE = """HUMAN DRAMA AND APPROACHABILITY (MANDATORY):
+Human drama comes first. The setting is only useful when it changes what a person
+wants, risks, chooses, or loses. Every scene must give a person a clear immediate
+want, an obstacle, and a visible choice or consequence. Start with the person and
+their problem; use the location only when it affects that problem.
+
+Use plain, approachable language. Prefer short, concrete sentences and familiar
+words. Do not reach for grand metaphors, ornate descriptions, or impressive-sounding
+history when a simple human action will do. Let the audience understand the scene
+without studying it. The narration should sound like a thoughtful person telling a
+friend what happened, not a tour guide describing a place.
+
+When a new character appears, make it clear who they are. In their first mention,
+give their name, role or relationship to the existing characters, one memorable
+physical or behavioral detail, and what they want right now. Never introduce a
+name without telling the audience who they are or why they matter. Keep the named
+cast small enough to remember. After the introduction, show relationships through
+choices, interruptions, practical help, disagreement, and consequences.
+
+Each scene should contain at least one human beat: a decision, a promise, a fear
+shown through action, a sacrifice, a misunderstanding, a joke, or a change in a
+relationship. Explain unusual world terms the first time they matter. Do not let
+landscape, lore, or spectacle occupy the narration when a character could be
+doing, saying, choosing, or losing something instead.
+"""
+
+
+STORY_OUTLINE_SYSTEM = HUMAN_DRAMA_GUIDANCE + "\n\n" + """You are a creative writing assistant specializing in visual storytelling.
 Your task is to generate a detailed scene-by-scene breakdown for an illustrated story.
 
 CRITICAL — CHARACTER BIBLE RULE:
@@ -347,9 +438,9 @@ story tone. Write narration whose pacing feels natural over that loop:
 
 For each scene, provide:
 1. Scene title (short, evocative, 2-5 words)
-2. Visual prompt (DETAILED natural language paragraph for image generation — never a tag list.
-   Write it as descriptive prose. Include: character appearances, setting, lighting, camera
-   angle/position, composition, color palette, mood, atmosphere. 80-150 words.)
+2. Visual prompt (COMPACT natural language prompt for image generation — never a tag list.
+   Write 35-60 words in this order: shot type, who is doing what, setting, then
+   lighting and visual style. Put the main action and location in the first 25 words.)
 3. Narrative (what happens in this scene — 40-80 words, purely in prose)
 4. Narration (voiceover text that will be read aloud by a narrator whose
    voice and delivery style match the requested TONE. The TTS model uses
@@ -468,6 +559,17 @@ Example: "wide shot, low angle, a rusted greatsword in the foreground
 out of focus, a lone warrior mid-stride in the center, distant
 burning city in the background haze".
 
+VISUAL HOOK AND ESCALATION (critical): every prompt must make the viewer
+want to know what happens next. Name one decisive action, reveal, danger, or
+emotional reversal; include a foreground occluder, a midground subject in
+motion, and a background event or scale cue. Add a deliberate color contrast
+or striking light source, plus one memorable image idea specific to this
+story's world. Do not use a neutral standing pose, generic group portrait,
+empty room, repeated centered composition, or the phrase "cinematic lighting"
+as a substitute for an actual light source. Across a scene sequence, vary
+scale, camera height, movement, color temperature, and visual rhythm so the
+art has a rising visual argument rather than interchangeable illustrations.
+
 TONE GUIDE — match the narration and visual style to the requested tone:
 - dramatic:    weight on key moments, controlled intensity, never stage-acting
 - dark:        dread and shadow, slow deliberate pacing, longer pauses
@@ -571,7 +673,7 @@ Format each scene exactly as:
 
 --- SCENE 1
 Title: <title>
-Visual Prompt: <detailed natural language image generation prompt — 80-150 words>
+Visual Prompt: <compact natural language image generation prompt — 35-60 words, action first>
 Narrative: <what happens — 40-80 words>
 Narration: <voiceover text — 80-150 words, dramatic, present tense>
 
@@ -589,14 +691,28 @@ previous scene. Maintain consistent character appearances across ALL scenes."""
 STORY_STYLE_PATH = Path(__file__).parent / "skills" / "style.md"
 
 
-def load_story_style_prompt() -> str:
-    """Load the canonical narration style used by generation and repairs."""
+def load_story_style_prompt(style_name: str = "") -> str:
+    """Load a narration style prompt from skills/.
+
+    If style_name is given, looks for skills/<style_name>-style-prompt.md.
+    Falls back to skills/style.md (the canonical default).
+    """
+    skills_dir = Path(__file__).parent / "skills"
+    if style_name:
+        candidate = skills_dir / f"{style_name}-style-prompt.md"
+        if candidate.exists():
+            try:
+                return candidate.read_text(encoding="utf-8").strip()
+            except (OSError, UnicodeError):
+                pass
+    # Default fallback
     try:
         return STORY_STYLE_PATH.read_text(encoding="utf-8").strip()
     except (OSError, UnicodeError):
         return ""
 
 
+# Module-level default (no style_name) for backward compat
 _STYLE_OVERRIDE = (
     "\n\nMANDATORY NARRATION STYLE OVERRIDE:\n"
     "For all narration and dialogue, follow the canonical style below. "
@@ -607,9 +723,229 @@ _STYLE_OVERRIDE = (
 STORY_OUTLINE_SYSTEM += _STYLE_OVERRIDE
 
 
+GRANULAR_BIBLE_SYSTEM = (
+    "You are the story bible editor. Return compact JSON only with keys: "
+    "cast, world, rules, conflicts, continuity. The cast value must be an array "
+    "of entries with name, role_or_relationship, immediate_want, fear_or_risk, "
+    "and distinguishing_detail. Each value is a short string or array of concrete "
+    "facts. Do not write scenes or prose.\n\n"
+    + HUMAN_DRAMA_GUIDANCE
+)
+GRANULAR_ARC_SYSTEM = (
+    "You are a story architect. Return compact JSON only with an array called "
+    "beats. Each beat has scene_number, purpose, turning_point, and continuity."
+)
+GRANULAR_SCENE_SYSTEM = (
+    "You are a scene writer working inside an approved story bible. Write exactly "
+    "one scene using these labels: Title, Visual Prompt, Narrative, Narration. "
+    "Keep the prompt 35-60 words and narration 80-150 words. Use the canonical style.\n\n"
+    + HUMAN_DRAMA_GUIDANCE
+)
+GRANULAR_SCENE_SYSTEM += _STYLE_OVERRIDE
+
+VISUAL_PROMPT_SYSTEM = (
+    "You are the visual continuity director for an illustrated story. "
+    "Turn exactly one visual sentence into a compact image-generation prompt. "
+    "Keep the event in that sentence as the only main action. Preserve recurring "
+    "characters, vehicles, clothing, devices, buildings, rooms, and landscape "
+    "from the continuity anchors. Do not introduce unrelated art, props, people, "
+    "locations, or genre elements. Output only 35-60 words of natural language."
+)
+
+
+def visual_style_instruction(style: str) -> str:
+    """Return bounded visual direction for the selected image preset."""
+    value = (style or "").lower()
+    if any(token in value for token in ("comic", "graphic novel", "motion comic")):
+        return (
+            "For this comic-book-panels direction, write each Visual Prompt as one "
+            "dynamic sequential-art panel: a decisive action or reveal, bold inked "
+            "contours, expressive body language, dramatic foreshortening, layered "
+            "foreground/midground/background, strong color contrast, and a specific "
+            "light source. No speech bubbles, captions, logos, or readable text. "
+            "Do not use a sterile standing portrait or a neutral lineup."
+        )
+    return ""
+
+
+def _clip_visual_context(value: object, limit: int) -> str:
+    """Keep continuity hints bounded so image prompting stays local."""
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    if len(text) <= limit:
+        return text
+    clipped = text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:")
+    return clipped + "..."
+
+
+def extract_visual_sentence(scene: dict) -> str:
+    """Select one concrete sentence for the visual director to stage."""
+    source = str(scene.get("narrative") or scene.get("narration") or "").strip()
+    if not source:
+        return ""
+    sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", source) if part.strip()]
+    return sentences[0] if sentences else _clip_visual_context(source, 240)
+
+
+def build_visual_prompt_request(
+    scene: dict,
+    *,
+    scene_index: int,
+    total_scenes: int,
+    characters: str,
+    previous_scene: Optional[dict] = None,
+) -> str:
+    """Build the bounded prompt consumed by the visual continuity director."""
+    continuity = scene.get("continuity") or scene.get("visual_continuity") or ""
+    previous_prompt = (previous_scene or {}).get("prompt") or ""
+    return f"""Scene {scene_index} of {total_scenes}
+
+Visual sentence:
+{extract_visual_sentence(scene)}
+
+Continuity anchors:
+{_clip_visual_context(characters, 700) or "(none recorded)"}
+
+Persistent details for this scene:
+{_clip_visual_context(continuity, 360) or "Preserve established people, clothing, props, architecture, and setting."}
+
+Previous scene visual reference:
+{_clip_visual_context(previous_prompt, 300) or "(opening scene)"}
+
+Write only the image prompt. Stage the visual sentence in the established world. Preserve identity, clothing, vehicles, devices, houses, rooms, and landscape continuity. Do not add unrelated subjects or locations."""
+
+
+def _clean_visual_prompt(value: str) -> str:
+    cleaned = re.sub(r"^\s*(?:\*\*)?\s*visual\s+prompt\s*:\s*", "", value or "", flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", cleaned).strip().strip('"')
+
+
+def _commission_visual_prompt(
+    scene: dict,
+    *,
+    scene_index: int,
+    total_scenes: int,
+    characters: str,
+    previous_scene: Optional[dict],
+    adapter: GranularLLMAdapter,
+) -> Optional[str]:
+    """Commission one bounded visual prompt without replacing a valid draft on failure."""
+    try:
+        raw = adapter.complete(
+            name=f"scene.{scene_index:02d}.visual_prompt",
+            system=VISUAL_PROMPT_SYSTEM,
+            prompt=build_visual_prompt_request(
+                scene,
+                scene_index=scene_index,
+                total_scenes=total_scenes,
+                characters=characters,
+                previous_scene=previous_scene,
+            ),
+            max_tokens=320,
+        ).text
+    except Exception as exc:
+        emit("warning", f"Scene {scene_index} visual prompt skipped: {exc}")
+        return None
+    cleaned = _clean_visual_prompt(raw)
+    words = cleaned.split()
+    return cleaned if 8 <= len(words) <= 90 else None
+
+
+def generate_story_outline_granular(
+    concept: str, num_scenes: int, style: str, characters: str, tone: str,
+    narration_style: str = "",
+) -> Optional[list]:
+    """Commission bounded context and one validated scene at a time."""
+    emit("running", "Commissioning story bible in focused sections...", 0.04)
+    context_retry_floor = _positive_int_setting("FANTASEE_LLM_LENGTH_RETRY_FLOOR", 8000)
+    budget = TokenBudget(
+        limit=scaled_llm_tokens(max(
+            context_retry_floor * 2 + num_scenes * 2400,
+            3600 + num_scenes * 2400,
+        ))
+    )
+    adapter = GranularLLMAdapter(call_llm, budget=budget, usage_sink=_llm_usage_sink)
+    narration_context = f"\nNarration direction: {narration_style}" if narration_style else ""
+    visual_direction = visual_style_instruction(style)
+    context = f"Concept: {concept}\nStyle: {style}\nTone: {tone}{narration_context}\nCharacters: {characters or '(none)'}"
+    if visual_direction:
+        context += f"\nVisual direction: {visual_direction}"
+    scene_system = GRANULAR_SCENE_SYSTEM
+    if visual_direction:
+        scene_system += "\n\nVISUAL DIRECTION:\n" + visual_direction
+    style_text = load_story_style_prompt(narration_style) if narration_style else ""
+    if style_text:
+        scene_system += "\n\nMANDATORY NARRATION STYLE OVERRIDE:\n" + style_text
+    try:
+        bible = adapter.complete(
+            name="story.bible", system=GRANULAR_BIBLE_SYSTEM,
+            prompt=context + "\nBuild the five required bible sections.", max_tokens=1400,
+        ).text
+        arc = adapter.complete(
+            name="story.arc", system=GRANULAR_ARC_SYSTEM,
+            prompt=context + "\nBible:\n" + bible + f"\nPlan exactly {num_scenes} scene beats.",
+            max_tokens=min(2200, max(1000, num_scenes * 180)),
+        ).text
+    except (RuntimeError, ValueError) as exc:
+        emit("error", f"Granular story context failed: {exc}")
+        return None
+
+    scenes: list[dict] = []
+    for index in range(1, num_scenes + 1):
+        previous = scenes[-1] if scenes else {}
+        prompt = (
+            f"{context}\nApproved bible:\n{bible}\nApproved arc:\n{arc}\n"
+            f"Write scene {index} of {num_scenes}. Previous scene: {previous.get('title', '(opening)')}\n"
+            "The scene must change the situation and end with a concrete turn."
+        )
+        try:
+            raw = adapter.complete(
+                name=f"scene.{index:02d}.card", system=scene_system,
+                prompt=prompt, max_tokens=1200,
+            ).text
+            parsed = parse_scene_response(f"Scene {index}\n{raw}", expected_scenes=1)
+        except (RuntimeError, ValueError) as exc:
+            emit("warning", f"Scene {index} commission failed: {exc}")
+            parsed = []
+        if len(parsed) != 1 or not _has_scene_content(parsed[0]):
+            emit("error", f"Scene {index} failed its schema gate.")
+            return None
+        visual_prompt = _commission_visual_prompt(
+            parsed[0],
+            scene_index=index,
+            total_scenes=num_scenes,
+            characters=characters,
+            previous_scene=scenes[-1] if scenes else None,
+            adapter=adapter,
+        )
+        if visual_prompt:
+            parsed[0]["prompt"] = visual_prompt
+        scenes.append(parsed[0])
+        emit("running", f"Commissioned scene {index} of {num_scenes}.", 0.08 + 0.55 * index / num_scenes)
+
+    return refine_scenes_granular(
+        scenes, concept=concept, style=style, tone=tone,
+        characters=characters, adapter=adapter,
+    )
+
+
 def generate_story_outline(concept: str, num_scenes: int, style: str,
-                           characters: str, tone: str) -> Optional[list]:
-    """Generate a complete story outline using MiMo LLM."""
+                           characters: str, tone: str,
+                           narration_style: str = "") -> Optional[list]:
+    """Generate a complete outline through bounded creative commissions."""
+    if os.environ.get("FANTASEE_GRANULAR_LADDER", "1") != "0":
+        return generate_story_outline_granular(concept, num_scenes, style, characters, tone, narration_style=narration_style)
+
+    # Build system prompt with the selected narration style
+    system_prompt = STORY_OUTLINE_SYSTEM
+    if narration_style:
+        style_text = load_story_style_prompt(narration_style)
+        if style_text:
+            system_prompt += (
+                "\n\nMANDATORY NARRATION STYLE OVERRIDE:\n"
+                "For all narration and dialogue, follow the style below. "
+                "It overrides earlier tone-specific or manhwa narration guidance.\n\n"
+                + style_text
+            )
     emit("running", "Generating story outline with MiMo LLM...", 0.05)
 
     char_section = f"\nCharacters: {characters}" if characters else ""
@@ -620,9 +956,12 @@ Concept: {concept}
 Style: {style}
 Tone: {tone}{char_section}
 
+{visual_style_instruction(style)}
+
 Generate exactly {num_scenes} scenes. Each scene MUST have a Narration field
 (voiceover text for TTS — 80-150 words, dramatic, present tense).
-Make each visual prompt detailed enough for AI image generation.
+Keep each visual prompt compact enough for an SD 1.5 CLIP encoder: 35-60 words,
+with the main action and location in the first 25 words.
 
 CRITICAL: For each scene, the Visual Prompt MUST start by naming ONE
 shot type from this list: extreme wide shot, wide shot, long shot,
@@ -633,11 +972,20 @@ Rotate the shot types across the {num_scenes} scenes so the
 player feels cinematic, not a slideshow of mugshots. Aim for a
 mix dominated by wide and medium shots, with close-ups reserved
 for the most important emotional beats. See the SHOT VARIETY
-block in the system prompt for details and keywords."""
+block in the system prompt for details and keywords.
+
+Make each scene visually arresting: include a decisive action or reveal,
+layered foreground/midground/background depth, a strong color contrast or
+specific light source, and a memorable world-specific visual hook. Avoid
+static standing poses, generic portraits, repeated centered framing, and
+generic "cinematic lighting" language."""
 
     scenes = []
     response = ""
     last_review = None
+    budget = TokenBudget(limit=scaled_llm_tokens(max(4096, num_scenes * 2200)))
+    adapter = GranularLLMAdapter(call_llm, budget=budget, usage_sink=_llm_usage_sink)
+    outline_max_tokens = min(16384, max(2048, num_scenes * 900))
     for attempt in range(3):
         prompt = user_prompt
         if attempt:
@@ -648,7 +996,16 @@ block in the system prompt for details and keywords."""
             )
         if attempt and last_review:
             prompt += "\nFix these quality issues before returning the outline:\n" + outline_feedback(last_review)
-        response = call_llm(STORY_OUTLINE_SYSTEM, prompt)
+        try:
+            response = adapter.complete(
+                name="story.outline",
+                system=system_prompt,
+                prompt=prompt,
+                max_tokens=outline_max_tokens,
+            ).text
+        except (RuntimeError, ValueError) as exc:
+            emit("warning", f"Outline commission unavailable: {exc}")
+            response = ""
         if not response:
             continue
         scenes = parse_scene_response(response, expected_scenes=num_scenes)
@@ -681,8 +1038,83 @@ block in the system prompt for details and keywords."""
             "warning",
             f"Outline accepted with {len(last_review['issues'])} review note(s).",
         )
+    if os.environ.get("FANTASEE_SCENE_REFINEMENT", "1") != "0":
+        scenes = refine_scenes_granular(
+            scenes,
+            concept=concept,
+            style=style,
+            tone=tone,
+            characters=characters,
+            adapter=adapter,
+        )
     emit("running", f"Generated {len(scenes)} scenes with narration.", 0.15)
     return scenes
+
+
+SCENE_REFINEMENT_SYSTEM = HUMAN_DRAMA_GUIDANCE + "\n\n" + """You are a scene editor. Revise exactly one story scene.
+Return exactly these four labels and nothing else:
+Title: ...
+Visual Prompt: ...
+Narrative: ...
+Narration: ...
+
+Keep the scene's event and continuity. Improve concrete action, sensory detail,
+visual specificity, and narration rhythm. Keep visual prompts under 60 words.
+Keep narration between 80 and 150 words. Do not add exposition or dialogue tags.
+"""
+
+
+def refine_scenes_granular(
+    scenes: list[dict],
+    *,
+    concept: str,
+    style: str,
+    tone: str,
+    characters: str,
+    adapter: GranularLLMAdapter,
+) -> list[dict]:
+    """Commission bounded revisions without allowing one bad response to erase a scene."""
+    refined: list[dict] = []
+    for index, scene in enumerate(scenes):
+        prompt = f"""Story concept: {concept}
+Style: {style}
+Tone: {tone}
+Characters: {characters or '(none)'}
+Scene number: {index + 1} of {len(scenes)}
+Previous scene title: {(scenes[index - 1].get('title') if index else '(opening)')}
+Next scene title: {(scenes[index + 1].get('title') if index + 1 < len(scenes) else '(ending)')}
+
+Scene to revise:
+Title: {scene.get('title', '')}
+Visual Prompt: {scene.get('prompt', '')}
+Narrative: {scene.get('narrative', '')}
+Narration: {scene.get('narration', '')}
+"""
+        try:
+            revised_text = adapter.complete(
+                name=f"scene.{index + 1}.revise",
+                system=SCENE_REFINEMENT_SYSTEM,
+                prompt=prompt,
+                max_tokens=1000,
+            ).text
+            parsed = parse_scene_response(f"Scene 1\n{revised_text}", expected_scenes=1)
+            if len(parsed) == 1 and _has_scene_content(parsed[0]):
+                visual_prompt = _commission_visual_prompt(
+                    parsed[0],
+                    scene_index=index + 1,
+                    total_scenes=len(scenes),
+                    characters=characters,
+                    previous_scene=refined[-1] if refined else None,
+                    adapter=adapter,
+                )
+                if visual_prompt:
+                    parsed[0]["prompt"] = visual_prompt
+                refined.append(parsed[0])
+                continue
+        except (RuntimeError, ValueError) as exc:
+            emit("warning", f"Scene {index + 1} revision skipped: {exc}")
+        refined.append(scene)
+    return refined
 
 
 # ── Story ID Generation ────────────────────────────────────────────────
@@ -902,6 +1334,39 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
                  characters: str = "", tone: str = "dramatic",
                  skip_images: bool = False, images_per_scene: int = 5,
                  voice_preset: str = "Dean",
+                 narration_style: str = "",
+                 world_context: str = "",
+                 background_audio: Optional[str] = None,
+                 background_volume: Optional[float] = None,
+                 background_muted: bool = False,
+                 progress_callback: Optional[Callable[[str, str, Optional[float]], None]] = None):
+    token = _PIPELINE_PROGRESS_CALLBACK.set(progress_callback)
+    try:
+        return _run_pipeline(
+            concept=concept,
+            num_scenes=num_scenes,
+            style=style,
+            characters=characters,
+            tone=tone,
+            skip_images=skip_images,
+            images_per_scene=images_per_scene,
+            voice_preset=voice_preset,
+            narration_style=narration_style,
+            world_context=world_context,
+            background_audio=background_audio,
+            background_volume=background_volume,
+            background_muted=background_muted,
+        )
+    finally:
+        _PIPELINE_PROGRESS_CALLBACK.reset(token)
+
+
+def _run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy painterly",
+                 characters: str = "", tone: str = "dramatic",
+                 skip_images: bool = False, images_per_scene: int = 5,
+                 voice_preset: str = "Dean",
+                 narration_style: str = "",
+                 world_context: str = "",
                  background_audio: Optional[str] = None,
                  background_volume: Optional[float] = None,
                  background_muted: bool = False):
@@ -917,8 +1382,9 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
     emit("queued", "Starting full-pipeline generation...")
 
     # Lazy imports — only load when needed
-    from tts_utils import generate_tts, get_audio_duration
+    from tts_utils import configured_tts_speed, generate_tts, get_audio_duration
     from comfyui_utils import checkpoint_for_style, generate_image, is_running as comfyui_running
+    tts_speed = configured_tts_speed()
 
     # ── Step 1: Generate story title & ID ──────────────────────────────
     emit("running", "Step 1/6: Generating title...", 0.02)
@@ -934,9 +1400,6 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
     update_stage(story_dir, "story", "running", message="Creating title and story metadata")
 
     emit("running", f"Story: \"{story_title}\" (id: {story_id})", 0.03)
-    emit("running", "Generating title slide first...", 0.035)
-    title_slide = write_title_slide(story_dir, story_id, story_title, concept, tone, style)
-
     # Pick a background music track up-front so the LLM can pace narration
     # to its mood. The selection is auto from the Background/ folder
     # unless the caller pinned one in via the CLI / API.
@@ -962,12 +1425,14 @@ def run_pipeline(concept: str, num_scenes: int = 10, style: str = "fantasy paint
         "tags": [style, tone, "generated"],
         "tone": tone,
         "voice_preset": voice_preset,
+        "tts_speed": tts_speed,
+        "story_concept": concept,
+        "style": style,
+        "num_scenes": num_scenes,
+        "images_per_scene": images_per_scene,
+        "world_context": world_context,
         "generated": True,
         "status": "generating",
-        "hero_image": title_slide,
-        "title_image": title_slide,    # canonical: image-backed PNG
-        "title_slide": title_slide,    # legacy alias for older clients
-        "title_slide_svg": "assets/title/title_slide.svg",
         "background_audio": bg_payload.get("background_audio"),
         "background_volume": bg_payload.get("background_volume", 0.05),
         "background_muted": bg_payload.get("background_muted", False),
@@ -997,7 +1462,10 @@ Be evocative but concise."""
     # ── Step 3: Generate scene outline + narration ─────────────────────
     emit("running", "Step 3/6: Generating scenes and narration...", 0.08)
     update_stage(story_dir, "outline", "running", message="Generating and reviewing the scene outline")
-    scenes = generate_story_outline(concept, num_scenes, style, characters, tone)
+    context_characters = characters
+    if world_context.strip():
+        context_characters = f"{characters}\n\nWorld knowledge and continuity bible:\n{world_context}".strip()
+    scenes = generate_story_outline(concept, num_scenes, style, context_characters, tone, narration_style=narration_style)
     if not scenes:
         update_stage(story_dir, "outline", "failed", message="Outline generation or quality review failed")
         emit("error", "Failed to generate scene outline.")
@@ -1011,7 +1479,7 @@ Be evocative but concise."""
         encoding="utf-8",
     )
     outline_review = review_scene_outline(
-        scenes, num_scenes, characters=characters, tone=tone,
+        scenes, num_scenes, characters=context_characters, tone=tone,
     )
     (layout["critic"] / "outline_review.json").write_text(
         json.dumps(outline_review, indent=2), encoding="utf-8",
@@ -1074,6 +1542,7 @@ Be evocative but concise."""
                     "output_prefix": prefix,
                     "seed": seed + img_idx,
                     "checkpoint": image_checkpoint,
+                    "style": style,
                 })
                 job_owners.append((s_idx, img_idx))
 
@@ -1110,6 +1579,7 @@ Be evocative but concise."""
                         output_dir=str(story_dir),
                         seed=seed + img_idx,
                         checkpoint=image_checkpoint,
+                        style=style,
                         timeout=600,
                     )
                     if filename:
@@ -1168,6 +1638,12 @@ Be evocative but concise."""
     update_stage(story_dir, "subtitles", "running", message="Aligning narration with Whisper")
     whisper_model = None
     whisper_missing = False
+    script_aligner = None
+    try:
+        from generate_subtitles import generate_subtitles as script_aligner
+    except ImportError:
+        # Keep the legacy Whisper segment path available on minimal installs.
+        pass
     subtitle_failures = []
     subtitles_generated = 0
     for i, s in enumerate(output_scenes):
@@ -1198,6 +1674,14 @@ Be evocative but concise."""
                     "start": round(seg["start"], 2),
                     "end": round(seg["end"], 2),
                 })
+
+            if script_aligner:
+                # Replace raw Whisper wording with approved narration text;
+                # the aligner retains timestamps and rejects long hallucinated gaps.
+                subs = script_aligner(
+                    str(audio_path),
+                    s.get("narration_text") or s.get("narration", ""),
+                )
 
             sub_filename = f"subs_{story_id}_s{s['scene']}.json"
             sub_path = story_dir / sub_filename
@@ -1254,12 +1738,14 @@ Be evocative but concise."""
         "tags": tags,
         "tone": tone,           # explicit top-level field for TTS lookups
         "voice_preset": voice_preset,
+        "tts_speed": tts_speed,
+        "story_concept": concept,
+        "style": style,
+        "num_scenes": num_scenes,
+        "images_per_scene": images_per_scene,
+        "world_context": world_context,
         "generated": True,
         "status": "draft",
-        "hero_image": title_slide,
-        "title_image": title_slide,    # canonical: image-backed PNG
-        "title_slide": title_slide,    # legacy alias
-        "title_slide_svg": "assets/title/title_slide.svg",
         "background_audio": early_manifest.get("background_audio"),
         "background_volume": early_manifest.get("background_volume", 0.05),
         "background_muted": early_manifest.get("background_muted", False),
@@ -1304,6 +1790,8 @@ if __name__ == "__main__":
     parser.add_argument("--characters", default="", help="Character descriptions")
     parser.add_argument("--tone", default="dramatic", help="Story tone")
     parser.add_argument("--voice", default="Dean", help="Xiaomi voice: Mia, Chloe, Milo, Dean (default: Dean)")
+    parser.add_argument("--narration-style", default="", help="Narration style name (maps to skills/<name>-style-prompt.md)")
+    parser.add_argument("--world-context", default="", help="World knowledge, continuity, arcs, and voice assignments")
     parser.add_argument("--skip-images", action="store_true", help="Skip ComfyUI rendering")
     parser.add_argument("--target-duration", type=float, help="Target total duration in minutes (overrides --scenes)")
     parser.add_argument("--background-audio", default=None,
@@ -1329,6 +1817,8 @@ if __name__ == "__main__":
             skip_images=args.skip_images,
             images_per_scene=args.images_per_scene,
             voice_preset=args.voice,
+            narration_style=args.narration_style,
+            world_context=args.world_context,
             background_audio=args.background_audio,
             background_volume=args.background_volume,
             background_muted=args.background_muted,

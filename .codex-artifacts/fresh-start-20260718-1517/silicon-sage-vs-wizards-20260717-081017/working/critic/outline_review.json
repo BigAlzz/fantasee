@@ -1,0 +1,19 @@
+{
+  "valid": true,
+  "score": 1.0,
+  "scene_count": 10,
+  "shot_types": [
+    "extreme wide shot",
+    "wide shot",
+    "over-the-shoulder shot",
+    "medium shot",
+    "low angle",
+    "high angle",
+    "close-up",
+    "medium close-up",
+    "medium shot",
+    "extreme wide shot"
+  ],
+  "issues": [],
+  "blocking_issues": 0
+}

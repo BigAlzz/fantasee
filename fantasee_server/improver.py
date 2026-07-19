@@ -29,6 +29,7 @@ from typing import Optional
 from fantasee_server.paths import STORY_VIEWER_DIR, generated_story_dir
 from fantasee_server.security import validate_provider_url
 from fantasee_server.state import _resolve_env_var, atomic_write_json
+from fantasee_server.llm_tokens import scaled_llm_tokens
 
 
 # ── Generic helpers used by both workers ──────────────────────────
@@ -90,7 +91,7 @@ def _llm_call_text(api_key: str, base_url: str, system: str, user: str,
                     {"role": "user", "content": user},
                 ],
                 "temperature": temperature,
-                "max_completion_tokens": max_tokens,
+                "max_completion_tokens": scaled_llm_tokens(max_tokens),
             },
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             timeout=timeout,
@@ -519,7 +520,7 @@ def _run_auto_improve_sync(story_id: str, body: dict | None = None, progress=Non
                         {"role": "user", "content": sc["prompt"]},
                     ],
                     "temperature": 0.7,
-                    "max_completion_tokens": 512,
+                    "max_completion_tokens": scaled_llm_tokens(512),
                 },
                 headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 timeout=120,

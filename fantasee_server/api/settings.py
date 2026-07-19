@@ -17,11 +17,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 
+from fantasee_server.paths import GEN_OUTPUTS, LEGACY_GEN_OUTPUTS
 from fantasee_server.security import validate_provider_url, validate_provider_urls
+from fantasee_server.state import atomic_write_json
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 SETTINGS_FILE = Path(__file__).parent.parent.parent / "fantasee_settings.json"
+DEFAULT_BACKGROUND_AUDIO_DIR = str(SETTINGS_FILE.parent / "Background")
 
 # ── Known tone presets (from tts_utils.py TONE_MODIFIERS) ─────────
 # These map to specific narration tone modifiers. Freeform strings
@@ -42,6 +45,7 @@ SUGGESTED_STYLES = [
     "noir chiaroscuro",
     "sci-fi concept",
     "children's illustration",
+    "comic book panels",
 ]
 
 
@@ -56,6 +60,16 @@ DEFAULTS: dict = {
     "llm_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
     "llm_api_key": "",
     "llm_model": "mimo-v2.5-pro",
+    "llm_unlimited": True,
+
+    # TTS provider (falls back to the LLM credential when its own key is blank)
+    "tts_base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
+    "tts_api_key": "",
+    "tts_model": "mimo-v2.5-tts",
+
+    # Unsplash stock image provider
+    "unsplash_base_url": "https://api.unsplash.com",
+    "unsplash_access_key": "",
 
     # TTS — uses the same Xiaomi MiMo TTS endpoint (mimo-v2.5-tts models)
     # Voice presets: Dean, Milo, Mia, Chloe. Most voice aliases map to Mia.
@@ -65,14 +79,19 @@ DEFAULTS: dict = {
     # Plex
     "plex_destination": r"D:\Downloads\Plex",
 
+    # Background audio stays in an operator-selected local folder.
+    "background_audio_dir": DEFAULT_BACKGROUND_AUDIO_DIR,
+
     # Whisper
     "whisper_model_size": "base",
 
     # Generation defaults
     "default_scenes": 5,
     "default_images_per_scene": 5,
+    "default_visual_style": "comic book panels",
     "default_style": "fantasy painterly",
     "default_tone": "dramatic",
+    "narration_style": "",
 }
 
 
@@ -87,13 +106,24 @@ class Settings(BaseModel):
     llm_base_url: str = Field(default="https://token-plan-sgp.xiaomimimo.com/v1", description="LLM API base URL")
     llm_api_key: str = Field(default="", description="LLM API key (stored locally, never sent to browser)")
     llm_model: str = Field(default="mimo-v2.5-pro", description="LLM model name")
+    llm_unlimited: bool = Field(default=True, description="Remove Fantasee completion ceilings; provider limits still apply")
 
     # TTS
+    tts_base_url: str = Field(default="https://token-plan-sgp.xiaomimimo.com/v1", description="TTS API base URL")
+    tts_api_key: str = Field(default="", description="TTS API key (stored locally, never sent to browser)")
+    tts_model: str = Field(default="mimo-v2.5-tts", description="Default TTS model name")
     tts_voice_preset: str = Field(default="Dean", description="Default TTS voice preset (Dean, Milo, Mia, Chloe)")
     tts_speed: float = Field(default=1.3, ge=0.5, le=3.0, description="TTS playback speed (0.5-3.0)")
 
+    # Unsplash
+    unsplash_base_url: str = Field(default="https://api.unsplash.com", description="Unsplash API base URL")
+    unsplash_access_key: str = Field(default="", description="Unsplash access key (stored locally, never sent to browser)")
+
     # Plex
     plex_destination: str = Field(default=r"D:\Downloads\Plex", description="Plex export destination directory")
+
+    # Background audio
+    background_audio_dir: str = Field(default=DEFAULT_BACKGROUND_AUDIO_DIR, description="Local folder containing background audio")
 
     # Whisper
     whisper_model_size: str = Field(default="base", description="Whisper model size (tiny/base/small/medium/large)")
@@ -101,8 +131,10 @@ class Settings(BaseModel):
     # Generation defaults
     default_scenes: int = Field(default=5, ge=1, le=50)
     default_images_per_scene: int = Field(default=5, ge=1, le=10)
+    default_visual_style: str = Field(default="comic book panels", description="Default visual direction for new story briefs")
     default_style: str = Field(default="fantasy painterly")
     default_tone: str = Field(default="dramatic")
+    narration_style: str = Field(default="", description="Narration style name (maps to skills/<name>-style-prompt.md)")
 
 
 # ── Persistence ───────────────────────────────────────────────────
@@ -127,6 +159,43 @@ def _save_settings(data: dict) -> None:
     os.replace(tmp, SETTINGS_FILE)
 
 
+def _invalidate_narration_outputs(previous: dict, current: dict) -> list[str]:
+    """Mark narration-derived media stale when its voice contract changes."""
+    fields = ("tts_voice_preset", "tts_speed")
+    if all(previous.get(field) == current.get(field) for field in fields):
+        return []
+    changed: list[str] = []
+    seen: set[Path] = set()
+    for root in (GEN_OUTPUTS, LEGACY_GEN_OUTPUTS):
+        if not root.exists():
+            continue
+        for story_dir in root.iterdir():
+            if not story_dir.is_dir() or story_dir.resolve() in seen:
+                continue
+            manifest_path = story_dir / f"{story_dir.name}.json"
+            if not manifest_path.is_file():
+                continue
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            scenes = manifest.get("scenes") or []
+            for scene in scenes:
+                stale = set(scene.get("stale_outputs") or [])
+                stale.update({"audio", "subtitles", "shot_timeline", "scene_video", "full_video", "plex"})
+                scene["stale_outputs"] = [kind for kind in ("images", "audio", "subtitles", "shot_timeline", "scene_video", "full_video", "plex") if kind in stale]
+            manifest["voice_preset"] = current.get("tts_voice_preset", manifest.get("voice_preset"))
+            manifest["tts_speed"] = current.get("tts_speed", manifest.get("tts_speed", 1.3))
+            manifest["status"] = "draft"
+            pipeline = manifest.setdefault("pipeline", {})
+            pipeline["status"] = "draft"
+            pipeline["next_stage"] = "audio"
+            atomic_write_json(manifest_path, manifest)
+            changed.append(story_dir.name)
+            seen.add(story_dir.resolve())
+    return changed
+
+
 def apply_settings_to_env(settings: dict) -> None:
     """Push settings into environment variables so existing code picks them up."""
     comfyui_urls = validate_provider_urls(
@@ -138,11 +207,37 @@ def apply_settings_to_env(settings: dict) -> None:
         kind="llm",
         resolve_dns=False,
     )
+    tts_base_url = validate_provider_url(
+        settings.get("tts_base_url", DEFAULTS["tts_base_url"]),
+        kind="tts",
+        resolve_dns=False,
+    )
+    unsplash_base_url = validate_provider_url(
+        settings.get("unsplash_base_url", DEFAULTS["unsplash_base_url"]),
+        kind="unsplash",
+        resolve_dns=False,
+    )
     os.environ["COMFYUI_URLS"] = comfyui_urls
     os.environ["FANTASEE_AUTO_SPAWN_CPU"] = "0" if not settings.get("comfyui_auto_spawn", True) else "1"
     os.environ["XIAOMI_BASE_URL"] = llm_base_url
     os.environ["XIAOMI_API_KEY"] = settings.get("llm_api_key", DEFAULTS["llm_api_key"])
+    os.environ["FANTASEE_LLM_MODEL"] = settings.get("llm_model", DEFAULTS["llm_model"])
+    os.environ["FANTASEE_LLM_UNLIMITED"] = "1" if settings.get("llm_unlimited", DEFAULTS["llm_unlimited"]) else "0"
+    os.environ["FANTASEE_TTS_BASE_URL"] = tts_base_url
+    os.environ["FANTASEE_TTS_API_KEY"] = (
+        settings.get("tts_api_key") or settings.get("llm_api_key", DEFAULTS["llm_api_key"])
+    )
+    os.environ["FANTASEE_TTS_MODEL"] = settings.get("tts_model", DEFAULTS["tts_model"])
+    os.environ["FANTASEE_UNSPLASH_BASE_URL"] = unsplash_base_url
+    os.environ["FANTASEE_UNSPLASH_ACCESS_KEY"] = settings.get(
+        "unsplash_access_key", DEFAULTS["unsplash_access_key"]
+    )
     os.environ["FANTASEE_PLEX_DEST"] = settings.get("plex_destination", DEFAULTS["plex_destination"])
+    background_audio_dir = str(settings.get("background_audio_dir", DEFAULTS["background_audio_dir"])).strip()
+    if background_audio_dir:
+        os.environ["FANTASEE_BACKGROUND_DIR"] = background_audio_dir
+    else:
+        os.environ.pop("FANTASEE_BACKGROUND_DIR", None)
     os.environ["FANTASEE_TTS_SPEED"] = str(settings.get("tts_speed", DEFAULTS["tts_speed"]))
     os.environ["FANTASEE_WHISPER_MODEL"] = settings.get("whisper_model_size", DEFAULTS["whisper_model_size"])
 
@@ -150,7 +245,7 @@ def apply_settings_to_env(settings: dict) -> None:
 def _mask_settings(data: dict) -> dict:
     """Return settings safe for a browser or operator response."""
     masked = dict(data)
-    for key in ("llm_api_key", "tts_api_key"):
+    for key in ("llm_api_key", "tts_api_key", "unsplash_access_key"):
         if masked.get(key):
             val = str(masked[key])
             masked[key] = f"{val[:4]}...{val[-4:]}" if len(val) > 8 else "****"
@@ -182,65 +277,113 @@ def get_settings_raw():
 @router.put("")
 def update_settings(body: Settings):
     """Update settings. Saves to disk and pushes into env vars."""
-    data = body.model_dump()
+    current = _load_settings()
+    data = {**current, **body.model_dump(exclude_unset=True)}
 
     try:
         data["comfyui_urls"] = validate_provider_urls(data["comfyui_urls"])
         data["llm_base_url"] = validate_provider_url(data["llm_base_url"], kind="llm")
+        data["tts_base_url"] = validate_provider_url(data["tts_base_url"], kind="tts")
+        data["unsplash_base_url"] = validate_provider_url(data["unsplash_base_url"], kind="unsplash")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Don't overwrite keys with masked values
-    current = _load_settings()
-    for key in ("llm_api_key",):
+    for key in ("llm_api_key", "tts_api_key", "unsplash_access_key"):
         val = data.get(key, "")
-        if val and ("..." in val or "••••" in val):
+        if val and ("..." in val or "••••" in val or val == "****"):
             data[key] = current.get(key, "")
         elif not val:
             data[key] = current.get(key, "")
 
     _save_settings(data)
     apply_settings_to_env(data)
+    narration_invalidated = _invalidate_narration_outputs(current, data)
 
-    return {"ok": True, "settings": _mask_settings(data)}
+    return {"ok": True, "settings": _mask_settings(data), "narration_invalidated": narration_invalidated}
 
 
-@router.get("/llm-models")
-def list_llm_models():
-    """Fetch available models from the configured LLM endpoint.
+@router.get("/narration-styles")
+def list_narration_styles():
+    """List available narration style prompts from skills/."""
+    skills_dir = Path(__file__).parent.parent.parent / "skills"
+    styles = []
+    if skills_dir.exists():
+        for f in sorted(skills_dir.glob("*-style-prompt.md")):
+            name = f.name.replace("-style-prompt.md", "")
+            # Read first non-empty, non-heading line as description
+            desc = ""
+            try:
+                for line in f.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        desc = line[:120]
+                        break
+            except (OSError, UnicodeError):
+                pass
+            styles.append({"name": name, "description": desc})
+    # Always include the default (Finn style from style.md)
+    default_desc = ""
+    default_path = skills_dir / "style.md"
+    if default_path.exists():
+        try:
+            for line in default_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    default_desc = line[:120]
+                    break
+        except (OSError, UnicodeError):
+            pass
+    styles.insert(0, {"name": "finn", "description": default_desc or "Default literary narration style"})
+    return {"styles": styles}
 
-    Returns the model list so the frontend can populate a dropdown.
-    The endpoint reads the current XIAOMI_BASE_URL and XIAOMI_API_KEY
-    from the environment (which were pushed from settings on startup).
-    """
+
+class ProviderDiscoveryRequest(BaseModel):
+    base_url: str = ""
+    api_key: str = ""
+
+
+def _list_llm_models(base_url: str, api_key: str) -> dict:
     import requests as req
-    base_url = os.environ.get("XIAOMI_BASE_URL", DEFAULTS["llm_base_url"])
-    api_key = os.environ.get("XIAOMI_API_KEY", "")
-
-    if not api_key:
-        # Try loading from saved settings as fallback
-        settings = _load_settings()
-        api_key = settings.get("llm_api_key", "")
 
     try:
         base_url = validate_provider_url(base_url, kind="llm")
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-        r = req.get(
+        response = req.get(
             f"{base_url}/models",
             headers=headers,
             timeout=10,
             allow_redirects=False,
         )
-        if r.status_code == 200:
-            data = r.json()
-            # Handle both { data: [...] } and [...] response formats
-            models = data.get("data", data) if isinstance(data, dict) else data
-            ids = [m["id"] for m in models if isinstance(m, dict) and m.get("id")]
-            return {"ok": True, "models": ids}
-        else:
-            return {"ok": False, "error": f"HTTP {r.status_code}", "models": []}
-    except Exception as e:
-        return {"ok": False, "error": str(e), "models": []}
+        if response.status_code != 200:
+            return {"ok": False, "error": f"HTTP {response.status_code}", "models": []}
+        data = response.json()
+        models = data.get("data", data) if isinstance(data, dict) else data
+        ids = [item["id"] for item in models if isinstance(item, dict) and item.get("id")]
+        return {"ok": True, "models": ids}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "models": []}
+
+
+def _discovery_credentials(body: ProviderDiscoveryRequest | None = None) -> tuple[str, str]:
+    saved = _load_settings()
+    base_url = body.base_url.strip() if body and body.base_url.strip() else saved["llm_base_url"]
+    api_key = body.api_key.strip() if body else ""
+    if not api_key or "..." in api_key or api_key == "****":
+        api_key = saved.get("llm_api_key", "")
+    return base_url, api_key
+
+
+@router.get("/llm-models")
+def list_llm_models():
+    """Fetch models from the saved LLM provider."""
+    return _list_llm_models(*_discovery_credentials())
+
+
+@router.post("/llm-models")
+def discover_llm_models(body: ProviderDiscoveryRequest):
+    """Fetch models from provider values currently entered in Settings."""
+    return _list_llm_models(*_discovery_credentials(body))
 
 
 @router.post("/test-connection")

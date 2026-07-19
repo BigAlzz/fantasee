@@ -1,0 +1,33 @@
+{
+  "id": "future-s-impossible-reply",
+  "title": "Future's Impossible Reply",
+  "subtitle": "A lost radio operator in Johannesburg hears one impossible r",
+  "description": "A lost radio operator in Johannesburg hears one impossible reply from the future.",
+  "tags": [
+    "cinematic grounded realism",
+    "tense, intimate, hopeful",
+    "generated"
+  ],
+  "tone": "tense, intimate, hopeful",
+  "voice_preset": "Dean",
+  "tts_speed": 1.2,
+  "story_concept": "A lost radio operator in Johannesburg hears one impossible reply from the future.",
+  "style": "cinematic grounded realism",
+  "num_scenes": 1,
+  "images_per_scene": 1,
+  "world_context": "",
+  "generated": true,
+  "status": "generating",
+  "background_audio": "musictown-light-and-reflective-piano-orchestra-1-22211 (1).mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 189.022031,
+  "background_track_tags": [
+    "piano",
+    "orchestra",
+    "reflective",
+    "light"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

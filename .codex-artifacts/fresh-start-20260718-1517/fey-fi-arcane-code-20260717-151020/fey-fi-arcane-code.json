@@ -1,0 +1,31 @@
+{
+  "id": "fey-fi-arcane-code",
+  "title": "Fey-Fi: Arcane Code",
+  "subtitle": "Arcane Wi-Fi and Fairy Lights\n\nTransmigrated into a fey-haun",
+  "description": "Arcane Wi-Fi and Fairy Lights\n\nTransmigrated into a fey-haunted forest, a programmer with a glitchy AI companion electrifies a hopeless pixie village, blending digital sorcery with ancient enchantment",
+  "tags": [
+    "anime",
+    "lighthearted",
+    "generated"
+  ],
+  "tone": "lighthearted",
+  "voice_preset": "Milo",
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-light-and-sweet-piano-orchestra-1-22210.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 182.77875,
+  "background_track_tags": [
+    "piano",
+    "orchestra",
+    "light",
+    "sweet"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

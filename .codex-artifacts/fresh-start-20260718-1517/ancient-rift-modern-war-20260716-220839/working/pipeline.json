@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "story_id": "ancient-rift-modern-war",
+  "status": "running",
+  "current_stage": "render",
+  "started_at": "2026-07-16T20:01:21.500826+00:00",
+  "updated_at": "2026-07-16T20:08:39.706162+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-16T20:01:29.130664+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-16T20:04:24.174044+00:00",
+      "message": "Scene outline passed structural quality review",
+      "details": {
+        "score": 0.75,
+        "issues": 5
+      }
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-16T20:04:24.182788+00:00",
+      "message": "Generating scene images"
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

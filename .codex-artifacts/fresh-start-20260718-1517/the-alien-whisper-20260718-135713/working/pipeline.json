@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "story_id": "the-alien-whisper",
+  "status": "running",
+  "current_stage": "outline",
+  "started_at": "2026-07-18T11:49:50.012679+00:00",
+  "updated_at": "2026-07-18T11:57:13.105620+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T11:50:00.245433+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "failed",
+      "attempts": 1,
+      "updated_at": "2026-07-18T11:50:28.833555+00:00",
+      "message": "Outline generation or quality review failed"
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  },
+  "last_error": "Outline generation or quality review failed"
+}

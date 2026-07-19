@@ -394,6 +394,19 @@ class TestPlanExtend(unittest.TestCase):
             self.assertEqual(plan.style, "cinematic")
             self.assertEqual(plan.tone, "noir")
 
+    def test_duration_mode_uses_average_scene_length(self):
+        with temp_dir() as tmp:
+            slug = "extend-duration"
+            story = _build_synthetic_story(tmp, slug, [
+                {"key": "01", "image": True, "audio": True, "subs": True},
+                {"key": "02", "image": True, "audio": True, "subs": True},
+            ])
+            import story_actions
+            plan = story_actions.plan_extend(slug, scenes=None, duration_minutes=0.1, story_dir=story)
+            self.assertEqual(plan.current_scene_count, 2)
+            self.assertEqual(plan.will_add, 6)
+            self.assertEqual(plan.duration_minutes, 0.1)
+
 
 # ── regenerate_story (mocked pipeline) ──────────────────────────────
 

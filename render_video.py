@@ -25,14 +25,16 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 from story_storage import STORIES_ROOT, existing_story_dir, ensure_story_layout
+from image_quality import is_usable_story_image
 
 # ── Defaults ────────────────────────────────────────────────────────────
 OUTPUTS = STORIES_ROOT
 DEFAULT_WIDTH = 1920
 DEFAULT_HEIGHT = 1080
 CROSSFADE_DURATION = 0.8       # seconds of crossfade between images
+SCENE_TRANSITION_DURATION = 0.8 # seconds of fade-through-black between scenes
 ZOOM_MAX = 1.08                # max zoom factor (8% zoom in)
-FPS = 30
+FPS = 60                  # Stable motion clock for smooth Ken Burns movement
 AUDIO_BITRATE = "192k"
 VIDEO_CRF = 20                 # quality (lower = better, 18-23 typical)
 
@@ -40,11 +42,42 @@ VIDEO_CRF = 20                 # quality (lower = better, 18-23 typical)
 def get_scene_assets(story_dir: Path, slug: str, scene_num: int) -> dict:
     """Find all assets for a given scene."""
     scene_key = f"{scene_num:02d}"
-    
-    # Find images (sorted by beat number in filename)
-    images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*_00001_.png"))
-    if not images:
-        images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*.png"))
+    image_durations: list[float] | None = None
+
+    # An approved editorial timeline wins over the legacy manifest glob. This
+    # prevents rejected candidates or unrelated scene artwork from entering
+    # the release render.
+    shot_segments: list[dict] = []
+    for timeline_name in ("timeline.json", "shot_timeline.json"):
+        try:
+            timeline = json.loads((story_dir / "working" / timeline_name).read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, json.JSONDecodeError):
+            continue
+        shot_segments = [
+            segment for segment in (timeline.get("shot_segments") or timeline.get("segments") or [])
+            if segment.get("scene_id") in {f"scene-{scene_key}", scene_key, f"s{scene_key}"}
+            and segment.get("asset_path")
+        ]
+        if shot_segments:
+            break
+
+    if shot_segments:
+        shot_segments.sort(key=lambda segment: (float(segment.get("start", 0)), segment.get("shot_id", "")))
+        images = []
+        image_durations = []
+        for segment in shot_segments:
+            path = Path(str(segment["asset_path"]))
+            if not path.is_absolute():
+                path = story_dir / path
+            if is_usable_story_image(path):
+                images.append(path)
+                image_durations.append(max(0.01, float(segment.get("end", 0)) - float(segment.get("start", 0))))
+    else:
+        # Legacy stories remain supported until their shot plans are migrated.
+        images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*_00001_.png"))
+        if not images:
+            images = sorted(story_dir.glob(f"{slug}_s{scene_key}_*.png"))
+        images = [path for path in images if is_usable_story_image(path)]
     
     # Find audio
     audio = None
@@ -79,6 +112,7 @@ def get_scene_assets(story_dir: Path, slug: str, scene_num: int) -> dict:
         "audio": audio,
         "subs": subs,
         "duration": duration,
+        "image_durations": image_durations,
     }
 
 
@@ -130,13 +164,27 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
     
     n_images = len(images)
     n_crossfades = max(0, n_images - 1)
-    
-    # Each image clip duration (before crossfade overlap)
-    # Total = n*clip_dur - n_crossfades*xfade_dur = duration
-    clip_dur = (duration + n_crossfades * CROSSFADE_DURATION) / n_images
-    
+
+    requested_durations = assets.get("image_durations")
+    if requested_durations and len(requested_durations) == n_images:
+        requested_total = sum(requested_durations)
+        scale = duration / requested_total if requested_total > 0 else 1.0
+        segment_durations = [value * scale for value in requested_durations]
+        clip_durations = [
+            segment + (CROSSFADE_DURATION if index < n_images - 1 else 0.0)
+            for index, segment in enumerate(segment_durations)
+        ]
+        clip_label = "approved shot timing"
+    else:
+        # Legacy behavior: distribute the scene evenly across its images.
+        clip_dur = (duration + n_crossfades * CROSSFADE_DURATION) / n_images
+        segment_durations = [clip_dur - CROSSFADE_DURATION] * n_images
+        segment_durations[-1] += CROSSFADE_DURATION
+        clip_durations = [clip_dur] * n_images
+        clip_label = f"clip={clip_dur:.2f}s"
+
     print(f"  Scene {scene_key}: {n_images} images, {duration:.1f}s, "
-          f"clip={clip_dur:.2f}s")
+          f"{clip_label}")
     
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
@@ -144,33 +192,37 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
         
         # Ken Burns zoom increment per frame
         # Total zoom range: 1.0 → ZOOM_MAX over clip_dur * fps frames
-        total_frames = int(clip_dur * fps)
-        zoom_per_frame = (ZOOM_MAX - 1.0) / max(total_frames, 1)
-        
         # Generate individual image clips with zoompan
         # Alternating directions: zoom-in, pan-right, zoom-out, pan-left
         directions = ["zoom_in", "pan_right", "zoom_out", "pan_left"]
         
         for i, img_path in enumerate(images):
+            clip_dur = clip_durations[i]
+            total_frames = max(1, int(round(clip_dur * fps)))
+            # Ease the camera in and out so Ken Burns motion does not jump at
+            # the start or end of a shot.  zoompan evaluates these expressions
+            # per frame; cosine easing gives zero velocity at both endpoints.
+            frame_denom = max(total_frames - 1, 1)
+            eased = f"(0.5-0.5*cos(PI*on/{frame_denom}))"
             direction = directions[i % len(directions)]
             clip_path = tmpdir / f"clip_{i:02d}.mp4"
             
             # Build zoompan expression based on direction
             if direction == "zoom_in":
-                z_expr = f"min(zoom+{zoom_per_frame:.8f},{ZOOM_MAX})"
+                z_expr = f"1+({ZOOM_MAX - 1.0:.4f})*{eased}"
                 x_expr = "iw/2-(iw/zoom/2)"
                 y_expr = "ih/2-(ih/zoom/2)"
             elif direction == "zoom_out":
-                z_expr = f"max({ZOOM_MAX}-on*{zoom_per_frame:.8f},1.0)"
+                z_expr = f"{ZOOM_MAX:.4f}-({ZOOM_MAX - 1.0:.4f})*{eased}"
                 x_expr = "iw/2-(iw/zoom/2)"
                 y_expr = "ih/2-(ih/zoom/2)"
             elif direction == "pan_right":
-                z_expr = str(ZOOM_MAX)
-                x_expr = f"(iw-iw/zoom)*on/{total_frames}"
+                z_expr = f"{ZOOM_MAX:.4f}"
+                x_expr = f"(iw-iw/zoom)*{eased}"
                 y_expr = "ih/2-(ih/zoom/2)"
             else:  # pan_left
-                z_expr = str(ZOOM_MAX)
-                x_expr = f"(iw-iw/zoom)*(1-on/{total_frames})"
+                z_expr = f"{ZOOM_MAX:.4f}"
+                x_expr = f"(iw-iw/zoom)*(1-{eased})"
                 y_expr = "ih/2-(ih/zoom/2)"
             
             # zoompan with d=1: outputs 1 frame per input frame
@@ -179,17 +231,19 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
                 f"zoompan=z='{z_expr}':d=1:"
                 f"x='{x_expr}':y='{y_expr}':"
                 f"s={width}x{height}:fps={fps},"
-                f"format=yuv420p"
+                f"fps={fps},settb=AVTB,setpts=N/({fps}*TB),format=yuv420p"
             )
             
             cmd = [
                 "ffmpeg", "-y",
-                "-r", str(fps),
-                "-loop", "1", "-t", f"{clip_dur:.3f}",
+                "-loop", "1", "-framerate", str(fps),
                 "-i", str(img_path),
                 "-vf", zp_filter,
+                "-frames:v", str(total_frames),
                 "-c:v", "libx264", "-preset", "fast",
                 "-crf", str(crf),
+                "-pix_fmt", "yuv420p",
+                "-fps_mode", "cfr",
                 "-an",
                 str(clip_path)
             ]
@@ -219,14 +273,23 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
             for i, cp in enumerate(clip_paths):
                 filter_inputs.extend(["-i", str(cp)])
             
-            prev_label = "v0"
+            # Input pads are addressed by their ffmpeg stream labels.  The
+            # previous implementation used ``v0``, ``v1``, ... for the
+            # inputs, which are output-link labels rather than input stream
+            # labels.  ffmpeg consequently kept the first stream as the
+            # effective video throughout the xfade chain.
+            for i in range(n_images):
+                filter_parts.append(
+                    f"[{i}:v]fps={fps},format=yuv420p,settb=AVTB,"
+                    f"setpts=PTS-STARTPTS[clip{i}]"
+                )
+
+            prev_label = "clip0"
             for i in range(1, n_images):
-                # xfade offset: when does this transition start in the output?
-                # After i-1 crossfades, each reducing by CROSSFADE_DURATION
-                # The output of step i has duration: (i+1)*clip_dur - i*CROSSFADE_DURATION
-                # The xfade starts at: output_dur - clip_dur
-                out_dur = (i + 1) * clip_dur - i * CROSSFADE_DURATION
-                xfade_off = out_dur - clip_dur
+                # With explicit shot timing, each transition starts at the
+                # next approved segment boundary. Legacy clips retain their
+                # equivalent evenly-spaced offsets.
+                xfade_off = sum(segment_durations[:i])
                 
                 if i < n_images - 1:
                     out_label = f"xf{i}"
@@ -234,7 +297,7 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
                     out_label = "vout"
                 
                 filter_parts.append(
-                    f"[{prev_label}][v{i}]xfade=transition=fade:"
+                    f"[{prev_label}][clip{i}]xfade=transition=fade:"
                     f"duration={CROSSFADE_DURATION}:"
                     f"offset={xfade_off:.3f}[{out_label}]"
                 )
@@ -265,6 +328,9 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
                 "-map", f"[{vout_label}]",
                 "-c:v", "libx264", "-preset", "fast",
                 "-crf", str(crf),
+                "-pix_fmt", "yuv420p",
+                "-r", str(fps),
+                "-fps_mode", "cfr",
                 "-an",
                 str(xfade_video)
             ]
@@ -288,6 +354,7 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
             "ffmpeg", "-y",
             "-i", str(concat_video),
             "-i", str(audio),
+            "-af", "dynaudnorm=f=150:g=15",
             "-map", "0:v", "-map", "1:a",
             "-t", f"{duration:.3f}",
             "-c:v", "copy",
@@ -317,23 +384,69 @@ def render_scene(story_dir: Path, slug: str, assets: dict,
 
 
 def concatenate_scenes(scene_videos: list[Path], slug: str,
-                       output_dir: Path) -> Optional[Path]:
-    """Concatenate per-scene MP4s into a full story video."""
+                       output_dir: Path, fps: int = FPS) -> Optional[Path]:
+    """Join scenes with a visible fade transition and matching audio overlap."""
     if not scene_videos:
         return None
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
-        concat_list = Path(tmpdir) / "concat.txt"
-        with open(concat_list, "w") as f:
-            for sv in scene_videos:
-                f.write(f"file '{sv}'\n")
-        
         out_path = output_dir / f"{slug}_full.mp4"
+        durations = []
+        for scene_video in scene_videos:
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(scene_video)],
+                capture_output=True, text=True, check=False,
+            )
+            try:
+                durations.append(float(probe.stdout.strip()))
+            except ValueError:
+                print(f"  ERROR: could not probe scene duration for {scene_video.name}")
+                return None
+
+        if len(scene_videos) == 1:
+            shutil.copy2(scene_videos[0], out_path)
+            return out_path
+
+        filter_inputs = []
+        for scene_video in scene_videos:
+            filter_inputs.extend(["-i", str(scene_video)])
+
+        filter_parts = []
+        for index in range(len(scene_videos)):
+            filter_parts.append(
+                f"[{index}:v]fps={fps},format=yuv420p,settb=AVTB,"
+                f"setpts=PTS-STARTPTS[scene_in{index}]"
+            )
+        previous_video = "scene_in0"
+        previous_audio = "0:a"
+        elapsed = durations[0]
+        for index in range(1, len(scene_videos)):
+            video_label = f"scene_v{index}"
+            audio_label = f"scene_a{index}"
+            offset = max(0.0, elapsed - SCENE_TRANSITION_DURATION)
+            filter_parts.append(
+                f"[{previous_video}][scene_in{index}]xfade=transition=fadeblack:"
+                f"duration={SCENE_TRANSITION_DURATION}:offset={offset:.3f}[{video_label}]"
+            )
+            filter_parts.append(
+                f"[{previous_audio}][{index}:a]acrossfade="
+                f"d={SCENE_TRANSITION_DURATION}:c1=tri:c2=tri[{audio_label}]"
+            )
+            previous_video = video_label
+            previous_audio = audio_label
+            elapsed += durations[index] - SCENE_TRANSITION_DURATION
+
+        filter_complex = ";\n".join(filter_parts)
         cmd = [
             "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0",
-            "-i", str(concat_list),
-            "-c", "copy",
+            *filter_inputs,
+            "-filter_complex", filter_complex,
+            "-map", f"[{previous_video}]",
+            "-map", f"[{previous_audio}]",
+            "-c:v", "libx264", "-preset", "fast", "-crf", str(VIDEO_CRF),
+            "-c:a", "aac", "-b:a", AUDIO_BITRATE,
+            "-pix_fmt", "yuv420p", "-r", str(fps), "-fps_mode", "cfr",
             "-movflags", "+faststart",
             str(out_path)
         ]
@@ -359,7 +472,9 @@ def concatenate_scenes(scene_videos: list[Path], slug: str,
 
 
 def concatenate_vtts(scene_vtts: list[Path], slug: str,
-                     output_dir: Path) -> Optional[Path]:
+                     output_dir: Path,
+                     scene_durations: Optional[list[float]] = None,
+                     transition_duration: float = SCENE_TRANSITION_DURATION) -> Optional[Path]:
     """Combine per-scene VTT files into one with adjusted timestamps."""
     if not scene_vtts:
         return None
@@ -383,7 +498,7 @@ def concatenate_vtts(scene_vtts: list[Path], slug: str,
         s = t % 60
         return f"{h:02d}:{m:02d}:{s:06.3f}"
     
-    for vtt_path in scene_vtts:
+    for index, vtt_path in enumerate(scene_vtts):
         with open(vtt_path, "r", encoding="utf-8") as f:
             content = f.read()
         
@@ -403,8 +518,18 @@ def concatenate_vtts(scene_vtts: list[Path], slug: str,
                     max_end = max(max_end, end - time_offset)
                     break
         
-        # Add gap between scenes (0.5s)
-        time_offset += max_end + 0.5
+        # Scene video transitions overlap adjacent scenes.  Use the measured
+        # scene duration rather than subtitle coverage so a quiet final cue
+        # cannot move every following subtitle out of sync.
+        scene_duration = (
+            scene_durations[index]
+            if scene_durations and index < len(scene_durations)
+            else max_end
+        )
+        if index < len(scene_vtts) - 1:
+            time_offset += max(0.0, scene_duration - transition_duration)
+        else:
+            time_offset += scene_duration
     
     lines = ["WEBVTT", ""]
     for i, (start, end, text) in enumerate(all_cues):
@@ -486,6 +611,7 @@ def main():
     t_start = _time()
     scene_videos = []
     scene_vtts = []
+    scene_durations = []
     
     for scene_num in scene_range:
         assets = get_scene_assets(story_dir, args.slug, scene_num)
@@ -499,6 +625,7 @@ def main():
         
         if result:
             scene_videos.append(result)
+            scene_durations.append(float(assets["duration"]))
             vtt_path = story_dir / f"{args.slug}_s{scene_num:02d}.vtt"
             if vtt_path.exists():
                 scene_vtts.append(vtt_path)
@@ -508,9 +635,14 @@ def main():
     # Concatenate all scenes
     if not args.no_full and len(scene_videos) > 1:
         print("Concatenating scenes...")
-        concatenate_scenes(scene_videos, args.slug, story_dir)
+        concatenate_scenes(scene_videos, args.slug, story_dir, fps=args.fps)
         if scene_vtts:
-            concatenate_vtts(scene_vtts, args.slug, story_dir)
+            concatenate_vtts(
+                scene_vtts,
+                args.slug,
+                story_dir,
+                scene_durations=scene_durations,
+            )
         for suffix in (".mp4", ".vtt"):
             full_path = story_dir / f"{args.slug}_full{suffix}"
             if full_path.exists():

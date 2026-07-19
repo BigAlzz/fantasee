@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "story_id": "magic-s-exiles-in-the-machine",
+  "status": "running",
+  "current_stage": "render",
+  "started_at": "2026-07-17T00:21:11.906651+00:00",
+  "updated_at": "2026-07-17T00:28:40.243002+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T00:21:19.952213+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T00:22:45.190035+00:00",
+      "message": "Scene outline passed structural quality review",
+      "details": {
+        "score": 1.0,
+        "issues": 0
+      }
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T00:22:45.196848+00:00",
+      "message": "Generating scene images"
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

@@ -19,13 +19,14 @@ import sys
 
 from fastapi import APIRouter, Body, HTTPException
 
-from fantasee_server.discovery import ensure_title_slide_for_manifest
+from fantasee_server.library import story_completion_report
 from fantasee_server.paths import (
     GEN_OUTPUTS,
     STORY_VIEWER_DIR,
     generated_story_dir,
 )
 from fantasee_server.security import validate_provider_url
+from fantasee_server.llm_tokens import scaled_llm_tokens
 from fantasee_server.state import (
     _resolve_env_var,
     atomic_write_json,
@@ -37,8 +38,8 @@ router = APIRouter(tags=["improvement"])
 
 
 @router.post("/api/stories/{story_id}/scenes/{scene_idx}/regenerate")
-async def regenerate_scene(story_id: str, scene_idx: int):
-    """Regenerate images and TTS for a single scene."""
+async def regenerate_scene(story_id: str, scene_idx: int, body: dict = Body(default=None)):
+    """Regenerate selected scene outputs and realign subtitles to new audio."""
     story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
@@ -54,58 +55,84 @@ async def regenerate_scene(story_id: str, scene_idx: int):
     padded = f"{scene_num:02d}"
     safe_title = re.sub(r'[^a-zA-Z0-9]+', '_', scene.get("title", "")).strip("_")[:30]
 
-    # Delete old images
-    for old_img in scene.get("image_filenames", []):
-        old_path = story_dir / old_img
-        if old_path.exists():
-            old_path.unlink()
+    options = body or {}
+    regenerate_images = bool(options.get("regenerate_images", True))
+    regenerate_audio = bool(options.get("regenerate_audio", True))
+    unknown = sorted(set(options) - {"regenerate_images", "regenerate_audio"})
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown regeneration options: {', '.join(unknown)}")
+    regenerated: list[str] = []
 
-    # Generate new image
+    # Generate a replacement before removing the last valid artwork.
     sys.path.insert(0, str(STORY_VIEWER_DIR))
     from comfyui_utils import generate_image, is_running
-    status = is_running()
-    new_filename = None
-    if status.get("running", False):
-        seed = hash(story_id + str(scene_num)) % (2**32 - 1)
-        prefix = f"{story_id}_s{padded}_{safe_title}_01"
-        new_filename = generate_image(
-            prompt=scene["prompt"],
-            output_prefix=prefix,
-            output_dir=str(story_dir),
-            seed=seed,
-            timeout=600,
-        )
-    scene["image_filenames"] = [new_filename] if new_filename else []
+    stale_outputs = set(scene.get("stale_outputs") or [])
+    if regenerate_images:
+        old_images = list(scene.get("image_filenames") or [])
+        status = is_running()
+        new_filename = None
+        if status.get("running", False):
+            seed = hash(story_id + str(scene_num)) % (2**32 - 1)
+            prefix = f"{story_id}_s{padded}_{safe_title}_01"
+            new_filename = generate_image(
+                prompt=scene["prompt"],
+                output_prefix=prefix,
+                output_dir=str(story_dir),
+                seed=seed,
+                timeout=600,
+            )
+        if new_filename:
+            for old_img in old_images:
+                old_path = story_dir / old_img
+                if old_path.exists() and old_img != new_filename:
+                    old_path.unlink()
+            scene["image_filenames"] = [new_filename]
+            stale_outputs.discard("images")
+            regenerated.append("images")
 
     # Regenerate TTS
-    from tts_utils import generate_tts, get_audio_duration
-    narration = scene.get("narration", scene.get("narration_text", ""))
-    if narration:
+    if regenerate_audio:
+        from tts_utils import generate_tts, get_audio_duration
+        narration = scene.get("narration", scene.get("narration_text", ""))
+    else:
+        narration = ""
+    if regenerate_audio and narration:
         old_audio = scene.get("audio_filename", "")
         if old_audio:
             old_path = story_dir / old_audio
             if old_path.exists():
                 old_path.unlink()
-            audio_filename = f"tts_{story_id}_s{padded}.wav"
-            audio_path = str(story_dir / audio_filename)
-            # Prefer the explicit "tone" field on the manifest, fall back
-            # to the legacy position in tags ([style, tone, "generated"]).
-            story_tone = manifest.get("tone") or ""
-            if not story_tone:
-                tags = manifest.get("tags", [])
-                story_tone = tags[1] if len(tags) >= 2 else ""
-            ok = generate_tts(narration, audio_path, voice="Dean", tone=story_tone or "normal")
-            if ok:
-                scene["audio_filename"] = audio_filename
-                scene["audio_duration"] = get_audio_duration(audio_path)
+        audio_filename = f"tts_{story_id}_s{padded}.wav"
+        audio_path = str(story_dir / audio_filename)
+        # Prefer the explicit "tone" field on the manifest, fall back
+        # to the legacy position in tags ([style, tone, "generated"]).
+        story_tone = manifest.get("tone") or ""
+        if not story_tone:
+            tags = manifest.get("tags", [])
+            story_tone = tags[1] if len(tags) >= 2 else ""
+        ok = generate_tts(narration, audio_path, voice="Dean", tone=story_tone or "normal")
+        if not ok:
+            raise HTTPException(status_code=500, detail="Narration regeneration failed")
+        scene["audio_filename"] = audio_filename
+        scene["audio_duration"] = get_audio_duration(audio_path)
+        # Subtitles are derived from this exact audio file, never from the
+        # previous narration timing.
+        sys.path.insert(0, str(STORY_VIEWER_DIR))
+        from story_actions import _regen_scene_subs
+        _regen_scene_subs(story_dir, story_id, padded, scene, manifest)
+        stale_outputs.discard("audio")
+        stale_outputs.discard("subtitles")
+        regenerated.extend(("audio", "subtitles"))
+
+    scene["stale_outputs"] = [kind for kind in ("images", "audio", "subtitles", "scene_video", "full_video", "plex") if kind in stale_outputs]
 
     atomic_write_json(manifest_path, manifest)
-    return {"status": "ok", "scene": scene}
+    return {"status": "ok", "scene": scene, "regenerated": regenerated}
 
 
 @router.post("/api/stories/{story_id}/scenes/{scene_idx}/add-image")
-async def add_scene_image(story_id: str, scene_idx: int):
-    """Add an additional image to a scene for more visual variety."""
+async def add_scene_image(story_id: str, scene_idx: int, body: dict = Body(default=None)):
+    """Add one or more images with director or explicit manual placement."""
     story_dir = generated_story_dir(story_id)
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
@@ -117,6 +144,16 @@ async def add_scene_image(story_id: str, scene_idx: int):
         raise HTTPException(status_code=400, detail="Invalid scene index")
 
     scene = scenes[scene_idx]
+    options = body or {}
+    mode = str(options.get("mode") or "director").strip().lower()
+    if mode not in {"director", "manual"}:
+        raise HTTPException(status_code=400, detail="mode must be director or manual")
+    try:
+        count = int(options.get("count", 1))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="count must be an integer") from exc
+    if count < 1 or count > 4:
+        raise HTTPException(status_code=400, detail="count must be between 1 and 4")
     scene_num = scene_idx + 1
     padded = f"{scene_num:02d}"
     safe_title = re.sub(r'[^a-zA-Z0-9]+', '_', scene.get("title", "")).strip("_")[:30]
@@ -127,24 +164,68 @@ async def add_scene_image(story_id: str, scene_idx: int):
     if not status.get("running", False):
         raise HTTPException(status_code=503, detail="ComfyUI not running")
 
-    existing = len(scene.get("image_filenames", []))
-    seed = hash(story_id + str(scene_num) + str(existing)) % (2**32 - 1)
-    prefix = f"{story_id}_s{padded}_{safe_title}_{existing + 1:02d}"
+    images = scene.setdefault("image_filenames", [])
+    try:
+        manual_position = int(options.get("position", len(images)))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="position must be an integer") from exc
+    insert_at = max(0, min(len(images), manual_position))
+    director_shots = []
+    if mode == "director":
+        try:
+            from fantasee_server.production_runtime import production_database_path
+            from fantasee_server.production_store import ProductionStore
+            from fantasee_server.shot_planning import plan_semantic_shots
+            scene_id = f"scene-{scene_num:02d}"
+            with ProductionStore(production_database_path()) as store:
+                director_shots = store.list_shots(story_id, scene_id)
+                if not director_shots:
+                    planned = plan_semantic_shots(
+                        scene_id=scene_id,
+                        narration=scene.get("narration") or scene.get("narration_text") or scene.get("narrative") or "",
+                        visual_direction=scene.get("prompt") or "",
+                    )
+                    store.save_shot_plan(story_id, scene_id, planned)
+                    director_shots = store.list_shots(story_id, scene_id)
+        except Exception:
+            # Image generation remains useful even if the optional durable shot
+            # plan is unavailable on an older story.
+            director_shots = []
 
-    filename = generate_image(
-        prompt=scene["prompt"],
-        output_prefix=prefix,
-        output_dir=str(story_dir),
-        seed=seed,
-        timeout=600,
-    )
+    added: list[str] = []
+    placements: list[dict] = []
+    for offset in range(count):
+        current_count = len(images)
+        target_shot = director_shots[min(current_count, len(director_shots) - 1)] if director_shots else None
+        if mode == "director" and target_shot:
+            position = max(0, min(current_count, target_shot.order - 1))
+            prompt = target_shot.visual_context or scene.get("prompt") or ""
+        else:
+            position = max(0, min(current_count, insert_at + offset))
+            prompt = scene.get("prompt") or ""
+        seed = hash(f"{story_id}:{scene_num}:{current_count}:{mode}") % (2**32 - 1)
+        prefix = f"{story_id}_s{padded}_{safe_title}_{current_count + 1:02d}"
+        filename = generate_image(
+            prompt=prompt,
+            output_prefix=prefix,
+            output_dir=str(story_dir),
+            seed=seed,
+            timeout=600,
+        )
+        if not filename:
+            continue
+        images.insert(position, filename)
+        added.append(filename)
+        placements.append({"filename": filename, "position": position, "shot_id": target_shot.id if target_shot else None})
 
-    if filename:
-        scene.setdefault("image_filenames", []).append(filename)
-        atomic_write_json(manifest_path, manifest)
-        return {"status": "ok", "filename": filename, "total_images": len(scene["image_filenames"])}
-
-    raise HTTPException(status_code=500, detail="Image generation failed")
+    if not added:
+        raise HTTPException(status_code=500, detail="Image generation failed; no new asset was returned")
+    stale = set(scene.get("stale_outputs") or [])
+    stale.update({"scene_video", "full_video", "plex"})
+    scene["stale_outputs"] = [kind for kind in ("images", "audio", "subtitles", "scene_video", "full_video", "plex") if kind in stale]
+    manifest["status"] = "draft"
+    atomic_write_json(manifest_path, manifest)
+    return {"status": "ok", "filename": added[-1], "filenames": added, "placements": placements, "total_images": len(images), "mode": mode}
 
 
 @router.post("/api/stories/{story_id}/scenes/{scene_idx}/refine-prompt")
@@ -203,7 +284,7 @@ async def refine_prompt(story_id: str, scene_idx: int, body: dict = Body(default
                 {"role": "user", "content": user_prompt},
             ],
             "temperature": 0.7,
-            "max_completion_tokens": 512,
+            "max_completion_tokens": scaled_llm_tokens(512),
         },
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
         timeout=120,
@@ -278,14 +359,18 @@ async def render_story(story_id: str, body: dict = Body(default=None)):
     manifest_path = story_dir / f"{story_id}.json"
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
-    try:
-        ensure_title_slide_for_manifest(
-            story_dir,
-            json.loads(manifest_path.read_text(encoding="utf-8")),
+    completion = story_completion_report(story_id, story_dir=story_dir)
+    blocking = {"story_text", "audio", "subtitles", "shot_image", "shot_timeline"}
+    blocked = sorted(blocking.intersection(completion.get("missing") or []))
+    if blocked:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Rendering is blocked until the approved timeline inputs are ready",
+                "missing": blocked,
+                "issues": [issue for issue in completion.get("issues", []) if issue.get("kind") in blocked][:20],
+            },
         )
-    except (json.JSONDecodeError, OSError):
-        pass
-
     scene_idx = (body or {}).get("scene_idx")
     cmd = [sys.executable, str(STORY_VIEWER_DIR / "render_video.py"), story_id]
     if scene_idx is not None:

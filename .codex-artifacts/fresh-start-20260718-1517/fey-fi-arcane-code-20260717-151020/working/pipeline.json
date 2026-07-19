@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "story_id": "fey-fi-arcane-code",
+  "status": "running",
+  "current_stage": "render",
+  "started_at": "2026-07-17T13:06:29.251189+00:00",
+  "updated_at": "2026-07-17T13:10:20.653636+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T13:06:37.506213+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T13:07:54.887346+00:00",
+      "message": "Scene outline passed structural quality review",
+      "details": {
+        "score": 0.95,
+        "issues": 1
+      }
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T13:07:54.894326+00:00",
+      "message": "Generating scene images"
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Test suite to run
+        required: true
+        default: unit
+        type: choice
+        options:
+          - unit
+          - media
+          - hardware
+          - all
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Studio dependencies
+        working-directory: studio
+        run: npm install
+
+      - name: Build Studio
+        working-directory: studio
+        run: npm run build
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          $suite = "${{ github.event_name == 'workflow_dispatch' && inputs.suite || 'unit' }}"
+          switch ($suite) {
+            "media" { $pytestArgs = @("-m", "media") }
+            "hardware" { $pytestArgs = @("-m", "hardware") }
+            "all" { $pytestArgs = @() }
+            default { $pytestArgs = @("-m", "not media and not hardware") }
+          }
+          python -m pytest @pytestArgs

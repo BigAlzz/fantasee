@@ -12,6 +12,7 @@ from pathlib import Path
 
 from plex_export import (
     SceneChapter,
+    _copy_poster,
     _ffmpeg_escape_title,
     _plex_movie_folder_name,
     _sanitize_for_plex,
@@ -23,6 +24,59 @@ from plex_export import (
     segments_to_srt,
     segments_to_vtt,
 )
+
+
+def test_plex_poster_uses_scene_art_not_title_slide(tmp_path):
+    story_dir = tmp_path / "story"
+    title = story_dir / "assets" / "title" / "title_slide.png"
+    scene = story_dir / "scene-01.png"
+    title.parent.mkdir(parents=True)
+    story_dir.mkdir(exist_ok=True)
+    (tmp_path / "plex").mkdir()
+    title.write_bytes(b"title-card")
+    scene.write_bytes(b"scene-art")
+
+    poster = _copy_poster(
+        story_dir,
+        "story",
+        tmp_path / "plex",
+        {"scenes": [{"image_filenames": ["scene-01.png"]}]},
+    )
+
+    assert poster is not None
+    assert poster.read_bytes() == b"scene-art"
+
+
+def test_timeline_sidecars_use_absolute_scene_offsets(tmp_path):
+    from plex_export import write_timeline_subtitles
+
+    timeline = tmp_path / "timeline.json"
+    timeline.write_text(
+        '{"segments":[{"text":"second scene","start":2.2,"end":3.5}]}',
+        encoding="utf-8",
+    )
+    srt, vtt = write_timeline_subtitles(timeline, "story", tmp_path / "plex")
+
+    assert "00:00:02,200 --> 00:00:03,500" in srt.read_text(encoding="utf-8")
+    assert "00:00:02.200 --> 00:00:03.500" in vtt.read_text(encoding="utf-8")
+
+
+def test_timeline_visuals_are_copied_into_plex_package(tmp_path):
+    from plex_export import _copy_timeline_visuals
+
+    story_dir = tmp_path / "story"
+    (story_dir / "working").mkdir(parents=True)
+    image = story_dir / "shot.png"
+    image.write_bytes(b"image")
+    (story_dir / "working" / "timeline.json").write_text(
+        '{"shot_segments":[{"shot_id":"scene-01-shot-01","asset_path":"shot.png"}]}',
+        encoding="utf-8",
+    )
+
+    visuals = _copy_timeline_visuals(story_dir, story_dir / "plex")
+
+    assert visuals is not None
+    assert (visuals / "scene-01-shot-01.png").read_bytes() == b"image"
 from tests._helpers import PROJECT_ROOT
 
 

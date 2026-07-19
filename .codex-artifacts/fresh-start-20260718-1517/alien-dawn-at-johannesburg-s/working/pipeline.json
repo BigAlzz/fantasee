@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "story_id": "alien-dawn-at-johannesburg-s",
+  "status": "failed",
+  "current_stage": "outline",
+  "started_at": "2026-07-18T11:48:57.403458+00:00",
+  "updated_at": "2026-07-18T11:49:33.362043+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T11:49:06.569835+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "failed",
+      "attempts": 1,
+      "updated_at": "2026-07-18T11:49:33.362028+00:00",
+      "message": "Outline generation or quality review failed"
+    },
+    "images": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "audio": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  },
+  "last_error": "Outline generation or quality review failed"
+}

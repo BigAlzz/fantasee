@@ -1,0 +1,74 @@
+{
+  "valid": true,
+  "score": 0.55,
+  "scene_count": 10,
+  "shot_types": [
+    "extreme wide shot",
+    "wide shot",
+    "medium shot",
+    "over-the-shoulder shot",
+    "medium close-up",
+    "low angle",
+    "wide shot",
+    "over-the-shoulder shot",
+    "close-up",
+    "low angle"
+  ],
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character Korrath Stone is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_02",
+      "message": "Character Korrath Stone is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_03",
+      "message": "Character Korrath Stone is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_04",
+      "message": "Character Korrath Stone is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_06",
+      "message": "Character Korrath Stone is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_07",
+      "message": "Character Korrath Stone is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character Korrath Stone is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_09",
+      "message": "Character Korrath Stone is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_10",
+      "message": "Character Korrath Stone is not named in the visual prompt or narrative."
+    }
+  ],
+  "blocking_issues": 0
+}

@@ -1,0 +1,157 @@
+- main [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - text: FantaSee
+      - generic [ref=e6]: Studio
+    - navigation [ref=e7]:
+      - button "Library" [ref=e8] [cursor=pointer]
+      - button "Productions" [ref=e12] [cursor=pointer]
+      - button "Assets" [ref=e19] [cursor=pointer]
+      - button "Workers" [ref=e24] [cursor=pointer]
+      - button "Settings" [ref=e38] [cursor=pointer]
+    - region "System activity" [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]: L
+        - generic [ref=e46]: R
+      - generic [ref=e50]: VU
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - text: System
+        - emphasis [ref=e54]: online
+      - generic [ref=e55]:
+        - button "previous" [ref=e56] [cursor=pointer]: ◀◀
+        - button "play" [ref=e57] [cursor=pointer]
+        - button "stop" [ref=e60] [cursor=pointer]
+        - button "record" [ref=e63] [cursor=pointer]: ●
+  - generic [ref=e64]:
+    - generic [ref=e65]:
+      - textbox [ref=e70]:
+        - /placeholder: Search stories...
+      - generic [ref=e71]:
+        - button "Refresh" [ref=e72] [cursor=pointer]
+        - button "Create story" [ref=e78] [cursor=pointer]
+        - button "Studio controls" [ref=e80] [cursor=pointer]
+    - generic [ref=e82]: Production ledger is live. • 0 active workers
+    - generic [ref=e84]:
+      - generic [ref=e85]:
+        - generic [ref=e86]:
+          - generic [ref=e87]: Featured story
+          - generic [ref=e88]: Newest first
+        - article [ref=e152]:
+          - generic [ref=e157]:
+            - heading "Silicon Sage vs. Wizards' Monopoly" [level=1] [ref=e158]
+            - paragraph [ref=e159]: In a realm scarred by arcane wars, a transmigrator's cracked smartphone screen glows like a captured star against the decay of a forgotten village. Where wizards hoarded magic, they instead share whis...
+            - generic [ref=e160]: 10 scenes updated Jul 17, 2026
+            - button "Open in editor" [ref=e162] [cursor=pointer]
+        - generic [ref=e95]:
+          - heading "Story library" [level=2] [ref=e96]
+          - generic [ref=e97]: 6 titles
+        - generic [ref=e98]:
+          - button "+ Silicon Sage vs. Wizards' Monopoly 10 scenes Jul 17, 2026" [ref=e165] [cursor=pointer]:
+            - generic [ref=e166]: +
+            - strong [ref=e172]: Silicon Sage vs. Wizards' Monopoly
+            - generic [ref=e173]: 10 scenes
+            - generic [ref=e174]: Jul 17, 2026
+          - button "o The Last Beacon of Hope 10 scenes Jul 17, 2026" [ref=e177] [cursor=pointer]:
+            - generic [ref=e178]: o
+            - strong [ref=e184]: The Last Beacon of Hope
+            - generic [ref=e185]: 10 scenes
+            - generic [ref=e186]: Jul 17, 2026
+          - 'button "o Fey-Fi: Arcane Code 10 scenes Jul 17, 2026" [ref=e189] [cursor=pointer]':
+            - generic [ref=e190]: o
+            - strong [ref=e196]: "Fey-Fi: Arcane Code"
+            - generic [ref=e197]: 10 scenes
+            - generic [ref=e198]: Jul 17, 2026
+          - 'button "o Rift War: Primal vs. Future 10 scenes Jul 17, 2026" [ref=e201] [cursor=pointer]':
+            - generic [ref=e202]: o
+            - strong [ref=e208]: "Rift War: Primal vs. Future"
+            - generic [ref=e209]: 10 scenes
+            - generic [ref=e210]: Jul 17, 2026
+          - button "o Magic's Exiles in the Machine Age 10 scenes Jul 17, 2026" [ref=e213] [cursor=pointer]:
+            - generic [ref=e214]: o
+            - strong [ref=e220]: Magic's Exiles in the Machine Age
+            - generic [ref=e221]: 10 scenes
+            - generic [ref=e222]: Jul 17, 2026
+          - button "o Ancient Rift, Modern War 10 scenes Jul 17, 2026" [ref=e225] [cursor=pointer]:
+            - generic [ref=e226]: o
+            - strong [ref=e232]: Ancient Rift, Modern War
+            - generic [ref=e233]: 10 scenes
+            - generic [ref=e234]: Jul 17, 2026
+      - complementary [ref=e99]:
+        - generic [ref=e100]:
+          - generic [ref=e101]: Production run
+          - generic [ref=e102]: Error
+        - generic [ref=e237]:
+          - text: library-9ad2ca
+          - heading "Silicon Sage vs. Wizards' Monopoly" [level=2] [ref=e239]
+          - paragraph [ref=e240]: "queued: Library maintenance complete: 0 complete, 3 failed"
+          - generic [ref=e243]: 100% complete
+        - generic [ref=e244]:
+          - heading "Completion evidence" [level=3] [ref=e245]
+          - generic [ref=e246]:
+            - generic [ref=e251]: Images
+            - generic [ref=e252]: pending · 0/10 scenes
+          - generic [ref=e254]:
+            - generic [ref=e259]: Narration
+            - generic [ref=e260]: verified · 10/10 tracks
+          - generic [ref=e262]:
+            - generic [ref=e266]: Subtitles
+            - generic [ref=e267]: verified · 10/10 timed
+          - generic [ref=e269]:
+            - generic [ref=e273]: Timeline
+            - generic [ref=e274]: pending · final pass pending
+          - generic [ref=e276]:
+            - generic [ref=e282]: MP4
+            - generic [ref=e283]: verified · master verified
+          - generic [ref=e285]:
+            - generic [ref=e288]: Plex
+            - generic [ref=e289]: verified · export verified
+        - generic [ref=e291]:
+          - heading "Run controls" [level=3] [ref=e292]
+          - button "Pause / cancel" [ref=e293] [cursor=pointer]
+          - button "Retry" [ref=e297] [cursor=pointer]
+    - article [ref=e112]:
+      - generic [ref=e113]:
+        - heading "Worker bay available" [level=2] [ref=e115]
+        - generic [ref=e116]: awaiting assignment
+      - generic [ref=e117]:
+        - generic [ref=e118]: Task
+        - strong [ref=e119]: "scene 01 regen_image: ComfyUI is not running — start a worker first; scene 02 regen_image: ComfyUI is not running — start a worker first; scene 03 regen_image: ComfyUI is not running — start a worker first"
+        - generic [ref=e120]: Queue depth 1
+      - generic [ref=e121]:
+        - generic [ref=e122]: Progress
+        - generic [ref=e125]: 55%
+      - button "Start GPU" [ref=e150] [cursor=pointer]
+    - generic [ref=e303]:
+      - generic [ref=e304]:
+        - generic [ref=e305]: New production brief
+        - button "Close" [ref=e306] [cursor=pointer]
+      - heading "Set the story in motion." [level=2] [ref=e310]
+      - paragraph [ref=e311]: The director will break this brief into granular scene commissions and complete every media requirement before release.
+      - generic [ref=e312]:
+        - text: Story intent
+        - textbox "Story intent" [active] [ref=e313]:
+          - /placeholder: A medic from Johannesburg wakes in a cold mountain village where every wound carries a memory...
+      - generic [ref=e314]:
+        - generic [ref=e315]:
+          - text: Scenes
+          - spinbutton "Scenes" [ref=e316]: "8"
+        - generic [ref=e317]:
+          - text: Images per scene
+          - spinbutton "Images per scene" [ref=e318]: "5"
+        - generic [ref=e319]:
+          - text: Style
+          - textbox "Style" [ref=e320]: cinematic fantasy realism
+        - generic [ref=e321]:
+          - text: Tone
+          - textbox "Tone" [ref=e322]: grounded, tense, humane
+      - generic [ref=e323]:
+        - text: Characters and continuity
+        - textbox "Characters and continuity" [ref=e324]:
+          - /placeholder: Optional character, setting, or visual continuity notes.
+      - generic [ref=e325]:
+        - text: Narrator
+        - textbox "Narrator" [ref=e326]: Dean
+      - generic [ref=e327]:
+        - button "Cancel" [ref=e328] [cursor=pointer]
+        - button "Queue production" [ref=e329] [cursor=pointer]

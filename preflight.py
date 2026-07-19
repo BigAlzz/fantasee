@@ -5,6 +5,7 @@ from pathlib import Path
 
 CWD = Path("C:/dev/fantasee")
 sys.path.insert(0, str(CWD))
+from fantasee_server.llm_tokens import scaled_llm_tokens
 
 def check(label, ok, detail=""):
     icon = "✅" if ok else "❌"
@@ -42,7 +43,7 @@ try:
     if api_key and not api_key.startswith("***"):
         resp = requests.post(
             f"{base_url}/chat/completions",
-            json={"model": "mimo-v2.5-pro", "messages": [{"role": "user", "content": "Say OK"}], "max_completion_tokens": 10},
+            json={"model": "mimo-v2.5-pro", "messages": [{"role": "user", "content": "Say OK"}], "max_completion_tokens": scaled_llm_tokens(10)},
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             timeout=30,
         )

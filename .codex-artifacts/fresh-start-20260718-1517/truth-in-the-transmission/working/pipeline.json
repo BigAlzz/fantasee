@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "story_id": "truth-in-the-transmission",
+  "status": "running",
+  "current_stage": "outline",
+  "started_at": "2026-07-18T12:07:03.925796+00:00",
+  "updated_at": "2026-07-18T12:07:16.058243+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T12:07:16.049316+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "running",
+      "attempts": 1,
+      "updated_at": "2026-07-18T12:07:16.058231+00:00",
+      "message": "Generating and reviewing the scene outline"
+    },
+    "images": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "audio": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

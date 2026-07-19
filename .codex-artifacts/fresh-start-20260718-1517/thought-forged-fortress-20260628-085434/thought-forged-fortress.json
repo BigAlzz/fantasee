@@ -1,0 +1,30 @@
+{
+  "id": "thought-forged-fortress",
+  "title": "Thought Forged Fortress Through Time",
+  "subtitle": "The power of Thought - I go back in time and use my telekeni",
+  "description": "The power of Thought - I go back in time and use my telekenisis power to build an inbreakable fortress",
+  "tags": [
+    "illustration",
+    "manhwa",
+    "generated"
+  ],
+  "tone": "manhwa",
+  "voice_preset": "Milo",
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

@@ -1,0 +1,26 @@
+{
+  "valid": true,
+  "score": 0.95,
+  "scene_count": 10,
+  "shot_types": [
+    "extreme wide shot",
+    "medium shot",
+    "wide shot",
+    "over-the-shoulder shot",
+    "low angle",
+    "high angle",
+    "medium close-up",
+    "wide shot",
+    "dutch angle",
+    "extreme wide shot"
+  ],
+  "issues": [
+    {
+      "severity": "warning",
+      "code": "first_person",
+      "scene": "scene_02",
+      "message": "Narration violates the canonical style rule: first person."
+    }
+  ],
+  "blocking_issues": 0
+}

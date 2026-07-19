@@ -78,6 +78,18 @@ Each story has a single JSON manifest named `<story-id>.json`. A typical scene c
 
 The server starts generation in the background and streams progress over `WS /ws` as `task_update` events.
 
+### Visual continuity and completion supervision
+
+The final image prompt is commissioned separately from the story-writing call. It receives one concrete visual sentence, bounded continuity anchors, and the previous scene's visual reference. The visual director must preserve recurring characters, clothing, vehicles, devices, buildings, rooms, and landscapes without adding unrelated subjects.
+
+After draft generation, the durable completion worker runs bounded maintenance iterations. Each iteration scans the completion contract, repairs only the missing dependency, and verifies the result again. An unchanged completion signature stops the loop as a terminal no-progress failure. Optional critic-driven improvement runs only after structural completion and marks affected renders and releases stale before the supervisor rebuilds them.
+
+Supervisor settings:
+
+- `FANTASEE_SUPERVISOR_MAX_ITERATIONS` — maximum completion iterations, default `3`.
+- `FANTASEE_AUTO_CRITIC` — enable the post-completion critic loop, default disabled.
+- `FANTASEE_CRITIC_MAX_ROUNDS` and `FANTASEE_CRITIC_MAX_SCENES` — bound critic work when enabled.
+
 ## Seed Suggestions
 
 When the Create modal seed slider is set above `1`, clicking **Generate N Seeds** calls `POST /api/seed-suggestions`. That endpoint asks the LLM for distinct story ideas, shows a picker, and only starts generation after the user chooses one or more seeds.
@@ -134,7 +146,7 @@ Priority order:
 2. Healthy CPU workers.
 3. Healthy manual workers of unknown kind.
 
-If a GPU worker is healthy, single-image generation stays on GPU and CPU workers remain idle. Startup and first-run generation require only one healthy GPU worker. Extra configured workers are optional throughput and are used only after their health checks pass.
+Unconstrained image work prefers healthy GPU workers and round-robins across the healthy pool for throughput. Jobs with an explicit capability requirement are strict: a GPU job can only use a GPU worker, and a CPU job can only use a CPU worker. Startup and first-run generation require only one healthy worker; extra configured workers are optional throughput and are used only after their health checks pass.
 
 ### Worker Commands
 
@@ -160,7 +172,7 @@ This avoids `Could not acquire lock on database` and `Unsupported database URL` 
 
 ### Auto-Spawn
 
-If the server starts and no ComfyUI worker is detected, Fantasee auto-spawns one DirectML GPU worker on `8189`. The startup wait is satisfied as soon as one worker is healthy; second and later workers can keep booting in the background. Disable this with:
+If the server starts and no ComfyUI worker is detected, Fantasee auto-spawns one DirectML GPU worker on `8189`. The startup wait is satisfied as soon as one worker is healthy; second and later workers can keep booting in the background. Use the Studio worker console to spawn an explicit CPU worker or additional GPU worker. Disable auto-spawn with:
 
 ```bat
 set FANTASEE_AUTO_SPAWN_CPU=0

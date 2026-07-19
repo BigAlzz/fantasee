@@ -1,0 +1,24 @@
+{
+  "id": "saints-of-the-plague-doctrine",
+  "title": "Saints of the Plague Doctrine",
+  "subtitle": "A pharmaceutical researcher is reborn in a plague-ridden fan",
+  "description": "A pharmaceutical researcher is reborn in a plague-ridden fantasy world where disease wipes out entire cities. Her modern knowledge of microbiology, epidemiology, and vaccine development gives her an e",
+  "tags": [
+    "manhwa",
+    "manhwa",
+    "generated"
+  ],
+  "tone": "manhwa",
+  "voice_preset": "Dean",
+  "generated": true,
+  "status": "regenerating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "chapters": [],
+  "storage_root": "stories",
+  "scenes": []
+}

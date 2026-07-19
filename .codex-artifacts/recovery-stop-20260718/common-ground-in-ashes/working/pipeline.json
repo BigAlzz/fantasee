@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "story_id": "common-ground-in-ashes",
+  "status": "running",
+  "current_stage": "images",
+  "started_at": "2026-07-18T13:33:00.662251+00:00",
+  "updated_at": "2026-07-18T13:38:07.459161+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T13:33:05.217305+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T13:38:07.447418+00:00",
+      "message": "Scene outline passed structural quality review",
+      "details": {
+        "score": 0.0,
+        "issues": 82
+      }
+    },
+    "images": {
+      "status": "running",
+      "attempts": 1,
+      "updated_at": "2026-07-18T13:38:07.459146+00:00",
+      "message": "Generating scene images"
+    },
+    "audio": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

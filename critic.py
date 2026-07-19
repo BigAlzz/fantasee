@@ -21,6 +21,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from story_storage import STORIES_ROOT, existing_story_dir
 from fantasee_server.security import validate_provider_url
+from fantasee_server.llm_tokens import scaled_llm_tokens
 
 OUTPUTS_DIR = STORIES_ROOT
 
@@ -772,7 +773,7 @@ Output ONLY a JSON object:
                     {"role": "user", "content": prompt},
                 ],
                 "temperature": 0.3,
-                "max_completion_tokens": 1024,
+                "max_completion_tokens": scaled_llm_tokens(1024),
             },
             headers={
                 "Authorization": f"Bearer {api_key}",

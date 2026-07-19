@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from background_music import (
     BackgroundTrack,
     DEFAULT_BACKGROUND_VOLUME,
     background_audio_payload,
+    build_track_index,
     list_background_tracks,
     select_background_track,
     _match_score,
@@ -19,10 +22,13 @@ from tests._helpers import PROJECT_ROOT, temp_dir
 
 class TestBackgroundListing(unittest.TestCase):
     def test_lists_real_background_tracks(self):
-        """The shipped Background/ folder should have at least one audio file."""
-        tracks = list_background_tracks(PROJECT_ROOT / "Background")
-        # Don't hard-code the count — the folder grows over time.
-        self.assertGreater(len(tracks), 0, "Background/ folder is empty — fixture missing")
+        """A configured background folder is indexed without bundled media."""
+        # Operator-selected tracks are runtime data and are intentionally
+        # ignored by git, so the clean-checkout test supplies a tiny fixture.
+        with temp_dir() as tmp:
+            (tmp / "cinematic-atmosphere-fixture.mp3").write_bytes(b"")
+            tracks = list_background_tracks(tmp)
+        self.assertGreater(len(tracks), 0, "background fixture was not indexed")
         for t in tracks:
             self.assertTrue(t.suffix.lower() in {".mp3", ".wav", ".m4a", ".ogg", ".flac"})
 
@@ -30,6 +36,15 @@ class TestBackgroundListing(unittest.TestCase):
         """If the dir is missing we return [] rather than raising."""
         with temp_dir() as tmp:
             self.assertEqual(list_background_tracks(tmp / "nope"), [])
+
+    def test_default_index_uses_operator_selected_folder(self):
+        """The app can scan a private local music folder without bundling it."""
+        with temp_dir() as tmp:
+            track = tmp / "cinematic-atmosphere-private.mp3"
+            track.write_bytes(b"")
+            with patch.dict(os.environ, {"FANTASEE_BACKGROUND_DIR": str(tmp)}):
+                indexed = build_track_index()
+        self.assertEqual([item.filename for item in indexed], [track.name])
 
 
 class TestToneScoring(unittest.TestCase):

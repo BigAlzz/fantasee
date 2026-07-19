@@ -206,6 +206,10 @@ async def _run_story_delete(task_id: str, story_id: str, story_dir: Path, backup
             })
             return
 
+        from fantasee_server.production_runtime import production_database_path
+        from fantasee_server.production_store import ProductionStore
+        with ProductionStore(production_database_path()) as store:
+            report["durable_records_deleted"] = store.delete_story_records(story_id)
         _state._stories_cache = _paths.load_stories()
         message = (
             f"Deleted {story_id}: {report['files_deleted']} file(s), "

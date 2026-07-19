@@ -1,0 +1,4 @@
+Title: The Dark Grid Virus
+Tone: manhwa
+Style: manhwa
+Concept: A female cybersecurity expert from the NSA is pulled into a medieval world where an ancient magical kingdom is being destroyed by a sentient dark network -- a corrupted magical grid that spreads like a computer virus through ley lines. She must apply network security principles and system architecture to fight an enemy operating like a distributed AI threat. Her partner is Zara, a mysterious mage with cybernetic-like magical implants.

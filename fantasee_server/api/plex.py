@@ -11,13 +11,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
+import hashlib
 import sys
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from fantasee_server.discovery import ensure_title_slide_for_manifest
 from fantasee_server.models import PlexExportRequest
 from fantasee_server.paths import STORY_VIEWER_DIR, generated_story_dir
 from fantasee_server.state import (
@@ -27,6 +26,9 @@ from fantasee_server.state import (
     new_uuid,
     now,
 )
+from fantasee_server.library import story_completion_report
+from fantasee_server.production_runtime import production_database_path
+from fantasee_server.production_store import ProductionStore
 
 
 router = APIRouter(tags=["plex"])
@@ -59,15 +61,16 @@ async def export_plex(story_id: str, req: PlexExportRequest):
     if not manifest_path.exists():
         raise HTTPException(status_code=404, detail="Story not found")
 
-    # Make sure the title slide exists (in case this story pre-dates the
-    # image-backed version). Skips silently if Pillow isn't available.
-    try:
-        ensure_title_slide_for_manifest(
-            story_dir,
-            json.loads(manifest_path.read_text(encoding="utf-8")),
+    completion = story_completion_report(story_id, story_dir=story_dir)
+    if not completion.get("complete"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Plex publishing is blocked until the completion contract passes",
+                "missing": completion.get("missing", []),
+                "issues": completion.get("issues", [])[:20],
+            },
         )
-    except (json.JSONDecodeError, OSError):
-        pass
 
     task_id = f"plex-{new_uuid()[:6]}"
     _generation_tasks[task_id] = {
@@ -130,6 +133,20 @@ async def export_plex(story_id: str, req: PlexExportRequest):
                 "message": "Plex export complete",
                 "result": result.to_dict(),
             })
+            final_mp4 = result.mp4
+            fingerprint_source = story_dir / "working" / "timeline.json"
+            fingerprint = hashlib.sha256()
+            if fingerprint_source.is_file():
+                fingerprint.update(fingerprint_source.read_bytes())
+            if final_mp4 and final_mp4.is_file():
+                fingerprint.update(final_mp4.read_bytes())
+            with ProductionStore(production_database_path()) as store:
+                store.record_release(
+                    story_id,
+                    release_type="plex",
+                    fingerprint=fingerprint.hexdigest(),
+                    path=str(result.plex_dir),
+                )
             for ws in _websocket_clients[:]:
                 try:
                     await ws.send_json({

@@ -1,0 +1,34 @@
+{
+  "id": "the-earth-remembers",
+  "title": "The Earth Remembers",
+  "subtitle": "Korrath Stone-Hand leads a Neanderthal war party into a froz",
+  "description": "Korrath Stone-Hand leads a Neanderthal war party into a frozen forest at dawn. A Concord patrol in powered armor blocks their path. Korrath kneels, presses his crystal stump to the earth, and undergoe",
+  "tags": [
+    "cinematic realism",
+    "dark",
+    "generated"
+  ],
+  "tone": "dark",
+  "voice_preset": "Dean",
+  "story_concept": "Korrath Stone-Hand leads a Neanderthal war party into a frozen forest at dawn. A Concord patrol in powered armor blocks their path. Korrath kneels, presses his crystal stump to the earth, and undergoes The Turning \u2014 bones shift, skin grays, eyes go white, he grows to eight feet of living stone. The Concord soldiers fire plasma rifles. The bolts hit his stone-skin and glow white-hot. He does not slow down. He shatters their weapons. He stands over them and says: Go home. Tell them the earth remembers.",
+  "style": "cinematic realism",
+  "num_scenes": 10,
+  "images_per_scene": 5,
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

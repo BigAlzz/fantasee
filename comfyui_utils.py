@@ -7,7 +7,9 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import sys
+import subprocess
 import time
 from pathlib import Path
 from typing import Optional
@@ -16,11 +18,61 @@ from urllib.parse import urlparse
 import requests
 
 from fantasee_server.security import validate_provider_url
+from image_quality import inspect_story_image
 
 # ── Config ──────────────────────────────────────────────────────────────
 COMFYUI_HOST = "127.0.0.1"
 COMFYUI_PORT = 8188
 COMFYUI_BASE = f"http://{COMFYUI_HOST}:{COMFYUI_PORT}"
+
+
+class ComfyGenerationError(RuntimeError):
+    """A ComfyUI prompt completed with a provider-side execution error."""
+
+
+def _safe_output_filename(filename: str) -> str:
+    """Return a Windows-safe leaf filename for a generated image."""
+    leaf = Path(str(filename).replace("\\", "/")).name
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", leaf).strip(" .")
+    if not safe or safe in {".", ".."}:
+        raise ValueError("ComfyUI returned an invalid image filename")
+    return safe
+
+
+def _history_error_message(status: dict) -> str | None:
+    """Extract a compact provider error from a ComfyUI history status."""
+    status_text = str(status.get("status_str") or "").lower()
+    if status_text not in {"error", "failed", "failure"}:
+        return None
+    messages = status.get("messages") or []
+    for message in messages:
+        if isinstance(message, (list, tuple)) and len(message) > 1:
+            detail = message[1]
+            if isinstance(detail, dict):
+                detail = detail.get("exception_message") or detail.get("message") or detail
+            if detail:
+                return str(detail)[:300]
+        elif message:
+            return str(message)[:300]
+    return f"ComfyUI reported status {status_text}"
+
+
+def _is_oom_error(message: str) -> bool:
+    """Recognize provider messages that indicate a video-memory allocation failure."""
+    text = str(message or "").lower()
+    return any(token in text for token in ("out of memory", "not enough gpu", "cuda oom", "video memory"))
+
+
+def _degraded_dimensions(width: Optional[int], height: Optional[int]) -> tuple[int, int] | None:
+    """Return one conservative fallback size, preserving the source aspect ratio."""
+    source_width = int(width or QUALITY_SETTINGS["width"])
+    source_height = int(height or QUALITY_SETTINGS["height"])
+    if source_width <= 640 and source_height <= 384:
+        return None
+    scale = min(0.75, 640 / max(1, source_width))
+    fallback_width = max(512, int(source_width * scale) // 8 * 8)
+    fallback_height = max(320, int(source_height * scale) // 8 * 8)
+    return fallback_width, fallback_height
 
 
 def _comfyui_bases() -> list[str]:
@@ -91,6 +143,58 @@ CHECKPOINTS = {
     "anything": "anything-v5.safetensors",
 }
 
+# Style presets keep the creative direction close to the ComfyUI adapter.
+# They target installed SD 1.5-class checkpoints rather than requiring a
+# large new model. The comic preset creates readable action panels; a later
+# page-layout workflow can compose several panels without asking SD 1.5 to
+# typeset a whole page in one fragile prompt.
+IMAGE_STYLE_PRESETS = {
+    "comic book panels": {
+        "aliases": ("comic", "comic-book", "comic book", "graphic novel", "motion comic"),
+        "prompt_prefix": (
+            "dynamic comic-book action panel, bold ink contours, expressive poses, "
+            "dramatic foreshortening, layered foreground and background, "
+            "high-contrast color blocking"
+        ),
+        "negative_remove": ("comic, manga lineart, ", "cartoon, "),
+        "negative_add": (
+            "speech bubble, caption box, readable text, lettering, logo, "
+            "watermark, static character lineup, passport portrait"
+        ),
+    },
+}
+
+
+def image_style_preset(style: Optional[str] = None) -> Optional[dict]:
+    """Resolve a user-facing visual style to a local image preset."""
+    value = (style or "").strip().lower()
+    for preset in IMAGE_STYLE_PRESETS.values():
+        if value in preset["aliases"] or any(alias in value for alias in preset["aliases"]):
+            return preset
+    return None
+
+
+def apply_image_style(prompt: str, style: Optional[str] = None) -> str:
+    """Add a compact style lead before SD 1.5 prompt compaction."""
+    preset = image_style_preset(style)
+    if not preset:
+        return prompt
+    prefix = preset["prompt_prefix"]
+    if prefix.lower() in prompt.lower():
+        return prompt
+    return f"{prefix}. {prompt.strip()}".strip()
+
+
+def negative_prompt_for_style(negative_prompt: str, style: Optional[str] = None) -> str:
+    """Adjust the house negative prompt without contradicting a style preset."""
+    preset = image_style_preset(style)
+    if not preset:
+        return negative_prompt
+    cleaned = negative_prompt
+    for phrase in preset["negative_remove"]:
+        cleaned = cleaned.replace(phrase, "")
+    return f"{cleaned.rstrip(', ')} {preset['negative_add']}".strip()
+
 
 def checkpoint_for_style(style: Optional[str] = None) -> str:
     """Return the checkpoint filename best suited to a story style."""
@@ -147,33 +251,11 @@ DEFAULT_NEGATIVE = (
 )
 
 
-# Positive-prompt guard suffix appended to every visual prompt before submission.
-# Pulls the model toward a sharp, well-framed, well-lit human face. The
-# previous version was tuned only for the close-up "pig snout" failure mode
-# and left medium shots looking flat and un-detailed — the new block adds
-# eye/iris detail, catchlights, framing cues, and quality boosters that
-# SD 1.5 needs to keep the face the focal point at medium framing.
+# Keep the guard compact and scene-neutral. A large face/portrait suffix
+# consumes the CLIP budget and can override the scene's action.
 DEFAULT_POSITIVE_GUARD_SUFFIX = (
-    # Face structure and skin
-    "beautiful detailed human face, well-defined human nose, "
-    "natural human facial features, sharp facial structure, "
-    "symmetric face, clear skin, natural skin texture, "
-    # Eye detail (the single biggest quality win on SD 1.5)
-    "detailed eyes, detailed iris, detailed pupils, detailed eyelashes, "
-    "defined eyebrows, catchlights in eyes, expressive eyes, "
-    # Lips and teeth
-    "detailed lips, natural lip color, visible teeth detail, "
-    # Hair (kept on face-side of the framing)
-    "detailed hair, individual hair strands, hair shading, "
-    # Lighting and focus — explicitly direct the model to keep the face sharp
-    "rim lighting, soft directional lighting on face, "
-    "sharp focus on face, subject in focus, shallow depth of field, "
-    "cinematic portrait lighting, "
-    # Framing cues so the model keeps the face the focal point at medium shots
-    "portrait framing, head and shoulders composition, medium close-up, "
-    "looking at viewer, eye contact, "
-    # Quality boosters
-    "masterpiece, best quality, highly detailed, sharp focus, 8k uhd"
+    "cinematic digital illustration, dynamic composition, clear subject and action, "
+    "detailed environment, coherent anatomy, sharp focus, high detail"
 )
 
 # ── Health Check ────────────────────────────────────────────────────────
@@ -284,6 +366,149 @@ def wait_for_ready(timeout: int = 120) -> bool:
     return False
 
 
+def _clamp_percent(value: object) -> float | None:
+    """Return a finite utilization percentage, or None for bad samples."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number:
+        return None
+    return round(max(0.0, min(100.0, number)), 1)
+
+
+def _normalize_process_cpu_percent(value: object, *, logical_cpus: int | None = None) -> float | None:
+    """Normalize Windows process CPU time to total machine capacity."""
+    try:
+        cpus = max(1, int(logical_cpus or os.cpu_count() or 1))
+        return _clamp_percent(float(value) / cpus)
+    except (TypeError, ValueError):
+        return None
+
+
+def _powershell_scalar(script: str) -> float | None:
+    """Run a small read-only Windows counter query and parse its scalar result."""
+    executable = shutil.which("powershell.exe") or shutil.which("pwsh")
+    if not executable:
+        return None
+    try:
+        result = subprocess.run(
+            [executable, "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=4,
+            check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            return float(line)
+        except ValueError:
+            return None
+    return None
+
+
+def _windows_gpu_usage(pid: int) -> float | None:
+    """Read the worker process's busiest Windows GPU engine as a percentage."""
+    if os.name != "nt" or not pid:
+        return None
+    # Task Manager reports the busiest engine rather than summing engines,
+    # which avoids double-counting a process using compute plus copy engines.
+    script = (
+        "$rows = @(Get-CimInstance -ClassName "
+        "Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine "
+        f"| Where-Object {{ $_.Name -like 'pid_{int(pid)}_*' }}); "
+        "if ($rows.Count -eq 0) { '' } else { "
+        "[math]::Round([double](($rows | Measure-Object "
+        "-Property UtilizationPercentage -Maximum).Maximum), 1) }"
+    )
+    return _clamp_percent(_powershell_scalar(script))
+
+
+def _nvidia_gpu_usage() -> float | None:
+    """Use nvidia-smi as a cross-platform fallback for a single GPU host."""
+    executable = shutil.which("nvidia-smi")
+    if not executable:
+        return None
+    try:
+        result = subprocess.run(
+            [executable, "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    samples = []
+    for line in result.stdout.splitlines():
+        try:
+            samples.append(float(line.strip()))
+        except ValueError:
+            continue
+    return _clamp_percent(max(samples)) if samples else None
+
+
+def _process_cpu_usage(pid: int) -> tuple[float | None, str]:
+    """Read process CPU usage, preferring the native Windows performance counter."""
+    if os.name == "nt" and pid:
+        script = (
+            "$process = Get-CimInstance -ClassName "
+            "Win32_PerfFormattedData_PerfProc_Process "
+            f"-Filter 'IDProcess = {int(pid)}' -ErrorAction SilentlyContinue; "
+            "if ($process) { [double]$process.PercentProcessorTime } else { '' }"
+        )
+        sample = _powershell_scalar(script)
+        normalized = _normalize_process_cpu_percent(sample)
+        if normalized is not None:
+            return normalized, "windows-process"
+    try:
+        import psutil  # type: ignore[import-not-found]
+
+        process = psutil.Process(pid)
+        sample = process.cpu_percent(interval=0.1)
+        return _normalize_process_cpu_percent(sample, logical_cpus=psutil.cpu_count()), "psutil-process"
+    except ImportError:
+        return None, "unavailable"
+    except Exception:
+        return None, "unavailable"
+
+
+def _worker_telemetry(pid: int | None, kind: str) -> dict[str, object]:
+    """Return one honest utilization sample for a local worker process."""
+    telemetry: dict[str, object] = {
+        "gpu_percent": None,
+        "cpu_percent": None,
+        "cpu_source": "unavailable",
+        "gpu_source": "unavailable",
+        "source": "unavailable",
+        "sampled_at": int(time.time() * 1000),
+    }
+    if not pid:
+        return telemetry
+    cpu_percent, cpu_source = _process_cpu_usage(int(pid))
+    telemetry.update(cpu_percent=cpu_percent, cpu_source=cpu_source)
+    if kind == "cpu":
+        telemetry.update(source=cpu_source)
+        return telemetry
+    gpu_percent = _windows_gpu_usage(int(pid))
+    gpu_source = "windows-gpu-engine"
+    if gpu_percent is None:
+        gpu_percent = _nvidia_gpu_usage()
+        gpu_source = "nvidia-smi" if gpu_percent is not None else "unavailable"
+    telemetry.update(gpu_percent=gpu_percent, gpu_source=gpu_source, source=gpu_source)
+    return telemetry
+
+
 # ── Worker Pool / Auto-spawn Supervisor ────────────────────────────────
 #
 # A single healthy GPU worker is enough for startup and first-run image
@@ -294,8 +519,8 @@ def wait_for_ready(timeout: int = 120) -> bool:
 # Disable with FANTASEE_AUTO_SPAWN_CPU=0.
 # Override CPU port with COMFYUI_CPU_PORT=8189.
 
-import subprocess
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 _cpu_process: Optional[subprocess.Popen] = None
 _gpu_processes: dict[str, subprocess.Popen] = {}
@@ -677,6 +902,23 @@ def ensure_workers(min_workers: int = 1, wait_for_spawn: bool = False,
             )
         return existing
 
+    # Basic mode is intentionally CPU-only. Do not auto-start the historical
+    # DirectML fallback and then silently leave the requested mode unusable.
+    mode = os.environ.get("FANTASEE_RENDERING_MODE", "gpu").strip().lower()
+    if mode == "basic" and not explicit_urls:
+        cpu_port = int(os.environ.get("COMFYUI_CPU_PORT", "8189"))
+        cpu_url = f"http://127.0.0.1:{cpu_port}"
+        if is_running_at(cpu_url, timeout=1.0)["running"]:
+            os.environ["COMFYUI_URLS"] = cpu_url
+            _register_worker_kind(cpu_url, "cpu")
+            return [cpu_url]
+        if os.environ.get("FANTASEE_AUTO_SPAWN_CPU", "1") != "0":
+            result = spawn_cpu_worker(port=cpu_port, wait=wait_for_spawn, wait_timeout=wait_timeout)
+            if result.get("started") or is_running_at(cpu_url, timeout=0.5)["running"]:
+                os.environ["COMFYUI_URLS"] = cpu_url
+                return [cpu_url]
+        return []
+
     # Auto-discover actual local workers. The default 8188 URL is only a
     # fallback address, not proof that a worker exists.
     discovered: list[str] = []
@@ -744,11 +986,9 @@ def get_worker_status() -> dict:
         "cpu_pid": _cpu_process.pid if (_cpu_process and _cpu_process.poll() is None) else None,
         "workers": [],
     }
-    seen = set()
-    for url in urls:
-        if url in seen:
-            continue
-        seen.add(url)
+    unique_urls = list(dict.fromkeys(urls))
+
+    def read_worker(url: str) -> dict:
         info = is_running_at(url)
         info["url"] = url
         try:
@@ -764,7 +1004,13 @@ def get_worker_status() -> dict:
         elif "--cpu" in argv_text:
             inferred_kind = "cpu"
         info["kind"] = _worker_kinds.get(url, inferred_kind)
-        status["workers"].append(info)
+        info["telemetry"] = _worker_telemetry(info.get("pid"), info["kind"])
+        return info
+
+    # Status calls include PowerShell performance counters. Sampling workers
+    # serially made the UI appear frozen as soon as a second worker existed.
+    with ThreadPoolExecutor(max_workers=max(1, min(8, len(unique_urls)))) as executor:
+        status["workers"] = list(executor.map(read_worker, unique_urls))
     return status
 
 
@@ -826,7 +1072,7 @@ def _approx_token_count(text: str) -> int:
     return max(1, int(words / 0.6) + punct // 4)
 
 
-def _clip_truncate(text: str, max_tokens: int = 77) -> str:
+def _clip_truncate(text: str, max_tokens: int = 77, *, preserve_tail: bool = False) -> str:
     """Truncate a prompt to fit SD 1.5's 77-token CLIP limit.
 
     Strategy: keep the beginning of the prompt (subject, framing,
@@ -841,13 +1087,18 @@ def _clip_truncate(text: str, max_tokens: int = 77) -> str:
         return text
     # Rough word budget. Use a smaller multiplier than 0.6 to leave
     # headroom for tokenization edge cases.
-    word_budget = int(max_tokens * 0.55)
+    # Use most of the CLIP budget. The old 55% budget plus a large portrait
+    # suffix left too little room for the scene action and setting.
+    word_budget = max(1, int(max_tokens * 0.58))
     words = text.split()
     if len(words) <= word_budget:
         return text
-    # Keep first 60% and last 30% of the budget, drop the middle 10%.
-    head_count = int(word_budget * 0.60)
-    tail_count = int(word_budget * 0.30)
+    if not preserve_tail:
+        return " ".join(words[:word_budget])
+
+    # Keep first 70% and last 30% for unordered negative terms.
+    head_count = int(word_budget * 0.70)
+    tail_count = word_budget - head_count
     head = " ".join(words[:head_count])
     tail = " ".join(words[-tail_count:]) if tail_count else ""
     if tail:
@@ -883,15 +1134,19 @@ def inject_prompt(
     """
     q = {**QUALITY_SETTINGS, **(quality or {})}
 
-    # SD 1.5's CLIP encoder has a 77-token limit. ComfyUI's CLIPTextEncode
-    # node silently truncates anything longer. We pre-truncate intelligently
-    # so the most important parts of the prompt survive. Approximate
-    # token count: 1 token ≈ 0.75 words for English natural language, but
-    # we also count commas/periods which inflate the BPE count. Use a
-    # conservative 0.6 multiplier so we never overflow the 77-token limit.
-    MAX_TOKENS = 77
-    positive_prompt = _clip_truncate(positive_prompt, MAX_TOKENS)
-    negative_prompt = _clip_truncate(negative_prompt, MAX_TOKENS)
+    # ComfyUI silently truncates text beyond the selected encoder limit.
+    # The workflow-aware limit below preserves the scene action for both
+    # standard SD 1.5 CLIP and SeaArt Long-CLIP.
+    # Standard SD 1.5 CLIP accepts 77 tokens. SeaArtLongClip expands the
+    # same encoder to 248 tokens, so detect it from the selected workflow.
+    long_clip_nodes = {"SeaArtLongClip", "LongCLIPTextEncodeFlux"}
+    has_long_clip = any(
+        isinstance(node, dict) and node.get("class_type") in long_clip_nodes
+        for node in workflow.values()
+    )
+    MAX_TOKENS = 248 if has_long_clip else 77
+    positive_prompt = _clip_truncate(positive_prompt, MAX_TOKENS, preserve_tail=False)
+    negative_prompt = _clip_truncate(negative_prompt, MAX_TOKENS, preserve_tail=True)
 
     for node_id, node in workflow.items():
         if not isinstance(node, dict):
@@ -953,10 +1208,16 @@ def _healthy_bases(timeout: float = 1.5) -> list[str]:
     generate_images_parallel() to avoid silently sending jobs to dead
     workers.
     """
-    healthy = []
-    for base in _comfyui_bases():
-        if is_running_at(base, timeout=timeout)["running"]:
-            healthy.append(base)
+    def probe(base: str) -> str | None:
+        status = is_running_at(base, timeout=timeout)
+        if status["running"]:
+            _infer_worker_kind(base, status)
+            return base
+        return None
+
+    bases = _comfyui_bases()
+    with ThreadPoolExecutor(max_workers=max(1, min(8, len(bases)))) as executor:
+        healthy = [base for base in executor.map(probe, bases) if base]
     return healthy
 
 
@@ -975,6 +1236,22 @@ def _worker_kind(url: str) -> str:
     return "manual"
 
 
+def _infer_worker_kind(url: str, status: dict) -> None:
+    """Record a worker's capability from ComfyUI's reported argv metadata."""
+    if url in _worker_kinds:
+        return
+    if url == COMFYUI_BASE:
+        _register_worker_kind(url, "gpu")
+        return
+    system = (status.get("system_stats") or {}).get("system") or {}
+    argv = system.get("argv") or ""
+    argv_text = " ".join(str(item) for item in argv) if isinstance(argv, list) else str(argv)
+    if "--directml" in argv_text:
+        _register_worker_kind(url, "gpu")
+    elif "--cpu" in argv_text:
+        _register_worker_kind(url, "cpu")
+
+
 def _bases_by_priority(bases: list[str]) -> list[str]:
     """Reorder a worker list so GPU workers come first, then CPU, then manual.
 
@@ -987,13 +1264,12 @@ def _bases_by_priority(bases: list[str]) -> list[str]:
     return gpus + cpus + manuals
 
 
-def _pick_healthy_base() -> Optional[str]:
+def _pick_healthy_base(worker_kind: Optional[str] = None) -> Optional[str]:
     """Pick a healthy ComfyUI worker.
 
-    Workers are ordered GPU, then CPU, then manual, but selection
-    round-robins across the entire healthy pool. That keeps GPU first
-    after startup while still allowing CPU and GPU workers to process
-    different queued image jobs in parallel.
+    Workers are ordered GPU, then CPU, then manual for unconstrained work.
+    A constrained job is only assigned to a worker with the requested kind;
+    a GPU-only job must never silently fall back to a CPU worker.
 
     Returns None if no configured worker is currently up.
     """
@@ -1001,6 +1277,16 @@ def _pick_healthy_base() -> Optional[str]:
     if not healthy:
         return None
     pool = _bases_by_priority(healthy)
+    if worker_kind:
+        pool = [base for base in pool if _worker_kind(base) == worker_kind]
+    else:
+        mode = os.environ.get("FANTASEE_RENDERING_MODE", "gpu").strip().lower()
+        if mode == "basic":
+            pool = [base for base in pool if _worker_kind(base) == "cpu"]
+        elif mode == "gpu":
+            pool = [base for base in pool if _worker_kind(base) == "gpu"]
+    if not pool:
+        return None
 
     global _rr_counter
     with _rr_lock:
@@ -1021,7 +1307,10 @@ def generate_image(
     timeout: int = 600,
     workflow_path: Optional[str] = None,
     append_positive_guard: bool = True,
+    style: Optional[str] = None,
     base_url: Optional[str] = None,
+    worker_kind: Optional[str] = None,
+    _degraded_retry: bool = False,
 ) -> Optional[str]:
     """
     Generate a single image via ComfyUI.
@@ -1047,6 +1336,7 @@ def generate_image(
             well-defined-human-nose cue. Disable only when an external caller
             has already baked the guard into its prompt.
         base_url: Optional explicit ComfyUI worker URL for queue fan-out.
+        worker_kind: Optional required worker kind (``gpu`` or ``cpu``).
 
     Returns:
         Output filename on success, None on failure.
@@ -1067,6 +1357,10 @@ def generate_image(
     # fail. ~5s total wait is enough for the spawn loop to finish and
     # the /system_stats endpoint to come up.
     base = base_url.rstrip("/") if base_url else None
+    if base and worker_kind and _worker_kind(base) != worker_kind:
+        raise ValueError(
+            f"Worker {base} is {_worker_kind(base)}, but this job requires {worker_kind}"
+        )
     for wait_attempt in range(5):
         if base:
             if is_running_at(base, timeout=2.0)["running"]:
@@ -1075,7 +1369,7 @@ def generate_image(
             if base_url:
                 time.sleep(1.0)
                 continue
-        base = _pick_healthy_base()
+        base = _pick_healthy_base(worker_kind)
         if base:
             break
         time.sleep(1.0)
@@ -1105,11 +1399,12 @@ def generate_image(
     # Append the positive guard suffix (well-defined human nose etc.) so
     # medium / close-up shots don't drift into a pig snout. Skip if the
     # caller already baked equivalent language into their prompt.
-    final_prompt = prompt
+    final_prompt = apply_image_style(prompt, style)
+    final_negative_prompt = negative_prompt_for_style(negative_prompt, style)
     if append_positive_guard and DEFAULT_POSITIVE_GUARD_SUFFIX:
         # Guard against double-append if a caller already included it.
-        if DEFAULT_POSITIVE_GUARD_SUFFIX.strip() not in prompt:
-            final_prompt = (prompt.rstrip(". ") + ". " + DEFAULT_POSITIVE_GUARD_SUFFIX).strip()
+        if DEFAULT_POSITIVE_GUARD_SUFFIX.strip() not in final_prompt:
+            final_prompt = (final_prompt.rstrip(". ") + ". " + DEFAULT_POSITIVE_GUARD_SUFFIX).strip()
 
     workflow = inject_prompt(
         workflow,
@@ -1194,6 +1489,11 @@ def generate_image(
                     if prompt_id in history:
                         entry = history[prompt_id]
                         status = entry.get("status", {})
+                        provider_error = _history_error_message(status)
+                        if provider_error:
+                            raise ComfyGenerationError(
+                                f"ComfyUI prompt {prompt_id} failed: {provider_error}"
+                            )
                         if status.get("completed", False) is False and status.get("status_str") not in ("success", None):
                             # Still running, keep waiting
                             time.sleep(3)
@@ -1202,12 +1502,14 @@ def generate_image(
                         # Find output images
                         outputs = entry.get("outputs", {})
                         found_image = None
+                        found_subfolder = ""
                         for node_out in outputs.values():
                             for img_list in node_out.values():
                                 if isinstance(img_list, list):
                                     for img in img_list:
                                         if isinstance(img, dict) and img.get("filename"):
                                             found_image = img["filename"]
+                                            found_subfolder = str(img.get("subfolder") or "")
                                             break
                                     if found_image:
                                         break
@@ -1222,18 +1524,32 @@ def generate_image(
                             )
                             # Copy from ComfyUI output to our output dir
                             comfyui_out = Path.home() / "Documents/comfy/ComfyUI/output"
-                            src = comfyui_out / found_image
+                            safe_filename = _safe_output_filename(found_image)
+                            subfolder_path = Path(found_subfolder.replace("\\", "/")) if found_subfolder else Path()
+                            if subfolder_path.is_absolute() or ".." in subfolder_path.parts:
+                                raise ValueError("ComfyUI returned an unsafe image subfolder")
+                            source_relative = subfolder_path / found_image if found_subfolder else Path(found_image)
+                            src = comfyui_out / source_relative
+                            validated_path = src
                             if src.exists():
                                 dest_dir = Path(output_dir) if output_dir else Path(".")
                                 dest_dir.mkdir(parents=True, exist_ok=True)
                                 import shutil
-                                dest = dest_dir / found_image
+                                dest = dest_dir / safe_filename
                                 shutil.copy2(str(src), str(dest))
+                                validated_path = dest
                                 print(
                                     f"[comfyui_utils] Copied to: {dest}",
                                     file=sys.stderr,
                                 )
-                            return found_image
+                            usable, reason = inspect_story_image(validated_path)
+                            if not usable:
+                                print(
+                                    f"[comfyui_utils] Rejected invalid image {validated_path}: {reason}",
+                                    file=sys.stderr,
+                                )
+                                return None
+                            return safe_filename
 
                         # Prompt finished but produced no images — this is a real error
                         empty_output_polls += 1
@@ -1246,12 +1562,71 @@ def generate_image(
                             )
                             return None
                 time.sleep(3)
+            except ComfyGenerationError:
+                raise
             except Exception:
                 time.sleep(3)
 
         print(f"[comfyui_utils] Timeout after {timeout}s waiting for prompt_id={prompt_id}", file=sys.stderr)
         return None
 
+    except ComfyGenerationError as error:
+        if base_url is None:
+            alternatives = [
+                worker for worker in _healthy_bases()
+                if worker != base and (not worker_kind or _worker_kind(worker) == worker_kind)
+            ]
+            if alternatives:
+                fallback = alternatives[0]
+                print(
+                    f"[comfyui_utils] Retrying failed prompt on alternate worker {fallback}",
+                    file=sys.stderr,
+                )
+                return generate_image(
+                    prompt=prompt,
+                    output_prefix=output_prefix,
+                    output_dir=output_dir,
+                    negative_prompt=negative_prompt,
+                    seed=seed,
+                    checkpoint=checkpoint,
+                    width=width,
+                    height=height,
+                    timeout=timeout,
+                    workflow_path=workflow_path,
+                    append_positive_guard=append_positive_guard,
+                    style=style,
+                    base_url=fallback,
+                    worker_kind=worker_kind,
+                    _degraded_retry=_degraded_retry,
+                )
+        message = str(error)
+        if not _degraded_retry and _is_oom_error(message):
+            fallback_dimensions = _degraded_dimensions(width, height)
+            if fallback_dimensions:
+                fallback_width, fallback_height = fallback_dimensions
+                print(
+                    f"[comfyui_utils] Retrying OOM prompt at reduced dimensions "
+                    f"{fallback_width}x{fallback_height}",
+                    file=sys.stderr,
+                )
+                return generate_image(
+                    prompt=prompt,
+                    output_prefix=output_prefix,
+                    output_dir=output_dir,
+                    negative_prompt=negative_prompt,
+                    seed=seed,
+                    checkpoint=checkpoint,
+                    width=fallback_width,
+                    height=fallback_height,
+                    timeout=timeout,
+                    workflow_path=workflow_path,
+                    append_positive_guard=append_positive_guard,
+                    style=style,
+                    base_url=base,
+                    worker_kind=worker_kind,
+                    _degraded_retry=True,
+                )
+        raise
     except requests.ConnectionError:
         print(f"[comfyui_utils] Connection error to {base} — ComfyUI may have stopped", file=sys.stderr)
         return None
@@ -1265,7 +1640,9 @@ def _generate_image_to_base(base_url: str, prompt: str, output_prefix: str,
                             seed: Optional[int] = None, checkpoint: Optional[str] = None,
                             width: Optional[int] = None, height: Optional[int] = None,
                             timeout: int = 600,
-                            workflow_path: Optional[str] = None) -> Optional[str]:
+                            workflow_path: Optional[str] = None,
+                            style: Optional[str] = None,
+                            worker_kind: Optional[str] = None) -> Optional[str]:
     """Generate a single image on a specific ComfyUI base URL.
 
     Same as generate_image() but accepts an explicit base URL, which lets us
@@ -1275,14 +1652,16 @@ def _generate_image_to_base(base_url: str, prompt: str, output_prefix: str,
         prompt=prompt,
         output_prefix=output_prefix,
         output_dir=output_dir,
-        negative_prompt=negative_prompt,
+        negative_prompt=final_negative_prompt,
         seed=seed,
         checkpoint=checkpoint,
         width=width,
         height=height,
         timeout=timeout,
         workflow_path=workflow_path,
+        style=style,
         base_url=base_url,
+        worker_kind=worker_kind,
     )
 
 
@@ -1329,13 +1708,23 @@ def generate_images_parallel(
             width=job.get("width"),
             height=job.get("height"),
             timeout=timeout,
+            worker_kind=job.get("worker_kind"),
+            style=job.get("style"),
         )
 
     # Round-robin assign jobs to available bases so load is spread evenly
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
         futures = []
         for i, job in enumerate(jobs):
-            base = bases[i % len(bases)]
+            requested_kind = job.get("worker_kind")
+            eligible = [base for base in bases if not requested_kind or _worker_kind(base) == requested_kind]
+            if not eligible:
+                print(
+                    f"[comfyui_utils] No healthy {requested_kind} worker for parallel job {i}",
+                    file=sys.stderr,
+                )
+                continue
+            base = eligible[i % len(eligible)]
             futures.append(ex.submit(_run_one, i, base, job))
         for fut in as_completed(futures):
             try:
@@ -1354,6 +1743,7 @@ def generate_scene_images(
     checkpoint: str = "fantasy",
     images_per_scene: int = 5,
     quality: Optional[dict] = None,
+    style: Optional[str] = None,
 ) -> dict:
     """
     Generate images for multiple scenes.
@@ -1403,6 +1793,7 @@ def generate_scene_images(
                 checkpoint=ckpt_name,
                 width=quality.get("width") if quality else None,
                 height=quality.get("height") if quality else None,
+                style=style,
             )
             if filename:
                 images.append(filename)

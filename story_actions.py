@@ -41,6 +41,8 @@ from pathlib import Path
 from typing import Callable, Iterable, Optional
 
 from story_storage import STORIES_ROOT, ensure_story_layout, existing_story_dir
+from image_quality import is_usable_story_image, requested_images_per_scene
+from fantasee_server.subtitle_validation import validate_subtitle_segments
 
 
 # ── Constants ──────────────────────────────────────────────────────────
@@ -141,6 +143,7 @@ class ExtendPlan:
     current_minutes: float
     style: str
     tone: str
+    duration_minutes: Optional[float] = None
 
     def to_dict(self) -> dict:
         return {
@@ -149,6 +152,7 @@ class ExtendPlan:
             "current_minutes": round(self.current_minutes, 1),
             "style": self.style,
             "tone": self.tone,
+            "duration_minutes": round(self.duration_minutes, 1) if self.duration_minutes else None,
         }
 
 
@@ -273,6 +277,7 @@ def regenerate_story(
     *,
     backup: bool = True,
     story_dir: Optional[Path] = None,
+    progress_callback: Optional[Callable[[str, str, Optional[float]], None]] = None,
 ) -> dict:
     """Wipe a story and re-run the generation pipeline from scratch.
 
@@ -292,6 +297,9 @@ def regenerate_story(
     if not story_dir.is_dir():
         raise FileNotFoundError(f"Story directory not found: {story_dir}")
 
+    if progress_callback:
+        progress_callback("discover", "Reading the saved story direction and production inputs", 0.02)
+
     manifest = _load_manifest(story_dir)
     if not manifest.get("story_concept") and not manifest.get("description"):
         # Older manifests stored the concept in `description`; fall back
@@ -305,6 +313,10 @@ def regenerate_story(
     style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
     tone = manifest.get("tone") or (tags[1] if len(tags) > 1 else "dramatic")
     voice = manifest.get("voice_preset") or "Dean"
+    narration_style = manifest.get("narration_style") or ""
+    world_context = manifest.get("world_context") or ""
+    voice_assignments = manifest.get("voice_assignments") or ""
+    characters = manifest.get("characters") or ""
     concept = (manifest.get("story_concept") or manifest.get("description") or "").strip()
     if not concept:
         raise ValueError("Manifest has no concept — cannot re-generate.")
@@ -318,6 +330,8 @@ def regenerate_story(
     # ── Backup to .trash/ ───────────────────────────────────────────
     backup_path = None
     if backup:
+        if progress_callback:
+            progress_callback("backup", "Securing a backup before replacing the current production", 0.06)
         TRASH_DIR.mkdir(parents=True, exist_ok=True)
         # Use a unique name so multiple regens don't clobber each other
         import time as _time
@@ -326,6 +340,8 @@ def regenerate_story(
         shutil.copytree(story_dir, backup_path)
 
     # ── Wipe everything in the story dir except the dir itself ────
+    if progress_callback:
+        progress_callback("reset", "Clearing stale generated assets while preserving the backup", 0.1)
     for child in list(story_dir.iterdir()):
         if child.is_dir() and not child.name.startswith("."):
             shutil.rmtree(child, ignore_errors=True)
@@ -358,11 +374,12 @@ def regenerate_story(
         "tags": [style, tone, "generated"],
         "tone": tone,
         "voice_preset": voice,
+        "narration_style": narration_style,
+        "characters": characters,
+        "world_context": world_context,
+        "voice_assignments": voice_assignments,
         "generated": True,
         "status": "regenerating",
-        "hero_image": "assets/title/title_slide.png",
-        "title_image": "assets/title/title_slide.png",
-        "title_slide": "assets/title/title_slide.png",
         "background_audio": manifest.get("background_audio"),
         "background_volume": manifest.get("background_volume", 0.05),
         "background_muted": manifest.get("background_muted", False),
@@ -376,6 +393,8 @@ def regenerate_story(
     # The caller (server endpoint) wraps this in a thread so the event
     # loop stays responsive.
     try:
+        if progress_callback:
+            progress_callback("generate", "Starting the full story pipeline: script, scenes, images, narration, and subtitles", 0.12)
         result = run_pipeline(
             concept=concept,
             num_scenes=num_scenes,
@@ -383,6 +402,10 @@ def regenerate_story(
             tone=tone,
             voice_preset=voice,
             images_per_scene=images_per_scene,
+            characters=characters,
+            narration_style=narration_style,
+            world_context=world_context,
+            progress_callback=progress_callback,
         )
     except Exception as pipeline_err:
         # Pipeline failed — restore from backup if we made one
@@ -469,6 +492,7 @@ def plan_repair(story_id: str, story_dir: Optional[Path] = None) -> RepairPlan:
     story_dir = _resolve_story_dir(story_id, story_dir)
     manifest = _load_manifest(story_dir)
     scenes = manifest.get("scenes") or []
+    target_images = requested_images_per_scene(manifest)
 
     plan = RepairPlan()
     for i, sc in enumerate(scenes):
@@ -478,7 +502,8 @@ def plan_repair(story_id: str, story_dir: Optional[Path] = None) -> RepairPlan:
 
         # ── Image check ──────────────────────────────────────────
         img_files = [story_dir / f for f in (sc.get("image_filenames") or []) if f]
-        image_present = bool(img_files) and all(p.exists() for p in img_files)
+        usable_img_files = [path for path in img_files if is_usable_story_image(path)]
+        image_present = len(usable_img_files) >= target_images
         if not image_present:
             sr.missing.append("image")
             sr.actions.append("regen_image")
@@ -491,8 +516,13 @@ def plan_repair(story_id: str, story_dir: Optional[Path] = None) -> RepairPlan:
                 prev = scenes[i - 1]
                 prev_imgs = [story_dir / f for f in (prev.get("image_filenames") or []) if f]
                 prev_imgs = [p for p in prev_imgs if p.exists()]
-                if prev_imgs and img_files:
-                    dist = min(_phash_hamming(cur, prev) for cur in img_files for prev in prev_imgs)
+                prev_imgs = [path for path in prev_imgs if is_usable_story_image(path)]
+                if prev_imgs and usable_img_files:
+                    dist = min(
+                        _phash_hamming(cur, prev)
+                        for cur in usable_img_files
+                        for prev in prev_imgs
+                    )
                     if dist <= PHASH_DUPLICATE_THRESHOLD:
                         sr.duplicate_image = True
                         sr.actions.append("regen_image")
@@ -674,10 +704,6 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
         # doing nothing. The endpoint translates this to a 503.
         raise RuntimeError("ComfyUI is not running — start a worker first")
 
-    # Drop any existing images so the new prefix starts fresh
-    for old in scene_obj.get("image_filenames", []):
-        _safe_unlink(story_dir / old)
-
     prompt = scene_obj.get("prompt") or ""
     if not prompt:
         raise RuntimeError("Scene has no prompt — cannot regenerate image")
@@ -686,8 +712,10 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
     tags = manifest.get("tags") or []
     style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
     checkpoint = checkpoint_for_style(style)
+    target_images = requested_images_per_scene(manifest)
+    old_images = list(scene_obj.get("image_filenames") or [])
     new_imgs = []
-    for i in range(max(1, len(scene_obj.get("image_filenames") or [None]))):
+    for i in range(target_images):
         prefix = f"{story_id}_s{padded}_{safe_title}_{(i + 1):02d}"
         filename = generate_image(
             prompt=prompt,
@@ -695,11 +723,29 @@ def _regen_scene_image(story_dir, story_id, padded, safe_title, scene_obj, manif
             output_dir=str(story_dir),
             seed=seed_base + i,
             checkpoint=checkpoint,
+            style=style,
             timeout=300,
         )
         if filename:
             new_imgs.append(filename)
+    if len(new_imgs) < target_images:
+        raise RuntimeError(
+            f"ComfyUI produced {len(new_imgs)} of {target_images} usable images for scene {padded}"
+        )
+
+    for old in old_images:
+        if old not in new_imgs:
+            _safe_unlink(story_dir / old)
     scene_obj["image_filenames"] = new_imgs
+
+    # Any video built from the old artwork is now stale and must be rebuilt.
+    _safe_unlink(story_dir / f"{story_id}_s{padded}.mp4")
+    _safe_unlink(story_dir / f"{story_id}_full.mp4")
+    _safe_unlink(story_dir / "final" / f"{story_id}_full.mp4")
+    plex_dir = story_dir / "final" / "plex"
+    if plex_dir.is_dir():
+        for plex_video in plex_dir.glob("*.mp4"):
+            _safe_unlink(plex_video)
 
 
 def _regen_scene_audio(story_dir, story_id, padded, scene_obj, manifest) -> None:
@@ -710,20 +756,27 @@ def _regen_scene_audio(story_dir, story_id, padded, scene_obj, manifest) -> None
     if not narration:
         raise RuntimeError("Scene has no narration — cannot regenerate audio")
 
-    # Drop the old audio file (any extension) so the .wav we write is
-    # the only thing on disk
     old = scene_obj.get("audio_filename")
-    if old:
-        _safe_unlink(story_dir / old)
     audio_filename = f"tts_{story_id}_s{padded}.wav"
     audio_path = str(story_dir / audio_filename)
+    target_path = Path(audio_path)
+    temporary_path = target_path.with_name(f".{target_path.stem}.{os.getpid()}.replacement.wav")
     tone = (manifest.get("tone") or (manifest.get("tags") or ["", "dramatic"])[1] or "dramatic")
     voice = manifest.get("voice_preset") or "Dean"
-    ok = generate_tts(narration, audio_path, voice=voice, tone=tone)
-    if not ok:
-        raise RuntimeError(f"TTS generation failed for scene {padded}")
+    try:
+        ok = generate_tts(narration, str(temporary_path), voice=voice, tone=tone)
+        if not ok or not temporary_path.exists() or temporary_path.stat().st_size <= 1000:
+            raise RuntimeError(f"TTS generation failed for scene {padded}")
+        duration = get_audio_duration(str(temporary_path))
+        if duration <= 0:
+            raise RuntimeError(f"TTS output has no usable duration for scene {padded}")
+        os.replace(temporary_path, target_path)
+    finally:
+        _safe_unlink(temporary_path)
+    if old and old != audio_filename:
+        _safe_unlink(story_dir / old)
     scene_obj["audio_filename"] = audio_filename
-    scene_obj["audio_duration"] = get_audio_duration(audio_path)
+    scene_obj["audio_duration"] = duration
 
 
 def _regen_scene_subs(story_dir, story_id, padded, scene_obj, manifest) -> None:
@@ -740,8 +793,6 @@ def _regen_scene_subs(story_dir, story_id, padded, scene_obj, manifest) -> None:
         raise RuntimeError("Scene has no narration — cannot generate subtitles")
 
     sub_path = story_dir / f"subs_{story_id}_s{padded}.json"
-    # Drop the old subs file so we always write a fresh one
-    _safe_unlink(sub_path)
 
     try:
         from generate_subtitles import generate_subtitles
@@ -749,7 +800,17 @@ def _regen_scene_subs(story_dir, story_id, padded, scene_obj, manifest) -> None:
     except Exception as e:
         raise RuntimeError(f"Subtitle generation failed: {e}")
 
-    sub_path.write_text(json.dumps(segs, indent=2), encoding="utf-8")
+    try:
+        validate_subtitle_segments(segs, _audio_duration(audio_path))
+    except ValueError as exc:
+        raise RuntimeError(f"Subtitle generation produced invalid timing: {exc}") from exc
+
+    temporary_path = sub_path.with_name(f".{sub_path.stem}.{os.getpid()}.replacement.json")
+    try:
+        temporary_path.write_text(json.dumps(segs, indent=2), encoding="utf-8")
+        os.replace(temporary_path, sub_path)
+    finally:
+        _safe_unlink(temporary_path)
     scene_obj["subtitle_file"] = sub_path.name
 
 
@@ -758,10 +819,11 @@ def _regen_scene_subs(story_dir, story_id, padded, scene_obj, manifest) -> None:
 
 def plan_extend(
     story_id: str,
-    scenes: int = DEFAULT_EXTEND_SCENES,
+    scenes: Optional[int] = DEFAULT_EXTEND_SCENES,
+    duration_minutes: Optional[float] = None,
     story_dir: Optional[Path] = None,
 ) -> ExtendPlan:
-    """Decide what the "Add N scenes" action will do."""
+    """Decide how many scenes are needed for a scene or duration extension."""
     story_dir = _resolve_story_dir(story_id, story_dir)
     manifest = _load_manifest(story_dir)
     current = manifest.get("scenes") or []
@@ -781,27 +843,40 @@ def plan_extend(
     style = manifest.get("style") or (tags[0] if tags else "fantasy painterly")
     tone = manifest.get("tone") or (tags[1] if len(tags) > 1 else "dramatic")
 
+    if duration_minutes is not None:
+        requested_minutes = float(duration_minutes)
+        if requested_minutes <= 0:
+            raise ValueError("duration_minutes must be positive")
+        average_seconds = total_seconds / len(current) if total_seconds and current else 45.0
+        will_add = max(1, min(50, int((requested_minutes * 60 + average_seconds - 1) // average_seconds)))
+    else:
+        requested_minutes = None
+        will_add = max(1, min(50, int(scenes or DEFAULT_EXTEND_SCENES)))
+
     return ExtendPlan(
-        will_add=max(1, int(scenes)),
+        will_add=will_add,
         current_scene_count=len(current),
         current_minutes=total_seconds / 60.0 if total_seconds else 0.0,
         style=style,
         tone=tone,
+        duration_minutes=requested_minutes,
     )
 
 
 def apply_extend(
     story_id: str,
-    scenes: int = DEFAULT_EXTEND_SCENES,
+    scenes: Optional[int] = DEFAULT_EXTEND_SCENES,
     *,
+    duration_minutes: Optional[float] = None,
+    prompt: str = "",
     progress: Optional[Callable[[str, str, float], None]] = None,
     story_dir: Optional[Path] = None,
 ) -> dict:
     """Add N new scenes to the end of the story.
 
-    Mirrors the existing ``/api/stories/{id}/extend`` endpoint but
-    accepts a scene count instead of target minutes, and runs the
-    per-scene work in-process so we can stream progress.
+    Runs the per-scene work in-process so the existing story-action progress
+    channel can report each generated scene. ``prompt`` is a creative
+    instruction, including an optional requested ending or character fate.
     """
     from generate_story import call_llm, STORY_OUTLINE_SYSTEM, parse_scene_response
     from tts_utils import generate_tts, get_audio_duration
@@ -820,7 +895,7 @@ def apply_extend(
     images_per_scene = int(manifest.get("images_per_scene") or 1)
     image_checkpoint = checkpoint_for_style(style)
 
-    plan = plan_extend(story_id, scenes, story_dir=story_dir)
+    plan = plan_extend(story_id, scenes, duration_minutes, story_dir=story_dir)
 
     def _emit(stage: str, msg: str, pct: float) -> None:
         if progress:
@@ -846,6 +921,7 @@ def apply_extend(
 
 Write exactly {plan.will_add} more scenes that continue from where the story left off.
 Maintain the same characters, tone, and visual style.
+Director's continuation instruction: {prompt.strip() or "Continue naturally and leave a meaningful new turn at the end."}
 Each scene MUST have a Narration field (voiceover text for TTS — 80-150 words, dramatic, present tense).
 Make each visual prompt detailed enough for AI image generation (80-150 words).
 Prefer cinematic action compositions over static portraits whenever possible: show characters moving, fighting, climbing, discovering, reacting, using tools, crossing terrain, or interacting with the environment. Use dynamic poses, visible hands/body language, depth, camera angle, and a clear story action in the frame. Do not make every image a face close-up.
@@ -897,6 +973,7 @@ Tone: {tone}"""
                         output_dir=str(story_dir),
                         seed=seed + img_idx,
                         checkpoint=image_checkpoint,
+                        style=style,
                         timeout=300,
                     )
                     if filename:

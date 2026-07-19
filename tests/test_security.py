@@ -98,6 +98,7 @@ class SecurityBoundaryTests(unittest.TestCase):
             "/api/settings/raw",
             "/api/generate",
             "/api/comfyui/workers/spawn-gpu",
+            "/api/system/restart",
             "/api/generated-stories/{story_id}/run-critic",
         }
         for route in server.app.routes:

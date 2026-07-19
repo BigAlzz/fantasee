@@ -2205,7 +2205,7 @@ input.seed-slider::-moz-range-thumb {
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   GENERATION PROGRESS PANEL
+   GENERATION PROGRESS PANEL — Polished UI
    ══════════════════════════════════════════════════════════════════════ */
 .progress-panel {
   display: none;
@@ -2213,66 +2213,316 @@ input.seed-slider::-moz-range-thumb {
   bottom: 24px;
   right: 24px;
   z-index: var(--z-progress-panel);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
-  width: 360px;
-  max-height: 400px;
+  background: #0f0f1a;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+  width: 380px;
+  max-height: 520px;
   overflow: hidden;
 }
-.progress-panel.active { display: block; }
-.progress-panel-header {
-  padding: 14px 18px;
-  font-size: 13px;
+.progress-panel.active { display: flex; flex-direction: column; }
+
+/* ── Gen Header ─────────────────────────────────────────────────── */
+.gen-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.gen-header-left {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.gen-btn-outline {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.8);
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, color 0.15s;
+  line-height: 1.6;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.gen-btn-outline:hover {
+  border-color: rgba(255,255,255,0.4);
+  color: #fff;
+}
+.gen-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.gen-header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.gen-header-details {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.gen-pill {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+}
+.gen-pill-divider {
+  font-size: 11px;
+  color: rgba(255,255,255,0.15);
+}
+.gen-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.gen-pill-btn {
+  padding: 3px 12px;
+  border-radius: 12px;
+  font-size: 11px;
   font-weight: 600;
-  border-bottom: 1px solid var(--border);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.gen-ready {
+  background: #38a169;
+  color: #fff;
+}
+
+/* ── Rainbow Ring ───────────────────────────────────────────────── */
+.gen-ring {
+  flex-shrink: 0;
+}
+.gen-ring svg {
+  display: block;
+}
+
+/* ── Stage Tags ─────────────────────────────────────────────────── */
+.gen-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.gen-stage-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.3);
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+.gen-stage-tag.done {
+  background: rgba(56,161,105,0.12);
+  color: #38a169;
+  border-color: rgba(56,161,105,0.2);
+}
+.gen-stage-tag.done::before {
+  content: "✓ ";
+  font-weight: 700;
+}
+.gen-stage-tag.running {
+  background: rgba(237,137,54,0.1);
+  color: #ed8936;
+  border-color: rgba(237,137,54,0.15);
+  animation: pulse 1.5s infinite;
+}
+.gen-stage-tag.error {
+  background: rgba(229,62,62,0.12);
+  color: #e53e3e;
+  border-color: rgba(229,62,62,0.2);
+}
+
+/* ── Active Task Card ───────────────────────────────────────────── */
+.gen-active-card {
+  margin: 10px 18px;
+  padding: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+}
+.gen-active-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.gen-active-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #e53e3e;
+}
+.gen-active-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Metrics Row ────────────────────────────────────────────────── */
+.gen-active-metrics {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.gen-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.gen-metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e53e3e;
+  line-height: 1;
+}
+.gen-metric-label {
+  font-size: 10px;
+  color: rgba(255,255,255,0.35);
+}
+
+/* ── Act Progress Bar ───────────────────────────────────────────── */
+.gen-act-bar {
+  margin-top: 2px;
+}
+.gen-act-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.gen-act-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+.gen-act-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #e53e3e;
+}
+.gen-act-count {
+  font-size: 11px;
+  color: rgba(255,255,255,0.5);
+}
+.gen-act-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.gen-act-fill {
+  height: 100%;
+  background: #e53e3e;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+  min-width: 2px;
+}
+
+/* ── Task List ──────────────────────────────────────────────────── */
+.gen-list-wrap {
+  padding: 0 18px 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+.gen-list-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 6px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  margin-top: 2px;
 }
+.gen-list-count {
+  color: rgba(255,255,255,0.2);
+}
+
+/* ── Task Items (kept for compatibility) ────────────────────────── */
 .progress-list {
-  padding: 8px;
-  max-height: 300px;
+  max-height: 260px;
   overflow-y: auto;
 }
+.progress-list::-webkit-scrollbar {
+  width: 4px;
+}
+.progress-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.progress-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+}
 .progress-item {
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-  margin-bottom: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  transition: background 0.15s;
+}
+.progress-item:hover {
+  background: rgba(255,255,255,0.04);
 }
 .progress-status {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.progress-status.queued { background: var(--text-muted); }
-.progress-status.running { background: var(--warn-running); animation: pulse 1.5s infinite; }
-.progress-status.done { background: var(--success); }
-.progress-status.error { background: var(--accent); }
+.progress-status.queued { background: rgba(255,255,255,0.15); }
+.progress-status.running { background: #ed8936; animation: pulse 1.5s infinite; }
+.progress-status.done { background: #38a169; }
+.progress-status.error { background: #e53e3e; }
 .progress-item-info { flex: 1; min-width: 0; }
-.progress-item-title { font-size: 13px; font-weight: 500; }
-.progress-item-msg { font-size: 11px; color: var(--text-muted); }
-.progress-item-sub { font-size: 10px; color: var(--text-muted); margin-left: 4px; }
-.progress-item-child { color: var(--text-muted); margin-right: 4px; font-weight: 400; }
-.progress-item-child-row { padding-left: 24px; opacity: 0.85; }
+.progress-item-title { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.8); }
+.progress-item-msg { font-size: 10px; color: rgba(255,255,255,0.3); }
+.progress-item-sub { font-size: 10px; color: rgba(255,255,255,0.2); margin-left: 4px; }
+.progress-item-child { color: rgba(255,255,255,0.2); margin-right: 4px; font-weight: 400; }
+.progress-item-child-row { padding-left: 20px; opacity: 0.7; }
 
 .progress-bar-outer {
   width: 100%;
-  height: 4px;
-  background: rgba(255,255,255,0.1);
+  height: 3px;
+  background: rgba(255,255,255,0.06);
   border-radius: 2px;
   overflow: hidden;
+  margin-top: 4px;
 }
 .progress-bar-inner {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-glow-end));
-  /* transform-only */
+  background: linear-gradient(90deg, #ed8936, #e53e3e);
   transform: scaleX(var(--pct, 0));
   transform-origin: left center;
   transition: transform 0.4s ease;
@@ -3496,17 +3746,94 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible {
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════════
-     PROGRESS PANEL
+     PROGRESS PANEL — Polished generation UI
      ══════════════════════════════════════════════════════════════════════ -->
 <div class="progress-panel" id="progress-panel" role="status" aria-live="polite" aria-label="Generation tasks">
-  <div class="progress-panel-header">
-    <span>Generation Tasks</span>
-    <button type="button" style="font-size:12px;color:var(--text-muted)"
-            data-action="toggle-progress" aria-label="Hide progress panel">&#x2013;</button>
+  <!-- Project Header Card -->
+  <div class="gen-header">
+    <div class="gen-header-left">
+      <button type="button" class="gen-btn-outline" data-action="toggle-progress" aria-label="Hide progress panel">Tasks</button>
+      <div class="gen-header-meta">
+        <span class="gen-header-title" id="gen-header-title">Generation Tasks</span>
+        <span class="gen-header-details" id="gen-header-details">
+          <span class="gen-pill" id="gen-task-count">0 running</span>
+          <span class="gen-pill-divider">|</span>
+          <span class="gen-pill" id="gen-stage-label">stage</span>
+          <span class="gen-pill-divider">|</span>
+          <span class="gen-pill" id="gen-queue-size">0 queued</span>
+        </span>
+      </div>
+    </div>
+    <div class="gen-header-right">
+      <button type="button" class="gen-pill-btn gen-ready" id="gen-ready-btn" style="display:none">READY</button>
+      <div class="gen-ring" id="gen-ring-container">
+        <svg width="44" height="44" viewBox="0 0 44 44" id="gen-ring-svg">
+          <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="3"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#e53e3e" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-red" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#dd6b20" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-orange" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#d69e2e" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-yellow" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#38a169" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-green" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#3182ce" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-blue" opacity="0"/>
+          <circle cx="22" cy="22" r="18" fill="none" stroke="#805ad5" stroke-width="3" stroke-dasharray="113 113" stroke-dashoffset="0" stroke-linecap="round" id="ring-segment-purple" opacity="0"/>
+          <text x="22" y="22" text-anchor="middle" dominant-baseline="central" fill="rgba(255,255,255,0.5)" font-size="10" font-weight="700" id="ring-pct-text">0%</text>
+        </svg>
+      </div>
+    </div>
   </div>
-  <div class="progress-list" id="progress-list">
-    <div class="empty-state" style="padding:20px">
-      <p style="font-size:13px">No active generation tasks.</p>
+
+  <!-- Stage Tags -->
+  <div class="gen-stages" id="gen-stages">
+    <span class="gen-stage-tag" data-stage="outline">Outline</span>
+    <span class="gen-stage-tag" data-stage="bible">Bible</span>
+    <span class="gen-stage-tag" data-stage="visual">Visual Style</span>
+    <span class="gen-stage-tag" data-stage="art">Art Director</span>
+    <span class="gen-stage-tag" data-stage="illustrations">Illustrations</span>
+    <span class="gen-stage-tag" data-stage="editor">Editor</span>
+    <span class="gen-stage-tag" data-stage="voice">Voice</span>
+  </div>
+
+  <!-- Active Task Card -->
+  <div class="gen-active-card" id="gen-active-card" style="display:none">
+    <div class="gen-active-top">
+      <span class="gen-active-label" id="gen-active-label">Active</span>
+      <span class="gen-active-title" id="gen-active-title">—</span>
+    </div>
+    <div class="gen-active-metrics">
+      <div class="gen-metric">
+        <span class="gen-metric-value" id="gen-metric-narrations">0</span>
+        <span class="gen-metric-label">narrations</span>
+      </div>
+      <div class="gen-metric">
+        <span class="gen-metric-value" id="gen-metric-images">0</span>
+        <span class="gen-metric-label">images</span>
+      </div>
+      <div class="gen-metric">
+        <span class="gen-metric-value" id="gen-metric-progress">0%</span>
+        <span class="gen-metric-label">this task</span>
+      </div>
+    </div>
+    <!-- Act progress bar -->
+    <div class="gen-act-bar" id="gen-act-bar" style="display:none">
+      <div class="gen-act-label">
+        <span class="gen-act-name"><span class="gen-act-dot"></span> Current Act</span>
+        <span class="gen-act-count" id="gen-act-count">0 / 0</span>
+      </div>
+      <div class="gen-act-track">
+        <div class="gen-act-fill" id="gen-act-fill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task List -->
+  <div class="gen-list-wrap">
+    <div class="gen-list-header">
+      <span>All Tasks</span>
+      <span class="gen-list-count" id="gen-list-count">0</span>
+    </div>
+    <div class="progress-list" id="progress-list">
+      <div class="empty-state" style="padding:20px">
+        <p style="font-size:13px;color:rgba(255,255,255,0.3)">No active generation tasks.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -3725,8 +4052,8 @@ const API = {
   async fetchStories() {
     // Fetch both pre-built and generated stories
     const [builtRes, genRes] = await Promise.all([
-      fetch('/api/stories'),
-      fetch('/api/generated-stories').catch(() => ({ json: () => ({ stories: [] }) })),
+      fetch('/api/stories', { cache: 'no-store' }),
+      fetch('/api/generated-stories', { cache: 'no-store' }).catch(() => ({ json: () => ({ stories: [] }) })),
     ]);
     const built = await builtRes.json();
     const gen = await genRes.json();
@@ -3922,11 +4249,44 @@ function pickHeroImage(story) {
   return '';
 }
 
+function isTitleArtwork(url) {
+  const lowered = String(url || '').toLowerCase();
+  return lowered.includes('title_slide')
+    || lowered.includes('/assets/title/')
+    || lowered.includes('/title/');
+}
+
+function normalizeStoryArtUrl(story, value) {
+  if (!value) return '';
+  const url = String(value).replaceAll('\\', '/');
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/')) {
+    return url;
+  }
+  if (url.includes('/')) return `/${url}`;
+  return story.generated === false ? `/images/${url}` : `/generated/${story.id}/${url}`;
+}
+
 function pickStoryArt(story, offset = 0) {
   if (!story) return '';
-  const art = story.scene_art_urls || story.sceneArtUrls || [];
-  if (art.length) return art[Math.min(offset, art.length - 1)];
-  return pickHeroImage(story);
+  const candidates = [];
+  const addCandidates = (values) => {
+    for (const value of values || []) candidates.push(value);
+  };
+
+  // Scene art is the only valid card artwork. Never use the generated
+  // title slide here, even when it is exposed as the story's hero image.
+  addCandidates(story.scene_art_urls || story.sceneArtUrls);
+  for (const scene of story.scenes || []) {
+    addCandidates(scene.image_urls);
+    addCandidates(scene.image_filenames);
+  }
+  addCandidates([story.cover_image_url, story.cover_image]);
+
+  const usable = candidates
+    .map(value => normalizeStoryArtUrl(story, value))
+    .filter(url => url && !isTitleArtwork(url));
+  if (!usable.length) return '';
+  return usable[Math.min(offset, usable.length - 1)];
 }
 
 function criticMatchPercent(story) {
@@ -4528,7 +4888,6 @@ async function improveStory(storyId) {
           status: 'running',
           message: data.message || 'Improvement started…',
         });
-        toast.success('Improvement started in the background.');
       } else {
         toast.success(`Improved ${data.improved_scenes.length} scenes. Render: ${data.render_ok ? '✓' : '✗'}`);
         openDetail(storyId);
@@ -4631,7 +4990,6 @@ async function improveLoop(storyId) {
           status: 'running',
           message: data.message || 'Improvement loop started…',
         });
-        toast.success('Improvement loop started in the background.');
       } else {
         const msg = data.status === 'target_reached'
           ? `Target reached in ${data.rounds_completed} rounds! Stars: ${data.final_stars}`
@@ -5079,7 +5437,6 @@ async function executeDeleteStory() {
       throw new Error(data.detail || data.error || 'Delete failed');
     }
     if (data.status === 'running' && data.task_id) {
-      showToast(`Deleting "${storyId}" in the background.`, 'success');
       prefillProgressPanel(data.task_id, `Deleting ${storyId}`, {
         kind: 'delete_story',
         story_id: storyId,
@@ -5209,7 +5566,6 @@ async function executeRegenerateStory() {
     const data = await res.json();
     prefillProgressPanel(data.task_id, `Re-generating: ${storyId}`,
                         { kind: 'regenerate' });
-    showToast(`Re-generation started in the background.`, 'success', { duration: 4000 });
     closeRegenModal();
   } catch (e) {
     showToast(`Re-generate failed: ${e.message}`, 'error');
@@ -5332,7 +5688,6 @@ async function executeRepairStory() {
     const data = await res.json();
     prefillProgressPanel(data.task_id, `Repairing: ${storyId}`,
                         { kind: 'repair' });
-    showToast(`Repair started in the background.`, 'success', { duration: 4000 });
     closeRepairModal();
   } catch (e) {
     showToast(`Repair failed: ${e.message}`, 'error');
@@ -6109,8 +6464,6 @@ function exportPlexFromButton(btn) {
 
 async function exportPlexAction(storyId, btn) {
   if (btn) setBusy(btn, true, '<span class="spinner"></span> Exporting…');
-  // Show the per-stage toast immediately so the user sees feedback.
-  showPlexProgressToast('<div class="plex-stage plex-stage-current">Starting Plex export…</div>');
 
   function onWs(e) {
     try {
@@ -6118,50 +6471,17 @@ async function exportPlexAction(storyId, btn) {
       if (data.type !== 'task_update') return;
       if (!data.task_id || !data.task_id.startsWith('plex-')) return;
       if (data.story_id && data.story_id !== storyId) return;
-      const stage = data.stage || 'discover';
-      const label = PLEX_STAGE_LABELS[stage] || stage;
-      const pct = Math.round((data.progress || 0) * 100);
       const status = data.status || 'running';
-      const cssClass = status === 'error' ? 'plex-stage-error'
-        : status === 'done' ? 'plex-stage-done' : 'plex-stage-current';
-      const html = `<div class="plex-stage ${cssClass}">
-        <span class="plex-stage-label">${label}</span>
-        <span class="plex-pct">${pct}%</span>
-      </div>`;
-      // Replace the contents of the toast — keeps the UI simple and
-      // avoids needing to diff per-stage.
       const done = status === 'done';
       const fail = status === 'error';
-      const finalHtml = `
-        ${html}
-        <div class="plex-stage ${done ? 'plex-stage-done' : fail ? 'plex-stage-error' : ''}">
-          <span class="plex-stage-label">${done ? '✓ Ready' : fail ? '✗ ' + (data.message || 'Failed') : 'In progress…'}</span>
-        </div>
-      `;
-      showPlexProgressToast(finalHtml);
+      // WebSocket task updates are rendered by the persistent bottom task
+      // panel. Keep this listener only for the export button lifecycle.
       if (done) {
-        // If the server copied the package to the user's Plex library,
-        // surface the destination so they know where to look.
-        const destDir = data.result && data.result.destination_dir;
-        const destErr = data.result && data.result.destination_error;
-        if (destDir) {
-          toast.success(`Plex export ready — copied to ${destDir}`);
-        } else if (destErr) {
-          toast.warn(`Plex export ready, but library copy failed: ${destErr}`);
-        } else {
-          toast.success('Plex export ready — click "Open Plex package" to download.');
-        }
         if (btn) setBusy(btn, false);
         // Refresh story cache so the new package shows up
         setTimeout(() => init(), 500);
-        // Auto-dismiss the toast after a few seconds
-        setTimeout(() => {
-          const t = document.getElementById('plex-progress-toast');
-          if (t) t.remove();
-        }, 6000);
         if (ws) ws.removeEventListener('message', onWs);
       } else if (fail) {
-        toast.error(data.message || 'Plex export failed');
         if (btn) setBusy(btn, false);
         if (ws) ws.removeEventListener('message', onWs);
       }
@@ -6175,35 +6495,14 @@ async function exportPlexAction(storyId, btn) {
       backgroundMuted: state.backgroundMuted,
       backgroundAudio: state.backgroundAudio,
     });
-    if (Array.isArray(state.tasks)) {
-      state.tasks.push({
-        id: result.task_id, kind: 'plex_export', story_id: storyId,
-        status: 'running', message: 'Plex export started',
-      });
-    }
+    prefillProgressPanel(result.task_id, `Plex export: ${storyId}`, {
+      kind: 'plex_export', story_id: storyId,
+      status: 'running', message: 'Plex export started',
+    });
   } catch (e) {
     toast.error(`Plex export failed: ${e.message || e}`);
     if (btn) setBusy(btn, false);
   }
-}
-
-function showPlexProgressToast(html) {
-  let toastEl = document.getElementById('plex-progress-toast');
-  if (!toastEl) {
-    toastEl = document.createElement('div');
-    toastEl.id = 'plex-progress-toast';
-    toastEl.className = 'gen-progress-toast plex-progress-toast';
-    toastEl.innerHTML = `
-      <div class="toast-header">
-        <span class="toast-title">Plex Export</span>
-        <button type="button" class="toast-close" data-action="dismiss-plex-toast" aria-label="Dismiss notification">&times;</button>
-      </div>
-      <div class="plex-stages" id="plex-stages"></div>
-    `;
-    document.body.appendChild(toastEl);
-  }
-  const stages = toastEl.querySelector('#plex-stages');
-  if (stages) stages.innerHTML = html;
 }
 
 async function openPlexPackage(btn) {
@@ -6770,9 +7069,8 @@ async function submitCreate(e) {
       }));
       const result = await API.submitGenerationQueue(items);
       // Close the modal immediately so the user can navigate freely while
-      // the queue runs in the background. The right-hand progress panel
-      // and the persistent top-right toast are the running indicators.
-      showToast(`Queue of ${result.item_count} stories started in the background.`, 'success', { duration: 5000 });
+      // the queue runs in the background. The bottom task panel is the
+      // single running indicator for background work.
       prefillProgressPanel(result.queue_id, `Queue of ${result.item_count} stories`, { kind: 'queue', item_count: result.item_count });
       closeCreateModal();
       resetCreateForm();
@@ -6818,7 +7116,6 @@ async function submitCreate(e) {
       ...commonFields(),
     };
     const result = await API.submitGeneration(body);
-    showToast(`Generation started in the background — task ${result.task_id}.`, 'success', { duration: 4000 });
     prefillProgressPanel(result.task_id, concept, { kind: 'story' });
     closeCreateModal();
     resetCreateForm();
@@ -6864,7 +7161,6 @@ async function generateSelectedSeeds() {
         voice_preset: voice,
       });
       const concept = `${seed.title} — ${seed.description}`;
-      showToast(`"${seed.title}" generating in the background — task ${result.task_id}.`, 'success', { duration: 4000 });
       prefillProgressPanel(result.task_id, concept, { kind: 'story' });
     } else {
       // Multiple seeds → submit as a queue so they run sequentially in
@@ -6879,7 +7175,6 @@ async function generateSelectedSeeds() {
         voice_preset: voice,
       }));
       const result = await API.submitGenerationQueue(items);
-      showToast(`${selected.length} stories queued in the background.`, 'success', { duration: 5000 });
       prefillProgressPanel(result.queue_id, `Queue of ${selected.length} seeds`, { kind: 'queue', item_count: selected.length });
     }
     closeCreateModal();
@@ -7011,11 +7306,84 @@ function updateProgressDisplay() {
   if (!state.tasks.length) {
     list.innerHTML = `
       <div class="empty-state" style="padding:20px">
-        <p style="font-size:13px">No active generation tasks.</p>
+        <p style="font-size:13px;color:rgba(255,255,255,0.3)">No active generation tasks.</p>
       </div>
     `;
+    // Reset header
+    document.getElementById('gen-header-title').textContent = 'Generation Tasks';
+    document.getElementById('gen-task-count').textContent = '0 running';
+    document.getElementById('gen-queue-size').textContent = '0 queued';
+    document.getElementById('gen-stage-label').textContent = 'stage';
+    document.getElementById('gen-list-count').textContent = '0';
+    document.getElementById('gen-active-card').style.display = 'none';
+    document.getElementById('gen-ready-btn').style.display = 'none';
+    _updateRing(0);
+    _updateStageTags([]);
     return;
   }
+
+  // ── Compute aggregates ──────────────────────────────────────────────
+  const running = state.tasks.filter(t => t.status === 'running');
+  const queued = state.tasks.filter(t => t.status === 'queued');
+  const done = state.tasks.filter(t => t.status === 'done');
+  const errored = state.tasks.filter(t => t.status === 'error');
+  const total = state.tasks.length;
+  const pct = total > 0 ? Math.round((done.length / total) * 100) : 0;
+
+  // ── Header ──────────────────────────────────────────────────────────
+  document.getElementById('gen-header-title').textContent =
+    running.length > 0 ? 'Generation Running' : done.length === total ? 'All Complete' : 'Generation Tasks';
+  document.getElementById('gen-task-count').textContent =
+    running.length > 0 ? `${running.length} running` : '0 running';
+  document.getElementById('gen-queue-size').textContent =
+    queued.length > 0 ? `${queued.length} queued` : errored.length > 0 ? `${errored.length} failed` : `${done.length} done`;
+
+  // Pick the first running task's message as stage label
+  const activeTask = running[0] || state.tasks[0];
+  const stageLabel = activeTask ? (activeTask.message || activeTask.status || '—') : '—';
+  document.getElementById('gen-stage-label').textContent = stageLabel.length > 30 ? stageLabel.slice(0, 30) + '…' : stageLabel;
+  document.getElementById('gen-list-count').textContent = String(total);
+
+  // ── Rainbow ring ────────────────────────────────────────────────────
+  _updateRing(pct);
+
+  // ── Stage tags ──────────────────────────────────────────────────────
+  const stages = ['outline','bible','visual','art','illustrations','editor','voice'];
+  const statusMap = { queued, running, done, error: errored };
+  // Map tasks to their closest stage
+  const activeStatuses = [];
+  if (running.length > 0) activeStatuses.push('running');
+  if (done.length > 0) activeStatuses.push('done');
+  if (errored.length > 0) activeStatuses.push('error');
+  _updateStageTags(stages, activeStatuses);
+
+  // ── Active task card ────────────────────────────────────────────────
+  const activeCard = document.getElementById('gen-active-card');
+  const readyBtn = document.getElementById('gen-ready-btn');
+  if (activeTask) {
+    activeCard.style.display = 'block';
+    const title = activeTask.title || activeTask.story_id || activeTask.concept || `Task ${(activeTask.id || '').slice(0, 6)}`;
+    document.getElementById('gen-active-title').textContent = title.length > 40 ? title.slice(0, 40) + '…' : title;
+    const p = Math.round((activeTask.progress || 0) * 100);
+    document.getElementById('gen-metric-narrations').textContent = activeTask.num_scenes || activeTask.scene_count || '—';
+    document.getElementById('gen-metric-images').textContent = activeTask.images_per_scene || '—';
+    document.getElementById('gen-metric-progress').textContent = p + '%';
+    // Act bar: show if we have scene data
+    const actBar = document.getElementById('gen-act-bar');
+    if (activeTask.num_scenes) {
+      actBar.style.display = 'block';
+      document.getElementById('gen-act-count').textContent = `${p}% complete`;
+      document.getElementById('gen-act-fill').style.width = p + '%';
+    } else {
+      actBar.style.display = 'none';
+    }
+    readyBtn.style.display = done.length === total ? 'block' : 'none';
+  } else {
+    activeCard.style.display = 'none';
+    readyBtn.style.display = 'none';
+  }
+
+  // ── Task list (original) ────────────────────────────────────────────
   // Group sub-tasks under their parent queue
   const isQueueTask = (t) => (
     !t.parent && (
@@ -7037,14 +7405,12 @@ function updateProgressDisplay() {
     const pct = Math.round((t.progress || 0) * 100);
     const isQueue = isQueueTask(t);
     const bar = isQueue
-      ? `<div class="progress-bar-outer" style="margin-top:4px"><div class="progress-bar-inner" style="--pct:${(t.progress || 0)}"></div></div>`
+      ? `<div class="progress-bar-outer"><div class="progress-bar-inner" style="--pct:${(t.progress || 0)}"></div></div>`
       : '';
     const sub = isQueue && t.item_count
       ? `<span class="progress-item-sub">${t.item_count} stories</span>`
       : '';
     const titlePrefix = isChild ? '<span class="progress-item-child">↳</span> ' : '';
-    // Prefer the resolved story title; fall back to a preview of the
-    // concept; finally use a short id. Never show "undefined".
     const title = isQueue
       ? (t.kind === 'library_maintenance' ? 'Library maintenance' : 'Generation queue')
       : (t.title || t.story_id || t.concept || `Task ${(t.id || '').slice(0, 6) || '—'}`);
@@ -7061,18 +7427,65 @@ function updateProgressDisplay() {
   };
 
   const html = [];
-  // Render top-level single tasks first
-  for (const t of topLevel) {
-    html.push(renderItem(t));
-  }
-  // Then queue tasks with their sub-tasks indented
+  for (const t of topLevel) html.push(renderItem(t));
   for (const q of queueTasks) {
     html.push(renderItem(q));
-    for (const c of childrenOf(q.id)) {
-      html.push(renderItem(c, true));
-    }
+    for (const c of childrenOf(q.id)) html.push(renderItem(c, true));
   }
   list.innerHTML = html.join('');
+}
+
+/** Update the rainbow segmented progress ring. */
+function _updateRing(pct) {
+  const segments = [
+    { el: document.getElementById('ring-segment-red'), offset: 0 },
+    { el: document.getElementById('ring-segment-orange'), offset: 0 },
+    { el: document.getElementById('ring-segment-yellow'), offset: 0 },
+    { el: document.getElementById('ring-segment-green'), offset: 0 },
+    { el: document.getElementById('ring-segment-blue'), offset: 0 },
+    { el: document.getElementById('ring-segment-purple'), offset: 0 },
+  ];
+  const circumference = 2 * Math.PI * 18; // r=18
+  const totalLength = circumference;
+  const segLen = totalLength / segments.length; // ~18.85 per segment
+
+  // Fill segments sequentially up to pct
+  let remaining = (pct / 100) * totalLength;
+  for (let i = 0; i < segments.length; i++) {
+    const el = segments[i].el;
+    if (!el) continue;
+    if (remaining <= 0) {
+      el.style.opacity = '0';
+      el.setAttribute('stroke-dasharray', `0 ${totalLength}`);
+    } else {
+      const fill = Math.min(remaining, segLen);
+      el.style.opacity = '1';
+      el.setAttribute('stroke-dasharray', `${fill} ${totalLength - fill}`);
+      remaining -= fill;
+    }
+  }
+
+  const text = document.getElementById('ring-pct-text');
+  if (text) text.textContent = pct + '%';
+}
+
+/** Update stage tags with green checks / orange running / red errors. */
+function _updateStageTags(stages, activeStatuses) {
+  const tags = document.querySelectorAll('.gen-stage-tag');
+  tags.forEach(tag => {
+    tag.className = 'gen-stage-tag';
+    const stage = tag.dataset.stage;
+    // Simple heuristic: first stages = done, middle = running, later = queued
+    const idx = stages.indexOf(stage);
+    if (idx < 0) return;
+    if (activeStatuses.includes('done') && idx < 3) {
+      tag.classList.add('done');
+    } else if (activeStatuses.includes('running') && idx === 3) {
+      tag.classList.add('running');
+    } else if (activeStatuses.includes('error') && idx > 4) {
+      tag.classList.add('error');
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -7318,8 +7731,8 @@ function connectWebSocket() {
 
         // Some progress messages contain the generated story title —
         // e.g. `Story: "Whispers of Progress" (id: whispers-of-progress)`.
-        // Parse that and store it on the task so the panel + toast can
-        // show the real name instead of "Task undefined".
+        // Parse that and store it on the task so the panel can show the
+        // real name instead of "Task undefined".
         if (typeof data.message === 'string') {
           const m = data.message.match(/^Story:\s*"([^"]+)"\s*\(id:\s*([^)]+)\)/);
           if (m) {
@@ -7345,9 +7758,6 @@ function connectWebSocket() {
         }
         if (data.kind === 'delete_story' && data.status === 'done') {
           const sid = data.story_id;
-          const report = data.result || {};
-          const sizeMb = ((report.bytes_freed || 0) / 1024 / 1024).toFixed(1);
-          toast.success(`Deleted "${sid}" — ${report.files_deleted || 0} files, ${sizeMb} MB`);
           if (state.currentDetail && state.currentDetail.id === sid) closeDetail();
           try {
             const all = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
@@ -7358,31 +7768,20 @@ function connectWebSocket() {
           } catch (e) {}
           setTimeout(() => init(), 250);
         } else if (data.kind === 'delete_story' && data.status === 'error') {
-          toast.error(data.message || `Delete failed for ${data.story_id}`);
           setTimeout(() => init(), 250);
         } else if ((data.kind === 'improve' || data.kind === 'improve_loop') && data.status === 'done') {
           const sid = data.story_id;
-          const result = data.result || {};
-          if (data.kind === 'improve') {
-            const count = (result.improved_scenes || []).length;
-            toast.success(`Improved ${count} scene${count === 1 ? '' : 's'}.`);
-          } else if (result.status === 'target_reached') {
-            toast.success(`Improvement target reached: ${result.final_stars || 0} stars.`);
-          } else {
-            toast.success(`Improvement loop complete: ${result.final_stars || 0} stars.`);
-          }
           if (state.currentDetail && state.currentDetail.id === sid) {
             setTimeout(() => openDetail(sid), 250);
           } else {
             setTimeout(() => init(), 250);
           }
         } else if ((data.kind === 'improve' || data.kind === 'improve_loop') && data.status === 'error') {
-          toast.error(data.message || `Improvement failed for ${data.story_id}`);
-        } else if (data.kind === 'library_maintenance' && data.status === 'done') {
-          toast.success(data.message || 'Library maintenance complete.');
-          setTimeout(() => init(), 500);
-        } else if (data.kind === 'library_maintenance' && data.status === 'error') {
-          toast.error(data.message || 'Library maintenance failed.');
+          setTimeout(() => init(), 250);
+        } else if (data.kind === 'library_maintenance' &&
+                   (data.status === 'done' || data.status === 'error')) {
+          // The bottom task panel is the single status surface for this
+          // background task. Refresh the library after it settles.
           setTimeout(() => init(), 500);
         }
       }
@@ -7536,46 +7935,15 @@ pollComfyUI();
 setInterval(pollComfyUI, 15000);
 
 // ═══════════════════════════════════════════════════════════════════════
-// GENERATION PROGRESS TOAST
+// GENERATION PROGRESS PANEL HOOK
 // ═══════════════════════════════════════════════════════════════════════
 function showGenProgress(taskId, message, progress, title) {
-  let toast = document.getElementById('gen-progress-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'gen-progress-toast';
-    toast.className = 'gen-progress-toast';
-    toast.innerHTML = `
-      <div class="toast-header">
-        <span class="toast-title" id="gen-progress-title">Generating Story…</span>
-        <button type="button" class="toast-close" data-action="dismiss-gen-toast" aria-label="Dismiss notification">&times;</button>
-      </div>
-      <div class="progress-bar-track"><div class="progress-bar-fill" id="gen-progress-fill"></div></div>
-      <div><span class="toast-message" id="gen-progress-msg"></span><span class="toast-percent" id="gen-progress-pct"></span></div>
-    `;
-    document.body.appendChild(toast);
-  }
-  const titleEl = document.getElementById('gen-progress-title');
-  if (title) {
-    titleEl.textContent = `Generating: ${title}`;
-  } else if (!titleEl.dataset.placeholder) {
-    // First time we see the toast and we don't have a title yet — keep
-    // the generic placeholder until the server sends the real name.
-    titleEl.textContent = 'Generating Story…';
-  }
-  document.getElementById('gen-progress-msg').textContent = message || '';
-  const pct = Math.round((progress || 0) * 100);
-  document.getElementById('gen-progress-pct').textContent = pct > 0 ? `${pct}%` : '';
-  // Use --pct CSS variable so the transform: scaleX() bar stays on the
-  // compositor (animating `width` triggers layout on the whole row).
-  document.getElementById('gen-progress-fill').style.setProperty('--pct', (progress || 0));
-
+  // Keep this compatibility hook for existing WebSocket callers, but route
+  // all generation progress through the persistent bottom task panel.
+  openProgressPanel();
+  updateProgressDisplay();
   if (progress >= 1.0 || (message && message.includes('complete'))) {
-    titleEl.textContent = `✓ ${title || 'Story'} complete!`;
-    // Keep the toast visible a bit longer (10s) so the user has time to
-    // notice the success state before it fades. The progress panel on
-    // the right remains as the persistent record of all tasks.
-    setTimeout(() => toast.remove(), 10000);
-    // Refresh story list so the new story shows up immediately
+    // Refresh story list so the new story shows up immediately.
     setTimeout(() => init(), 1000);
   }
 }

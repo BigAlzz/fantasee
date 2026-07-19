@@ -1,0 +1,501 @@
+{
+  "valid": false,
+  "score": 0.0,
+  "scene_count": 8,
+  "shot_types": [],
+  "issues": [
+    {
+      "severity": "blocking",
+      "code": "missing_field",
+      "scene": "scene_01",
+      "message": "Every scene needs a title, visual prompt, narrative, and narration."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_01",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character Universe is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character Premise is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character World rules is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character Factions is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character Character sheets is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character Relationships is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character Nara is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character Universe arcs is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_01",
+      "message": "Character Beats is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "first_person",
+      "scene": "scene_02",
+      "message": "Narration violates the canonical style rule: first person."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_02",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_02",
+      "message": "Character Universe is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_02",
+      "message": "Character Premise is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_02",
+      "message": "Character World rules is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_02",
+      "message": "Character Factions is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_02",
+      "message": "Character Character sheets is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_02",
+      "message": "Character Relationships is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_02",
+      "message": "Character Universe arcs is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_02",
+      "message": "Character Beats is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_03",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_03",
+      "message": "Character Universe is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_03",
+      "message": "Character Premise is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_03",
+      "message": "Character World rules is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_03",
+      "message": "Character Factions is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_03",
+      "message": "Character Character sheets is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_03",
+      "message": "Character Relationships is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_03",
+      "message": "Character Universe arcs is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_03",
+      "message": "Character Beats is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_04",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_04",
+      "message": "Character Universe is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_04",
+      "message": "Character Premise is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_04",
+      "message": "Character World rules is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_04",
+      "message": "Character Factions is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_04",
+      "message": "Character Character sheets is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_04",
+      "message": "Character Relationships is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_04",
+      "message": "Character Universe arcs is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_04",
+      "message": "Character Beats is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "blocking",
+      "code": "missing_field",
+      "scene": "scene_05",
+      "message": "Every scene needs a title, visual prompt, narrative, and narration."
+    },
+    {
+      "severity": "warning",
+      "code": "narration_long",
+      "scene": "scene_05",
+      "message": "Narration has 605 words; target is at most 220."
+    },
+    {
+      "severity": "warning",
+      "code": "first_person",
+      "scene": "scene_05",
+      "message": "Narration violates the canonical style rule: first person."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_05",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_05",
+      "message": "Character Universe is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_05",
+      "message": "Character Premise is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_05",
+      "message": "Character World rules is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_05",
+      "message": "Character Factions is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_05",
+      "message": "Character Character sheets is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_05",
+      "message": "Character Relationships is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_05",
+      "message": "Character Nara is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_05",
+      "message": "Character Universe arcs is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_05",
+      "message": "Character Beats is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_06",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_06",
+      "message": "Character Universe is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_06",
+      "message": "Character Premise is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_06",
+      "message": "Character World rules is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_06",
+      "message": "Character Factions is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_06",
+      "message": "Character Character sheets is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_06",
+      "message": "Character Relationships is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_06",
+      "message": "Character Universe arcs is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_06",
+      "message": "Character Beats is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "long_sentence",
+      "scene": "scene_07",
+      "message": "Keep narration sentences under 25 words except for deliberate reflective breaths."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_07",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_07",
+      "message": "Character Universe is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_07",
+      "message": "Character Premise is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_07",
+      "message": "Character World rules is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_07",
+      "message": "Character Factions is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_07",
+      "message": "Character Character sheets is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_07",
+      "message": "Character Relationships is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_07",
+      "message": "Character Universe arcs is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_07",
+      "message": "Character Beats is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "blocking",
+      "code": "missing_field",
+      "scene": "scene_08",
+      "message": "Every scene needs a title, visual prompt, narrative, and narration."
+    },
+    {
+      "severity": "warning",
+      "code": "shot_type_missing",
+      "scene": "scene_08",
+      "message": "Visual prompt should begin with an explicit cinematography shot type."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character Universe is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character Premise is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character World rules is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character Factions is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character Character sheets is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character Relationships is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character Nara is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character Universe arcs is not named in the visual prompt or narrative."
+    },
+    {
+      "severity": "warning",
+      "code": "character_continuity",
+      "scene": "scene_08",
+      "message": "Character Beats is not named in the visual prompt or narrative."
+    }
+  ],
+  "blocking_issues": 3
+}

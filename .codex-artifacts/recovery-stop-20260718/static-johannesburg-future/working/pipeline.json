@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "story_id": "static-johannesburg-future",
+  "status": "running",
+  "current_stage": "images",
+  "started_at": "2026-07-18T13:42:49.048574+00:00",
+  "updated_at": "2026-07-18T13:44:15.753088+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T13:42:53.213852+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-18T13:44:15.742730+00:00",
+      "message": "Scene outline passed structural quality review",
+      "details": {
+        "score": 0.75,
+        "issues": 2
+      }
+    },
+    "images": {
+      "status": "running",
+      "attempts": 1,
+      "updated_at": "2026-07-18T13:44:15.753073+00:00",
+      "message": "Generating scene images"
+    },
+    "audio": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

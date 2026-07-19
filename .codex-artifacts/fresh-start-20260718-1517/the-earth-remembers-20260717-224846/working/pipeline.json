@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "story_id": "the-earth-remembers",
+  "status": "running",
+  "current_stage": "render",
+  "started_at": "2026-07-17T20:43:23.584884+00:00",
+  "updated_at": "2026-07-17T20:48:46.874986+00:00",
+  "stages": {
+    "story": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T20:43:33.222680+00:00",
+      "message": "Title and story metadata created"
+    },
+    "outline": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T20:47:26.362653+00:00",
+      "message": "Scene outline passed structural quality review",
+      "details": {
+        "score": 0.55,
+        "issues": 9
+      }
+    },
+    "images": {
+      "status": "complete",
+      "attempts": 1,
+      "updated_at": "2026-07-17T20:47:26.383829+00:00",
+      "message": "Generating scene images"
+    },
+    "audio": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "subtitles": {
+      "status": "complete",
+      "attempts": 0
+    },
+    "render": {
+      "status": "pending",
+      "attempts": 0
+    },
+    "plex": {
+      "status": "pending",
+      "attempts": 0
+    }
+  }
+}

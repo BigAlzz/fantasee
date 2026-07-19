@@ -166,32 +166,32 @@ def _pick_palette(tone: str, style: str) -> tuple[tuple[int, int, int], tuple[in
 
 
 def _draw_gradient(img: Image.Image, top: tuple[int, int, int], mid: tuple[int, int, int], bottom: tuple[int, int, int]) -> None:
-    """Diagonal 3-stop gradient using numpy for performance."""
-    import numpy as np
+    """Draw the diagonal three-stop gradient using Pillow only.
+
+    Title images are a core fallback and must not require an optional numerical
+    package.  Building one byte buffer keeps the implementation dependency-free
+    while preserving the diagonal treatment used by the renderer.
+    """
     w, h = img.size
-    
-    # Create coordinate grids
-    x = np.linspace(0, 1, w)
-    y = np.linspace(0, 1, h)
-    xx, yy = np.meshgrid(x, y)
-    
-    # Diagonal t-value in [0, 1]
-    t = (xx + yy) / 2.0
-    
-    # Create output array
-    arr = np.zeros((h, w, 3), dtype=np.uint8)
-    
-    # top → mid region (t < 0.5)
-    mask1 = t < 0.5
-    a1 = t * 2.0
-    for c in range(3):
-        arr[:, :, c] = np.where(
-            mask1,
-            top[c] * (1 - a1) + mid[c] * a1,
-            mid[c] * (1 - (t - 0.5) * 2.0) + bottom[c] * (t - 0.5) * 2.0
-        ).astype(np.uint8)
-    
-    img.paste(Image.fromarray(arr))
+    pixels = bytearray(w * h * 3)
+    offset = 0
+    x_denominator = max(1, w - 1)
+    y_denominator = max(1, h - 1)
+
+    for y in range(h):
+        y_ratio = y / y_denominator
+        for x in range(w):
+            t = (x / x_denominator + y_ratio) / 2.0
+            if t < 0.5:
+                start, end, amount = top, mid, t * 2.0
+            else:
+                start, end, amount = mid, bottom, (t - 0.5) * 2.0
+            pixels[offset] = int(start[0] * (1 - amount) + end[0] * amount)
+            pixels[offset + 1] = int(start[1] * (1 - amount) + end[1] * amount)
+            pixels[offset + 2] = int(start[2] * (1 - amount) + end[2] * amount)
+            offset += 3
+
+    img.paste(Image.frombytes("RGB", (w, h), bytes(pixels)))
 
 
 def _draw_radial_glow(img: Image.Image, color: tuple[int, int, int], radius_factor: float = 0.6, alpha: float = 0.18) -> None:

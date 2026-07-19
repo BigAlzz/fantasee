@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse
 
 import fantasee_server.state as _state
 from fantasee_server.discovery import _story_scene_art_urls
-from fantasee_server.paths import generated_path
+from fantasee_server.paths import generated_path, load_stories
 from fantasee_server.state import _story_sort_ts
 
 
@@ -28,6 +28,10 @@ router = APIRouter(tags=["stories (legacy)"])
 @router.get("/api/stories")
 def list_stories():
     """Return summary of all stories (without full scene data)."""
+    # The browse page also calls this legacy endpoint. Refresh from disk so
+    # an archive, restore, or external story-folder change is visible without
+    # serving stale entries from the process-start cache.
+    _state._stories_cache = load_stories()
     summaries = []
     for s in _state._stories_cache or []:
         scene_art_urls = s.get("scene_art_urls") or _story_scene_art_urls(s)

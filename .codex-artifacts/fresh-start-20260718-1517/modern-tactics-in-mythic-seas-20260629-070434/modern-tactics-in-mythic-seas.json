@@ -1,0 +1,24 @@
+{
+  "id": "modern-tactics-in-mythic-seas",
+  "title": "Modern Tactics in Mythic Seas",
+  "subtitle": "A naval warfare strategist from the US Pacific Fleet is tran",
+  "description": "A naval warfare strategist from the US Pacific Fleet is transported to a world of island nations locked in perpetual maritime war. With knowledge of modern naval tactics, ship construction, and ocean",
+  "tags": [
+    "manhwa",
+    "manhwa",
+    "generated"
+  ],
+  "tone": "manhwa",
+  "voice_preset": "Dean",
+  "generated": true,
+  "status": "regenerating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "chapters": [],
+  "storage_root": "stories",
+  "scenes": []
+}

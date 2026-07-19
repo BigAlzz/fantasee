@@ -1,0 +1,227 @@
+- main [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - text: FantaSee
+      - generic [ref=e6]: Studio
+    - navigation [ref=e7]:
+      - button "Library" [ref=e8] [cursor=pointer]
+      - button "Productions" [ref=e12] [cursor=pointer]
+      - button "Assets" [ref=e19] [cursor=pointer]
+      - button "Workers" [ref=e24] [cursor=pointer]
+      - button "Settings" [ref=e38] [cursor=pointer]
+    - region "System activity" [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]: L
+        - generic [ref=e46]: R
+      - generic [ref=e50]: VU
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - text: System
+        - emphasis [ref=e54]: online
+      - generic [ref=e55]:
+        - button "previous" [ref=e56] [cursor=pointer]: ◀◀
+        - button "play" [ref=e57] [cursor=pointer]
+        - button "stop" [ref=e60] [cursor=pointer]
+        - button "record" [ref=e63] [cursor=pointer]: ●
+  - generic [ref=e64]:
+    - generic [ref=e65]:
+      - textbox [ref=e70]:
+        - /placeholder: Search stories...
+      - generic [ref=e71]:
+        - button "Refresh" [ref=e72] [cursor=pointer]
+        - button "Create story" [ref=e78] [cursor=pointer]
+        - button "Studio controls" [ref=e80] [cursor=pointer]
+    - generic [ref=e82]: Production ledger is live. • 1 active worker
+    - generic [ref=e84]:
+      - generic [ref=e85]:
+        - generic [ref=e86]:
+          - generic [ref=e87]: Featured story
+          - generic [ref=e88]: Newest first
+        - article [ref=e152]:
+          - generic [ref=e157]:
+            - heading "The Last Beacon of Hope" [level=1] [ref=e158]
+            - paragraph [ref=e159]: In a world shattered by magical cataclysm, a lone survivor clings to a flickering pre-collapse AI—the last repository of forgotten code. Against the gnawing dread of monstrous things in the ruin-dark,...
+            - generic [ref=e160]: 10 scenes updated Jul 17, 2026
+            - button "Open in editor" [active] [ref=e162] [cursor=pointer]
+        - generic [ref=e95]:
+          - heading "Story library" [level=2] [ref=e96]
+          - generic [ref=e97]: 6 titles
+        - generic [ref=e98]:
+          - button "+ The Last Beacon of Hope 10 scenes Jul 17, 2026" [ref=e165] [cursor=pointer]:
+            - generic [ref=e166]: +
+            - strong [ref=e172]: The Last Beacon of Hope
+            - generic [ref=e173]: 10 scenes
+            - generic [ref=e174]: Jul 17, 2026
+          - button "o Silicon Sage vs. Wizards' Monopoly 10 scenes Jul 17, 2026" [ref=e177] [cursor=pointer]:
+            - generic [ref=e178]: o
+            - strong [ref=e184]: Silicon Sage vs. Wizards' Monopoly
+            - generic [ref=e185]: 10 scenes
+            - generic [ref=e186]: Jul 17, 2026
+          - 'button "o Fey-Fi: Arcane Code 10 scenes Jul 17, 2026" [ref=e189] [cursor=pointer]':
+            - generic [ref=e190]: o
+            - strong [ref=e196]: "Fey-Fi: Arcane Code"
+            - generic [ref=e197]: 10 scenes
+            - generic [ref=e198]: Jul 17, 2026
+          - 'button "o Rift War: Primal vs. Future 10 scenes Jul 17, 2026" [ref=e201] [cursor=pointer]':
+            - generic [ref=e202]: o
+            - strong [ref=e208]: "Rift War: Primal vs. Future"
+            - generic [ref=e209]: 10 scenes
+            - generic [ref=e210]: Jul 17, 2026
+          - button "o Magic's Exiles in the Machine Age 10 scenes Jul 17, 2026" [ref=e213] [cursor=pointer]:
+            - generic [ref=e214]: o
+            - strong [ref=e220]: Magic's Exiles in the Machine Age
+            - generic [ref=e221]: 10 scenes
+            - generic [ref=e222]: Jul 17, 2026
+          - button "o Ancient Rift, Modern War 10 scenes Jul 17, 2026" [ref=e225] [cursor=pointer]:
+            - generic [ref=e226]: o
+            - strong [ref=e232]: Ancient Rift, Modern War
+            - generic [ref=e233]: 10 scenes
+            - generic [ref=e234]: Jul 17, 2026
+      - complementary [ref=e99]:
+        - generic [ref=e100]:
+          - generic [ref=e101]: Production run
+          - generic [ref=e102]: Error
+        - generic [ref=e237]:
+          - text: library-f4eb3b
+          - heading "The Last Beacon of Hope" [level=2] [ref=e239]
+          - paragraph [ref=e240]: "queued: Library maintenance complete: 0 complete, 3 failed"
+          - generic [ref=e243]: 100% complete
+        - generic [ref=e244]:
+          - heading "Completion evidence" [level=3] [ref=e245]
+          - generic [ref=e246]:
+            - generic [ref=e251]: Images
+            - generic [ref=e252]: pending · 0/10 scenes
+          - generic [ref=e254]:
+            - generic [ref=e259]: Narration
+            - generic [ref=e260]: verified · 10/10 tracks
+          - generic [ref=e262]:
+            - generic [ref=e266]: Subtitles
+            - generic [ref=e267]: verified · 10/10 timed
+          - generic [ref=e269]:
+            - generic [ref=e273]: Timeline
+            - generic [ref=e274]: pending · final pass pending
+          - generic [ref=e276]:
+            - generic [ref=e282]: MP4
+            - generic [ref=e283]: pending · master pending
+          - generic [ref=e285]:
+            - generic [ref=e288]: Plex
+            - generic [ref=e289]: pending · export pending
+        - generic [ref=e291]:
+          - heading "Run controls" [level=3] [ref=e292]
+          - button "Pause / cancel" [ref=e293] [cursor=pointer]
+          - button "Retry" [ref=e297] [cursor=pointer]
+        - generic [ref=e303]:
+          - heading "Job ledger" [level=3] [ref=e304]
+          - generic [ref=e305]:
+            - generic [ref=e306]:
+              - strong [ref=e308]: Library.complete
+              - generic [ref=e309]: Queued · attempt 1
+            - generic [ref=e310]:
+              - button "Retry this job" [ref=e311] [cursor=pointer]
+              - button "Cancel this job" [ref=e317] [cursor=pointer]
+          - generic [ref=e321]:
+            - generic [ref=e322]:
+              - strong [ref=e324]: Library.complete
+              - generic [ref=e325]: Queued · attempt 1
+            - generic [ref=e326]:
+              - button "Retry this job" [ref=e327] [cursor=pointer]
+              - button "Cancel this job" [ref=e333] [cursor=pointer]
+          - generic [ref=e337]:
+            - generic [ref=e338]:
+              - strong [ref=e340]: Library.complete
+              - generic [ref=e341]: Queued · attempt 1
+            - generic [ref=e342]:
+              - button "Retry this job" [ref=e343] [cursor=pointer]
+              - button "Cancel this job" [ref=e349] [cursor=pointer]
+    - article [ref=e353]:
+      - generic [ref=e354]:
+        - heading "GPU worker" [level=2] [ref=e356]
+        - generic [ref=e357]: signal live
+      - generic [ref=e358]:
+        - generic [ref=e359]: Task
+        - strong [ref=e360]: Standing by for a durable job
+        - generic [ref=e361]: Queue depth 3
+      - generic [ref=e362]:
+        - generic [ref=e363]: Progress
+        - generic [ref=e366]: 0%
+      - button "Start an additional worker" [ref=e391] [cursor=pointer]
+    - generic [ref=e394]:
+      - generic [ref=e395]:
+        - generic [ref=e396]:
+          - text: Story editor
+          - heading "The Last Beacon of Hope" [level=1] [ref=e397]
+          - generic [ref=e398]: Scene 01 of 10
+        - button "Close editor" [ref=e399] [cursor=pointer]
+      - generic [ref=e403]:
+        - complementary [ref=e404]:
+          - heading "Scenes" [level=3] [ref=e405]
+          - button "01 Ash and Silence 7 images" [ref=e406] [cursor=pointer]:
+            - generic [ref=e407]: "01"
+            - strong [ref=e408]: Ash and Silence
+            - generic [ref=e409]: 7 images
+          - button "02 The Broken Gate 7 images" [ref=e410] [cursor=pointer]:
+            - generic [ref=e411]: "02"
+            - strong [ref=e412]: The Broken Gate
+            - generic [ref=e413]: 7 images
+          - button "03 The Village Chief 7 images" [ref=e414] [cursor=pointer]:
+            - generic [ref=e415]: "03"
+            - strong [ref=e416]: The Village Chief
+            - generic [ref=e417]: 7 images
+          - button "04 Old Code, New Fire 7 images" [ref=e418] [cursor=pointer]:
+            - generic [ref=e419]: "04"
+            - strong [ref=e420]: Old Code, New Fire
+            - generic [ref=e421]: 7 images
+          - button "05 What the Device Remembers 7 images" [ref=e422] [cursor=pointer]:
+            - generic [ref=e423]: "05"
+            - strong [ref=e424]: What the Device Remembers
+            - generic [ref=e425]: 7 images
+          - button "06 Forty-Three Against the Dark 7 images" [ref=e426] [cursor=pointer]:
+            - generic [ref=e427]: "06"
+            - strong [ref=e428]: Forty-Three Against the Dark
+            - generic [ref=e429]: 7 images
+          - button "07 Wiring the Bones 7 images" [ref=e430] [cursor=pointer]:
+            - generic [ref=e431]: "07"
+            - strong [ref=e432]: Wiring the Bones
+            - generic [ref=e433]: 7 images
+          - button "08 They Come 7 images" [ref=e434] [cursor=pointer]:
+            - generic [ref=e435]: "08"
+            - strong [ref=e436]: They Come
+            - generic [ref=e437]: 7 images
+          - button "09 The Price of Light 7 images" [ref=e438] [cursor=pointer]:
+            - generic [ref=e439]: "09"
+            - strong [ref=e440]: The Price of Light
+            - generic [ref=e441]: 7 images
+          - button "10 What Remains 7 images" [ref=e442] [cursor=pointer]:
+            - generic [ref=e443]: "10"
+            - strong [ref=e444]: What Remains
+            - generic [ref=e445]: 7 images
+        - main [ref=e446]:
+          - generic [ref=e447]: Ash and Silence
+          - generic [ref=e448]:
+            - img "Current scene artwork" [ref=e449]
+            - generic [ref=e450]: Primary visual beat
+          - generic [ref=e451]:
+            - generic [ref=e452]:
+              - heading "Narration" [level=3] [ref=e453]
+              - paragraph [ref=e454]: The Ashfield stretches in every direction. Gray dust, gray sky, gray silence. Mira has not spoken aloud in six days. The device on her forearm vibrates — a low, persistent hum against cracked skin. She does not stop. She does not look back. The last settlement burned because she arrived too late. The bodies still smelled of char when she buried them. Three weeks of walking since. Her boots are worn through. The device hums louder. There is something ahead. Something beneath the ash. She follows the signal because there is nothing else to follow.
+            - generic [ref=e455]:
+              - heading "Visual direction" [level=3] [ref=e456]
+              - paragraph [ref=e457]: Extreme wide shot, a vast gray wasteland of petrified trees and cracked earth stretching under a bruised purple sky, a lone figure in dark traveling clothes walking along a broken road, Mira with dark hair pulled back and a cracked device glowing faintly on her forearm, distant ruins on the horizon, muted desaturated color palette, cold directional lighting from a dim sun, cinematic dark fantasy atmosphere.
+          - generic [ref=e458]:
+            - button "Regenerate scene" [ref=e459] [cursor=pointer]
+            - button "Add visual beat" [ref=e465] [cursor=pointer]
+        - complementary [ref=e467]:
+          - heading "Shot plan" [level=3] [ref=e468]
+          - generic [ref=e469]:
+            - strong [ref=e471]: Primary beat
+            - generic [ref=e472]: Scene plan will be stored here as semantic shots in the next migration slice.
+          - heading "Continuity" [level=3] [ref=e473]
+          - paragraph [ref=e474]: Changes stay contained to this scene. The release is marked stale until its media evidence is rebuilt.
+          - heading "Evidence" [level=3] [ref=e475]
+          - generic [ref=e476]:
+            - generic [ref=e477]:
+              - term [ref=e478]: Images
+              - definition [ref=e479]: "7"
+            - generic [ref=e480]:
+              - term [ref=e481]: Duration
+              - definition [ref=e482]: 32.9s

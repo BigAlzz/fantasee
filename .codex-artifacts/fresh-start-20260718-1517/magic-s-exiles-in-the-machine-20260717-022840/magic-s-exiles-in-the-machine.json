@@ -1,0 +1,30 @@
+{
+  "id": "magic-s-exiles-in-the-machine",
+  "title": "Magic's Exiles in the Machine Age",
+  "subtitle": "Magic Against the Machine\n\nA tribe of Neanderthals, exiled t",
+  "description": "Magic Against the Machine\n\nA tribe of Neanderthals, exiled to a magical dimension millennia ago, must navigate a technology-ravaged Earth to find a new home, while humans see them as a threat to be er",
+  "tags": [
+    "dark fantasy",
+    "epic",
+    "generated"
+  ],
+  "tone": "epic",
+  "voice_preset": "Milo",
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-cinematic-atmosphere-score-1-no-melody-99288.mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 183.823656,
+  "background_track_tags": [
+    "cinematic",
+    "atmosphere",
+    "no-melody"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

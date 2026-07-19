@@ -384,6 +384,25 @@ def write_combined_subtitles(
     return srt_path, vtt_path
 
 
+def write_timeline_subtitles(
+    timeline_path: Path, slug: str, out_dir: Path
+) -> tuple[Optional[Path], Optional[Path]]:
+    """Write sidecars from the canonical absolute-time timeline."""
+    try:
+        timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+        segments = timeline.get("segments") or []
+    except (OSError, json.JSONDecodeError):
+        return None, None
+    if not segments:
+        return None, None
+    out_dir.mkdir(parents=True, exist_ok=True)
+    srt_path = out_dir / f"{slug}.en.srt"
+    vtt_path = out_dir / f"{slug}.en.vtt"
+    srt_path.write_text(segments_to_srt(segments), encoding="utf-8")
+    vtt_path.write_text(segments_to_vtt(segments), encoding="utf-8")
+    return srt_path, vtt_path
+
+
 # ── Chapter assembly ───────────────────────────────────────────────────
 
 
@@ -454,8 +473,10 @@ def mix_audio_into_video(
         raise ValueError(f"Could not determine narration duration: {narration_path}")
 
     inputs: list[str] = ["-y", "-i", str(video_path), "-i", str(narration_path)]
-    filter_complex_parts: list[str] = []
-    map_args: list[str] = ["-map", "0:v:0", "-map", "1:a:0"]
+    filter_complex_parts: list[str] = [
+        "[1:a]dynaudnorm=f=150:g=15[narration]"
+    ]
+    map_args: list[str] = ["-map", "0:v:0", "-map", "[narration]"]
 
     if background_path and background_path.exists() and not background_muted and background_volume > 0:
         # Loop background infinitely so the amix can take what it needs and
@@ -470,7 +491,7 @@ def mix_audio_into_video(
         # background weight 1 too — we already scaled its volume above so
         # the mix produces the right final loudness.
         filter_complex_parts.append(
-            "[1:a][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]"
+            "[narration][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]"
         )
         map_args = ["-map", "0:v:0", "-map", "[aout]"]
 
@@ -623,9 +644,24 @@ def _copy_to_plex_destination(
         suffix = poster_path.suffix.lower()
         candidates.append((poster_path, f"{file_stem}-poster{suffix}"))
 
+    visuals = plex_dir / "visuals"
+    if visuals.is_dir():
+        for visual in sorted(visuals.iterdir()):
+            if visual.is_file():
+                candidates.append((visual, f"visuals/{visual.name}"))
+
+    # Remove poster variants from an earlier export so a legacy title card
+    # cannot remain alongside the new scene-art poster in the Plex folder.
+    for stale_poster in target_dir.glob(f"{file_stem}-poster.*"):
+        try:
+            stale_poster.unlink()
+        except OSError:
+            pass
+
     copied: list[str] = []
     for src, dst_name in candidates:
         dst = target_dir / dst_name
+        dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
         copied.append(dst_name)
 
@@ -647,6 +683,7 @@ class PlexExportResult:
     srt: Optional[Path] = None
     vtt: Optional[Path] = None
     poster: Optional[Path] = None
+    visuals_dir: Optional[Path] = None
     chapters_file: Optional[Path] = None
     background_used: Optional[str] = None
     background_volume: float = DEFAULT_BACKGROUND_VOLUME
@@ -667,6 +704,7 @@ class PlexExportResult:
             "srt": str(self.srt).replace("\\", "/") if self.srt else None,
             "vtt": str(self.vtt).replace("\\", "/") if self.vtt else None,
             "poster": str(self.poster).replace("\\", "/") if self.poster else None,
+            "visuals_dir": str(self.visuals_dir).replace("\\", "/") if self.visuals_dir else None,
             "chapters_file": str(self.chapters_file).replace("\\", "/") if self.chapters_file else None,
             "background_used": self.background_used,
             "background_volume": self.background_volume,
@@ -767,7 +805,13 @@ def export_plex_package(
 
     # ── 2. Write combined SRT + VTT sidecars ────────────────────────
     _progress("subtitles", "Writing SRT and VTT sidecars...", 0.20)
-    srt_path, vtt_path = write_combined_subtitles(discovered, slug, result.plex_dir)
+    canonical_timeline = story_dir / "working" / "timeline.json"
+    if canonical_timeline.is_file():
+        srt_path, vtt_path = write_timeline_subtitles(
+            canonical_timeline, slug, result.plex_dir
+        )
+    else:
+        srt_path, vtt_path = write_combined_subtitles(discovered, slug, result.plex_dir)
     if srt_path:
         result.srt = srt_path
         result.vtt = vtt_path
@@ -776,7 +820,7 @@ def export_plex_package(
 
     # ── 3. Build chapter metadata ──────────────────────────────────
     _progress("chapters", "Generating chapter metadata...", 0.35)
-    chapters = build_chapters(discovered)
+    chapters = build_chapters(discovered, gap_between_scenes=0 if canonical_timeline.is_file() else 0.5)
     if not chapters:
         raise RuntimeError("No chapters produced (every scene is empty or missing audio).")
     chapters_file = result.plex_dir / "chapters.ffmeta"
@@ -838,8 +882,9 @@ def export_plex_package(
 
     # ── 7. Copy poster image next to the video ─────────────────────
     _progress("finalize", "Copying poster image...", 0.90)
-    poster = _copy_poster(story_dir, slug, result.plex_dir)
+    poster = _copy_poster(story_dir, slug, result.plex_dir, manifest)
     result.poster = poster
+    result.visuals_dir = _copy_timeline_visuals(story_dir, result.plex_dir)
 
     # ── 8. Clean up working files ──────────────────────────────────
     for tmp_name in ("_concat.mp4", "_narration.wav"):
@@ -972,16 +1017,18 @@ def _mix_and_chapter(
 ) -> None:
     """Run the final FFmpeg pass: mix audio, embed chapters, faststart."""
     inputs: list[str] = ["-y", "-i", str(video_path), "-i", str(narration_path)]
-    filter_parts: list[str] = []
+    filter_parts: list[str] = [
+        "[1:a]dynaudnorm=f=150:g=15[narration]"
+    ]
 
     if background_path and background_path.exists() and not background_muted and background_volume > 0:
         vol = max(0.0, min(1.0, float(background_volume)))
         inputs.extend(["-stream_loop", "-1", "-i", str(background_path)])
         filter_parts.append(f"[2:a]volume={vol:.4f},aresample=44100[bg]")
-        filter_parts.append("[1:a][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]")
+        filter_parts.append("[narration][bg]amix=inputs=2:duration=first:dropout_transition=0[aout]")
         audio_map = ["-map", "0:v:0", "-map", "[aout]"]
     else:
-        audio_map = ["-map", "0:v:0", "-map", "1:a:0"]
+        audio_map = ["-map", "0:v:0", "-map", "[narration]"]
 
     narration_dur = _read_audio_duration(narration_path)
     # Chapters file input index: 2 when no background, 3 when background is present
@@ -1008,33 +1055,60 @@ def _mix_and_chapter(
         raise RuntimeError(f"Final mux failed: {(result.stderr or '')[-600:]}")
 
 
-def _copy_poster(story_dir: Path, slug: str, plex_dir: Path) -> Optional[Path]:
-    """Copy a poster/title image next to the final MP4.
+def _copy_poster(story_dir: Path, slug: str, plex_dir: Path, manifest: Optional[dict] = None) -> Optional[Path]:
+    """Copy the first approved story artwork next to the final MP4.
 
-    Prefers the image-backed title PNG, falls back to the legacy SVG, then
-    to the first scene image.
+    Title slides are metadata and must never become the Plex poster. Prefer
+    the manifest's first scene artwork, then the conventional scene filename.
     """
-    candidates = [
-        story_dir / "assets" / "title" / "title_slide.png",
-        story_dir / "assets" / "title" / "title_slide.svg",
-        story_dir / f"{slug}.json",  # used below for hero_image / first scene fallback
-    ]
-    poster: Optional[Path] = None
-    for c in candidates[:2]:
-        if c.exists():
-            poster = c
+    candidates: list[Path] = []
+    for scene in (manifest or {}).get("scenes", []) or []:
+        for filename in scene.get("image_filenames", []) or []:
+            if filename:
+                candidates.append(story_dir / str(filename).lstrip("/\\"))
+                break
+        if candidates:
             break
-    if not poster:
-        # Last-resort: first scene image
-        for c in sorted(story_dir.glob(f"{slug}_s*_00001_.png")):
-            poster = c
-            break
+    candidates.extend(sorted(story_dir.glob(f"{slug}_s*_00001_.png")))
+    poster = next((candidate for candidate in candidates if candidate.is_file()), None)
     if not poster:
         return None
     suffix = poster.suffix.lower()
     target = plex_dir / f"{slug}-poster{suffix}"
+    for stale_poster in plex_dir.glob(f"{slug}-poster.*"):
+        if stale_poster != target:
+            try:
+                stale_poster.unlink()
+            except OSError:
+                pass
     shutil.copy2(poster, target)
     return target
+
+
+def _copy_timeline_visuals(story_dir: Path, plex_dir: Path) -> Optional[Path]:
+    """Copy approved shot artwork into the export for inspection and reuse."""
+    timeline_path = story_dir / "working" / "timeline.json"
+    try:
+        timeline = json.loads(timeline_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return None
+    segments = timeline.get("shot_segments") or []
+    if not segments:
+        return None
+    visuals = plex_dir / "visuals"
+    visuals.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for segment in segments:
+        source = Path(str(segment.get("asset_path") or ""))
+        if not source.is_absolute():
+            source = story_dir / source
+        if not source.is_file():
+            continue
+        shot_id = _sanitize_for_plex(str(segment.get("shot_id") or f"shot-{copied + 1}"), "shot")
+        target = visuals / f"{shot_id}{source.suffix.lower()}"
+        shutil.copy2(source, target)
+        copied += 1
+    return visuals if copied else None
 
 
 # ── CLI ────────────────────────────────────────────────────────────────

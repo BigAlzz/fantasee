@@ -20,6 +20,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -47,12 +48,18 @@ from fantasee_server.state import (
 
 router = APIRouter(tags=["generated-stories"])
 
+STUDIO_DIR = Path(__file__).resolve().parents[2] / "studio" / "dist"
+
 
 # ── Generated-asset serving ───────────────────────────────────────
 
 @router.get("/")
 def serve_index():
     """Serve the bundled frontend SPA at the root URL."""
+    if os.environ.get("FANTASEE_STUDIO_DEFAULT", "0").strip().lower() in {"1", "true", "yes", "on"}:
+        studio_index = STUDIO_DIR / "index.html"
+        if studio_index.is_file():
+            return FileResponse(str(studio_index))
     return FileResponse(str(STATIC_DIR / "index.html"))
 
 
@@ -119,6 +126,30 @@ def serve_generated_vtt(filename: str):
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="VTT not found")
     return FileResponse(str(filepath), media_type="text/vtt")
+
+
+@router.get("/api/stories/{story_id}/scenes/{scene_idx}/subtitles")
+def get_scene_subtitles(story_id: str, scene_idx: int):
+    """Return the Whisper cues tied to the scene's current audio file."""
+    story_dir = generated_story_dir(story_id)
+    manifest_path = story_dir / f"{story_id}.json"
+    if not manifest_path.is_file():
+        raise HTTPException(status_code=404, detail="Story not found")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        scene = (manifest.get("scenes") or [])[scene_idx]
+    except (OSError, json.JSONDecodeError, IndexError, TypeError):
+        raise HTTPException(status_code=404, detail="Scene not found")
+    subtitle_name = scene.get("subtitle_file") or f"subs_{story_id}_s{scene_idx + 1:02d}.json"
+    subtitle_path = path_under(story_dir, subtitle_name)
+    if not subtitle_path.is_file():
+        raise HTTPException(status_code=404, detail="Subtitles not found")
+    try:
+        payload = json.loads(subtitle_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=422, detail="Subtitles are unreadable") from exc
+    segments = payload if isinstance(payload, list) else payload.get("segments", [])
+    return {"audio_filename": scene.get("audio_filename") or "", "subtitle_file": subtitle_name, "segments": segments}
 
 
 # ── Generated story list / detail ─────────────────────────────────

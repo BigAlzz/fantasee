@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,17 +34,25 @@ from fantasee_server.api import (
     generation,
     improvement,
     library_routes,
+    migration,
     plex,
+    production,
     settings,
+    shots,
     stories,
+    system,
     tts,
+    world,
     ws,
 )
-from fantasee_server.library import _library_agent_loop
+from fantasee_server.library import _library_agent_loop, recover_library_jobs
 from fantasee_server.paths import STATIC_DIR, load_stories
 from fantasee_server.security import require_operator
 from fantasee_server.startup import startup_ensure_workers
 from fantasee_server.state import _library_agent_task
+
+
+STUDIO_DIR = Path(__file__).parent / "studio" / "dist"
 
 
 @asynccontextmanager
@@ -56,6 +64,21 @@ async def lifespan(app: FastAPI):
     _state._stories_cache = load_stories()
     print(f"Loaded {len(_state._stories_cache)} stories with "
           f"{sum(len(s['scenes']) for s in _state._stories_cache)} total scenes")
+
+    # Worker selection is durable, but the image adapter also needs a fast
+    # process-local copy while it dispatches a request.
+    try:
+        from fantasee_server.production_runtime import production_database_path
+        from fantasee_server.production_store import ProductionStore
+        with ProductionStore(production_database_path()) as store:
+            os.environ["FANTASEE_RENDERING_MODE"] = store.rendering_mode()
+    except Exception as exc:
+        print(f"[startup] Rendering mode could not be restored: {exc}")
+
+    # Resume durable generation jobs after ComfyUI has had a chance to start.
+    asyncio.create_task(generation.recover_generation_jobs())
+    asyncio.create_task(recover_library_jobs())
+    asyncio.create_task(shots.recover_shot_jobs())
 
     # On startup, check whether a ComfyUI worker is already running. If
     # not (e.g. user just ran `start.bat server` with no ComfyUI), auto-spawn
@@ -124,19 +147,36 @@ app.include_router(stories.router)
 app.include_router(generated.router)
 app.include_router(generation.router, dependencies=[Depends(require_operator)])
 app.include_router(comfyui.router, dependencies=[Depends(require_operator)])
+app.include_router(system.router, dependencies=[Depends(require_operator)])
 app.include_router(tts.router, dependencies=[Depends(require_operator)])
 app.include_router(improvement.router, dependencies=[Depends(require_operator)])
 app.include_router(plex.router, dependencies=[Depends(require_operator)])
 app.include_router(delete.router, dependencies=[Depends(require_operator)])
 app.include_router(actions.router, dependencies=[Depends(require_operator)])
 app.include_router(library_routes.router, dependencies=[Depends(require_operator)])
+app.include_router(migration.router, dependencies=[Depends(require_operator)])
+app.include_router(production.router, dependencies=[Depends(require_operator)])
+app.include_router(shots.router, dependencies=[Depends(require_operator)])
 app.include_router(settings.router, dependencies=[Depends(require_operator)])
+app.include_router(world.router, dependencies=[Depends(require_operator)])
 app.include_router(ws.router)
 
 # Serve the bundled frontend (index.html, CSS, JS, etc.) at /static/.
 # The root URL (``/``) is served by generated.router.serve_index
 # so the SPA's index.html is returned even for the bare root.
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.get("/studio/{path:path}", include_in_schema=False)
+def serve_studio(path: str = ""):
+    """Serve the independently-built Studio client without replacing legacy UI."""
+    index = STUDIO_DIR / "index.html"
+    if not index.is_file():
+        raise HTTPException(status_code=404, detail="Studio is not built. Run npm run build in studio/.")
+    requested = (STUDIO_DIR / path).resolve()
+    if path and requested.is_file() and requested.is_relative_to(STUDIO_DIR.resolve()):
+        return FileResponse(str(requested))
+    return FileResponse(str(index))
 
 
 # ── Public re-exports ───────────────────────────────────────────
@@ -176,7 +216,6 @@ from fantasee_server.discovery import (  # noqa: E402
     _first_scene_art_url,
     _story_scene_art_urls,
     discover_generated_stories,
-    ensure_title_slide_for_manifest,
     generated_asset_url,
     iter_generated_story_dirs,
 )

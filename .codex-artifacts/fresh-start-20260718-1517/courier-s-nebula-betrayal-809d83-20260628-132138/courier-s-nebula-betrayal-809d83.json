@@ -1,0 +1,31 @@
+{
+  "id": "courier-s-nebula-betrayal-809d83",
+  "title": "Courier's Nebula Betrayal",
+  "subtitle": "A lone courier pilot delivers critical data through enemy sp",
+  "description": "A lone courier pilot delivers critical data through enemy space. Two couriers before him died. He discovers the route is compromised, a traitor in Fleet Command is feeding coordinates to the enemy. Ne",
+  "tags": [
+    "manhwa",
+    "tense military",
+    "generated"
+  ],
+  "tone": "tense military",
+  "voice_preset": "Dean",
+  "generated": true,
+  "status": "generating",
+  "hero_image": "assets/title/title_slide.png",
+  "title_image": "assets/title/title_slide.png",
+  "title_slide": "assets/title/title_slide.png",
+  "title_slide_svg": "assets/title/title_slide.svg",
+  "background_audio": "musictown-light-and-reflective-piano-orchestra-1-22211 (1).mp3",
+  "background_volume": 0.05,
+  "background_muted": false,
+  "background_track_duration": 189.022031,
+  "background_track_tags": [
+    "piano",
+    "orchestra",
+    "reflective",
+    "light"
+  ],
+  "storage_root": "stories",
+  "scenes": []
+}

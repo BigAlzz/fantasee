@@ -1,0 +1,62 @@
+- main [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - text: FantaSee
+      - generic [ref=e6]: Studio
+    - navigation [ref=e7]:
+      - button "Library" [ref=e8] [cursor=pointer]
+      - button "Productions" [ref=e12] [cursor=pointer]
+      - button "Assets" [ref=e19] [cursor=pointer]
+      - button "Workers" [ref=e24] [cursor=pointer]
+      - button "Settings" [ref=e38] [cursor=pointer]
+    - region "System activity" [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]: L
+        - generic [ref=e46]: R
+      - generic [ref=e50]: VU
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - text: System
+        - emphasis [ref=e54]: online
+      - generic [ref=e55]:
+        - button "previous" [ref=e56] [cursor=pointer]: ◀◀
+        - button "play" [ref=e57] [cursor=pointer]
+        - button "stop" [ref=e60] [cursor=pointer]
+        - button "record" [ref=e63] [cursor=pointer]: ●
+  - generic [ref=e64]:
+    - generic [ref=e65]:
+      - textbox [ref=e70]:
+        - /placeholder: Search stories...
+      - generic [ref=e71]:
+        - button "Refresh" [ref=e72] [cursor=pointer]
+        - button "Create story" [ref=e78] [cursor=pointer]
+        - button "Studio controls" [ref=e80] [cursor=pointer]
+    - generic [ref=e82]: Connecting to the production ledger... • 0 active workers
+    - generic [ref=e84]:
+      - generic [ref=e85]:
+        - generic [ref=e86]:
+          - generic [ref=e87]: Featured story
+          - generic [ref=e88]: Newest first
+        - generic [ref=e89]:
+          - heading "No stories yet" [level=1] [ref=e93]
+          - paragraph [ref=e94]: Create a story to establish the first production run.
+        - generic [ref=e95]:
+          - heading "Story library" [level=2] [ref=e96]
+          - generic [ref=e97]: 0 titles
+      - complementary [ref=e99]:
+        - generic [ref=e100]:
+          - generic [ref=e101]: Production run
+          - generic [ref=e102]: Idle
+        - paragraph [ref=e110]: No production run selected.
+    - article [ref=e112]:
+      - generic [ref=e113]:
+        - heading "Worker bay available" [level=2] [ref=e115]
+        - generic [ref=e116]: awaiting assignment
+      - generic [ref=e117]:
+        - generic [ref=e118]: Task
+        - strong [ref=e119]: No worker in this lane
+        - generic [ref=e120]: Queue depth 0
+      - generic [ref=e121]:
+        - generic [ref=e122]: Progress
+        - generic [ref=e125]: 0%
+      - button "Start GPU" [ref=e150] [cursor=pointer]

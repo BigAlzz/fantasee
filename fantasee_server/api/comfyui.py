@@ -26,6 +26,25 @@ from fastapi.responses import FileResponse
 router = APIRouter(tags=["comfyui"])
 
 
+@router.get("/api/background/tracks")
+def background_tracks():
+    """List selectable background tracks without exposing filesystem paths."""
+    try:
+        from background_music import build_track_index
+        return {
+            "tracks": [
+                {
+                    "filename": track.filename,
+                    "duration_seconds": track.duration_seconds,
+                    "tags": track.tags,
+                }
+                for track in build_track_index()
+            ]
+        }
+    except Exception as exc:
+        return {"tracks": [], "error": str(exc)}
+
+
 @router.get("/api/comfyui/status")
 def comfyui_status():
     """Check if ComfyUI is running and return system info."""
@@ -46,11 +65,12 @@ def serve_background_audio(filename: str):
     the generator from the Background/ folder.
     """
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-    from background_music import BACKGROUND_DIR
+    from background_music import configured_background_dir
     safe = Path(filename).name  # strip any path components the URL might carry
-    target = (BACKGROUND_DIR / safe).resolve()
+    background_dir = configured_background_dir().resolve()
+    target = (background_dir / safe).resolve()
     try:
-        target.relative_to(BACKGROUND_DIR.resolve())
+        target.relative_to(background_dir)
     except ValueError:
         raise HTTPException(status_code=404, detail="Background track not found")
     if not target.is_file():
